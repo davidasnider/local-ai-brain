@@ -34,12 +34,14 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
 
     llm_active_requests.inc()
     start_time = time.time()
+    decremented = False
     try:
         messages_dict = [msg.model_dump(exclude_none=True) for msg in body.messages]
 
         if body.stream:
 
             async def generate_stream():
+                nonlocal decremented
                 try:
                     prompt_len = sum(len(m.get("content", "")) for m in messages_dict)
                     llm_tokens_consumed_total.inc(prompt_len // 4 or 1)
@@ -67,48 +69,50 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                         yield f"data: {json.dumps(response_chunk)}\n\n"
                     yield "data: [DONE]\n\n"
                 finally:
-                    llm_active_requests.dec()
-                    llm_generation_latency_seconds.observe(time.time() - start_time)
+                    if not decremented:
+                        llm_active_requests.dec()
+                        llm_generation_latency_seconds.observe(time.time() - start_time)
+                        decremented = True
 
             return StreamingResponse(generate_stream(), media_type="text/event-stream")
         else:
-            try:
-                output = await engine.chat(
-                    messages=messages_dict,
-                    max_tokens=body.max_tokens or 2048,
-                    temperature=body.temperature,
-                    top_p=body.top_p,
-                )
-                prompt_toks = getattr(output, "prompt_tokens", 0)
-                gen_toks = getattr(output, "completion_tokens", 0)
-                llm_tokens_consumed_total.inc(prompt_toks)
-                llm_tokens_generated_total.inc(gen_toks)
+            output = await engine.chat(
+                messages=messages_dict,
+                max_tokens=body.max_tokens or 2048,
+                temperature=body.temperature,
+                top_p=body.top_p,
+            )
+            prompt_toks = getattr(output, "prompt_tokens", 0)
+            gen_toks = getattr(output, "completion_tokens", 0)
+            llm_tokens_consumed_total.inc(prompt_toks)
+            llm_tokens_generated_total.inc(gen_toks)
 
-                return {
-                    "id": f"chatcmpl-{uuid.uuid4()}",
-                    "object": "chat.completion",
-                    "created": int(time.time()),
-                    "model": model_name,
-                    "choices": [
-                        {
-                            "index": 0,
-                            "message": {
-                                "role": "assistant",
-                                "content": output.text,
-                            },
-                            "finish_reason": output.finish_reason or "stop",
-                        }
-                    ],
-                    "usage": {
-                        "prompt_tokens": prompt_toks,
-                        "completion_tokens": gen_toks,
-                        "total_tokens": prompt_toks + gen_toks,
-                    },
-                }
-            finally:
-                llm_active_requests.dec()
-                llm_generation_latency_seconds.observe(time.time() - start_time)
+            return {
+                "id": f"chatcmpl-{uuid.uuid4()}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": model_name,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": output.text,
+                        },
+                        "finish_reason": output.finish_reason or "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": prompt_toks,
+                    "completion_tokens": gen_toks,
+                    "total_tokens": prompt_toks + gen_toks,
+                },
+            }
     except Exception as e:
-        llm_active_requests.dec()
         logger.error(f"Error during chat completion: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        if not body.stream and not decremented:
+            llm_active_requests.dec()
+            llm_generation_latency_seconds.observe(time.time() - start_time)
+            decremented = True
