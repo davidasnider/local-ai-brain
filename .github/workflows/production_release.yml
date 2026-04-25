@@ -1,0 +1,13 @@
+name: Production Release
+on:
+  release:
+    types: [published]
+
+jobs:
+  release_notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Notify Release
+        run: echo "Production release ${{ github.event.release.tag_name }} triggered. The macOS host auto-updater will fetch it upon next startup."
