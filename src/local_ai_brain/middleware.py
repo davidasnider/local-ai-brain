@@ -10,11 +10,15 @@ from .metrics import http_requests_total, memory_rejections_total
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        http_requests_total.labels(
-            endpoint=request.url.path, status=str(response.status_code)
-        ).inc()
-        return response
+        status_code = "500"
+        try:
+            response = await call_next(request)
+            status_code = str(response.status_code)
+            return response
+        except Exception:
+            raise
+        finally:
+            http_requests_total.labels(endpoint=request.url.path, status=status_code).inc()
 
 
 class MemoryGuardMiddleware(BaseHTTPMiddleware):
@@ -72,6 +76,9 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
 
         vm_post = psutil.virtual_memory()
         used_post_gb = vm_post.used / (1024**3)
-        logger.debug(f"Post-Request Memory: {used_post_gb:.2f}GB used.")
+        logger.debug(
+            f"Memory after call_next returned response object: {used_post_gb:.2f}GB used. "
+            "Streaming responses may still be in progress."
+        )
 
         return response

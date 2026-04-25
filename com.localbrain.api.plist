@@ -22,6 +22,8 @@
     <dict>
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>LOCAL_API_KEY</key>
+        <string>__REPLACE_WITH_LOCAL_API_KEY__</string>
     </dict>
 </dict>
 </plist>

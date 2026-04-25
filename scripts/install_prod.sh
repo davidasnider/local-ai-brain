@@ -34,7 +34,13 @@ uv sync --frozen --no-dev
 # Register and enable macOS launchd service
 PLIST_PATH="$HOME/Library/LaunchAgents/com.localbrain.api.plist"
 echo "Registering macOS LaunchAgent to $PLIST_PATH..."
-cp com.localbrain.api.plist "$PLIST_PATH"
+
+if [ -z "$LOCAL_API_KEY" ]; then
+    echo "Error: LOCAL_API_KEY environment variable is not set. It is required for the production service." >&2
+    exit 1
+fi
+
+sed "s/__REPLACE_WITH_LOCAL_API_KEY__/$LOCAL_API_KEY/g" com.localbrain.api.plist > "$PLIST_PATH"
 
 # Unload existing instance if present
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
