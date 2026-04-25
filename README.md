@@ -6,11 +6,11 @@ It wraps `vllm-mlx` and MLX-optimized audio models in a FastAPI backend, exposin
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 (27B parameter) quantized for MLX (4-bit/8-bit).
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit/8-bit).
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing.
 - **Unified Memory Management:** Strictly caps memory usage at **48GB** to ensure system stability.
-- **Observability:** Granular logging with `loguru` and OpenTelemetry (OTEL) Prometheus `/metrics` endpoint.
+- **Observability:** Granular logging with `loguru` and a Prometheus `/metrics` endpoint.
 - **Security:** Authenticated via a static `LOCAL_API_KEY` Bearer token.
 
 ## Prerequisites
@@ -70,7 +70,7 @@ curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
   -d '{
-    "model": "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit",
+    "model": "mlx-community/Qwen3.6-35B-A3B-8bit",
     "messages": [{"role": "user", "content": "How do I build a DIY smart mirror?"}],
     "stream": true
   }'
@@ -80,8 +80,7 @@ curl http://localhost:8000/v1/chat/completions \
 ```bash
 curl http://localhost:8000/v1/audio/transcriptions \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
-  -F "file=@path/to/audio.wav" \
-  -F "model=base"
+  -F "file=@path/to/audio.wav"
 ```
 
 ### Text-to-Speech (Kokoro)
@@ -92,7 +91,7 @@ curl http://localhost:8000/v1/audio/speech \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
   -d '{
-    "model": "kokoro",
+    "model": "kokoro-onnx",
     "input": "The weather is lovely in the Shire today.",
     "voice": "af_heart",
     "character": "jack_skellington"

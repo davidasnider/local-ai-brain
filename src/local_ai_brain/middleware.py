@@ -43,7 +43,7 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
 
         total_projected_gb = used_gb + projected_cost_gb
 
-        logger.info(
+        logger.debug(
             f"Memory Check: {used_gb:.2f}GB used. Projected request cost: "
             f"{projected_cost_gb:.2f}GB. Total projected: {total_projected_gb:.2f}GB. "
             f"Limit: {settings.MEMORY_LIMIT_GB}GB"
@@ -72,6 +72,6 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
 
         vm_post = psutil.virtual_memory()
         used_post_gb = vm_post.used / (1024**3)
-        logger.info(f"Post-Request Memory: {used_post_gb:.2f}GB used.")
+        logger.debug(f"Post-Request Memory: {used_post_gb:.2f}GB used.")
 
         return response

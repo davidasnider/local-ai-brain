@@ -23,8 +23,9 @@ if ! command -v uv &> /dev/null; then
     if command -v brew &> /dev/null; then
         brew install uv
     else
-        echo "uv is required but not installed. Install Homebrew and rerun this script, or install uv manually." >&2
-        exit 1
+        echo "brew not found, attempting to install uv via standalone installer..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.cargo/bin:$PATH"
     fi
 fi
 

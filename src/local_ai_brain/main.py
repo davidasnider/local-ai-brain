@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import secrets
 import sys
 
 import mlx_whisper
@@ -50,7 +51,7 @@ security = HTTPBearer()
 
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)):
-    if credentials.credentials != settings.LOCAL_API_KEY:
+    if not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
         logger.warning("Unauthorized API access attempt.")
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
