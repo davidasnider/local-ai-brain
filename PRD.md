@@ -1,4 +1,4 @@
-# Product Requirements Document (PRD): Local AI Brain (Ponderosa Core)
+# Product Requirements Document (PRD): Local AI Brain
 
 ## 1. Project Overview
 A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding. It wraps `vllm-mlx` and MLX-optimized audio models in a FastAPI backend, exposing an OpenAI-compatible interface.

@@ -2,6 +2,7 @@ import contextlib
 import logging
 import sys
 
+import mlx_whisper
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -9,7 +10,6 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import disable_progress_bars
 from kokoro_onnx import Kokoro
 from loguru import logger
-import mlx_whisper
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from vllm_mlx.engine.batched import BatchedEngine
 
@@ -56,10 +56,16 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     return credentials.credentials
 
 
-
-
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.TESTING:
+        logger.info("TESTING mode: Skipping model initialization.")
+        app.state.llm_engine = None
+        app.state.stt_model = None
+        app.state.tts_model = None
+        yield
+        return
+
     logger.info("Initializing Local AI Brain models...")
 
     try:
@@ -99,7 +105,6 @@ async def lifespan(app: FastAPI):
     app.state.llm_engine = None
     app.state.stt_model = None
     app.state.tts_model = None
-
 
 
 app = FastAPI(lifespan=lifespan, title="Local AI Brain")
