@@ -28,9 +28,13 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
         if request.url.path == "/v1/chat/completions" and request.method == "POST":
             content_length = request.headers.get("content-length")
             if content_length:
-                # Rough projection heuristic based on payload size
-                # Adjust multiplier as needed based on empirical testing of KV cache growth
-                projected_cost_gb = int(content_length) * 0.0001
+                try:
+                    content_length_bytes = int(content_length)
+                    if content_length_bytes < 0:
+                        content_length_bytes = 0
+                except ValueError:
+                    content_length_bytes = 0
+                projected_cost_gb = content_length_bytes * 0.0001
 
         total_projected_gb = used_gb + projected_cost_gb
 
