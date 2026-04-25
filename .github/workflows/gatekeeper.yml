@@ -6,13 +6,11 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   gatekeeper-check:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
     steps:
       - name: Check for approval label
@@ -29,6 +27,9 @@ jobs:
   automerge:
     needs: [gatekeeper-check]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
     steps:
       - name: Enable auto-merge for PR
@@ -39,6 +40,9 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
     if: |
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
       (github.event_name == 'workflow_dispatch')
