@@ -41,7 +41,6 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
 
             async def generate_stream():
                 try:
-                    # Estimate prompt tokens
                     prompt_len = sum(len(m.get("content", "")) for m in messages_dict)
                     llm_tokens_consumed_total.inc(prompt_len // 4 or 1)
 
@@ -110,5 +109,6 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 llm_active_requests.dec()
                 llm_generation_latency_seconds.observe(time.time() - start_time)
     except Exception as e:
+        llm_active_requests.dec()
         logger.error(f"Error during chat completion: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

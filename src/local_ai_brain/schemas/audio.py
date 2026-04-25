@@ -9,7 +9,7 @@ class SpeechRequest(BaseModel):
     model: Optional[str] = None
     input: str
     voice: str
-    response_format: Optional[str] = "mp3"
+    response_format: Optional[str] = "wav"
     speed: Optional[float] = 1.0
 
     # Custom parameters for dynamic Kokoro voice routing

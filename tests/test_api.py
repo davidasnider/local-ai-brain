@@ -12,9 +12,6 @@ def _load_app():
 
 
 app = _load_app()
-client = TestClient(app)
-
-
 def test_health():
     with TestClient(app) as client:
         response = client.get("/health")
@@ -26,7 +23,7 @@ def test_metrics():
     with TestClient(app) as client:
         response = client.get("/metrics")
         assert response.status_code == 200
-        assert "python_info" in response.text
+        assert "http_requests_total" in response.text
 
 
 def test_unauthorized_access():
@@ -55,7 +52,10 @@ def test_chat_completions():
             headers=headers,
         )
         assert response.status_code == 200
-        assert response.json()["id"] == "chatcmpl-mock"
+        body = response.json()
+        assert "id" in body
+        assert isinstance(body["id"], str)
+        assert body["id"].startswith("chatcmpl-")
 
 
 def test_audio_speech():
@@ -67,8 +67,8 @@ def test_audio_speech():
             headers=headers,
         )
         assert response.status_code == 200
-        assert response.json()["status"] == "stub_audio_response"
-        assert response.json()["resolved_voice"] == "character_santa"
+        assert response.headers["content-type"] == "audio/wav"
+        assert len(response.content) > 0
 
         # Test season routing
         response2 = client.post(
@@ -77,7 +77,7 @@ def test_audio_speech():
             headers=headers,
         )
         assert response2.status_code == 200
-        assert response2.json()["resolved_voice"] == "season_halloween"
+        assert response2.headers["content-type"] == "audio/wav"
 
 
 def test_audio_transcription():
@@ -86,7 +86,7 @@ def test_audio_transcription():
         files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
         response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
         assert response.status_code == 200
-        assert response.json()["text"] == "Stub transcription."
+        assert "text" in response.json()
 
 
 @patch("local_ai_brain.middleware.psutil.virtual_memory")

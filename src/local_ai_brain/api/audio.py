@@ -45,23 +45,32 @@ async def create_transcription(
 
         # Define a blocking function for whisper
         def run_whisper():
+            import os
             import tempfile
 
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                tmp.write(audio_content)
-                tmp.flush()
+            tmp_path = None
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                    tmp.write(audio_content)
+                    tmp.flush()
+                    tmp_path = tmp.name
 
-                # Get audio duration
                 try:
-                    data, samplerate = sf.read(tmp.name)
+                    data, samplerate = sf.read(tmp_path)
                     duration_seconds = len(data) / samplerate
                     stt_audio_seconds_transcribed_total.inc(duration_seconds)
                 except Exception as e:
                     logger.warning(f"Could not calculate audio duration: {e}")
 
-                # Run transcription
-                result = stt_model.transcribe(tmp.name, path_or_hf_repo=model_name)
-            return result
+                return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name)
+            finally:
+                if tmp_path is not None:
+                    try:
+                        os.unlink(tmp_path)
+                    except FileNotFoundError:
+                        pass
+                    except Exception as e:
+                        logger.warning(f"Could not remove temporary audio file {tmp_path}: {e}")
 
         result = await asyncio.to_thread(run_whisper)
         audio_processing_latency_seconds.observe(time.time() - start_time)
@@ -74,6 +83,11 @@ async def create_transcription(
 
 @router.post("/audio/speech")
 async def create_speech(request: Request, body: SpeechRequest):
+    if body.response_format and body.response_format != "wav":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported response_format: {body.response_format}. This API only supports wav.",
+        )
     model_name = getattr(body, "model", None) or settings.KOKORO_MODEL_PATH
     if model_name != settings.KOKORO_MODEL_PATH:
         raise HTTPException(

@@ -5,7 +5,19 @@ import sys
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import disable_progress_bars
+from kokoro_onnx import Kokoro
 from loguru import logger
+import mlx_whisper
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from vllm_mlx.engine.batched import BatchedEngine
+
+from .api.audio import router as audio_router
+from .api.chat import router as chat_router
+from .config import settings
+from .metrics import update_memory_metrics
+from .middleware import MemoryGuardMiddleware, MetricsMiddleware
 
 
 class InterceptHandler(logging.Handler):
@@ -31,19 +43,8 @@ for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
     logging_logger = logging.getLogger(logger_name)
     logging_logger.handlers = []
     logging_logger.propagate = True
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import disable_progress_bars
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-
-from .api.audio import router as audio_router
-from .api.chat import router as chat_router
-from .config import settings
-from .middleware import MemoryGuardMiddleware
 
 disable_progress_bars()
-import mlx_whisper
-from kokoro_onnx import Kokoro
-from vllm_mlx.engine.batched import BatchedEngine
 
 security = HTTPBearer()
 
@@ -76,16 +77,20 @@ async def lifespan(app: FastAPI):
 
         logger.info("Loading Kokoro ONNX TTS...")
         onnx_path = hf_hub_download(
-            repo_id=settings.KOKORO_HF_REPO, filename=settings.KOKORO_ONNX_FILE
+            repo_id=settings.KOKORO_HF_REPO,
+            filename=settings.KOKORO_ONNX_FILE,
+            token=settings.HF_TOKEN,
         )
         voices_path = hf_hub_download(
-            repo_id=settings.KOKORO_HF_REPO, filename=settings.KOKORO_VOICES_FILE
+            repo_id=settings.KOKORO_HF_REPO,
+            filename=settings.KOKORO_VOICES_FILE,
+            token=settings.HF_TOKEN,
         )
         app.state.tts_model = Kokoro(onnx_path, voices_path)
     except Exception as e:
         logger.error(f"Failed to initialize models: {e}")
         # In production, we might want to fail-fast or retry depending on the issue.
-        raise RuntimeError("Model initialization failed")
+        raise RuntimeError("Model initialization failed") from e
 
     yield
 
@@ -118,5 +123,7 @@ async def health_check():
 @app.get("/metrics", tags=["System"])
 async def get_metrics():
     # Expose Prometheus metrics with updated memory states
+    from .metrics import METRICS_REGISTRY
+
     update_memory_metrics()
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    return Response(generate_latest(METRICS_REGISTRY), media_type=CONTENT_TYPE_LATEST)
