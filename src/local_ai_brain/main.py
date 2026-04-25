@@ -112,7 +112,7 @@ app.include_router(audio_router, prefix="/v1", dependencies=[Depends(verify_api_
 
 @app.get("/health", tags=["System"])
 async def health_check():
-    return {"status": "ok", "models_loaded": hasattr(app.state, "llm_engine")}
+    return {"status": "ok", "models_loaded": getattr(app.state, "llm_engine", None) is not None}
 
 
 @app.get("/metrics", tags=["System"])
