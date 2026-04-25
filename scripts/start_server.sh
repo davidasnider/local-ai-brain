@@ -22,7 +22,7 @@ fi
 
 echo "Syncing dependencies..."
 export PATH="$HOME/.cargo/bin:$PATH"
-uv sync
+uv sync --frozen
 
 echo "Starting server on port 8000..."
 PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8000

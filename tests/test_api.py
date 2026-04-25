@@ -3,11 +3,15 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-# Set API key for testing
-os.environ["LOCAL_API_KEY"] = "test-secret-key"
 
-from local_ai_brain.main import app
+def _load_app():
+    os.environ.setdefault("LOCAL_API_KEY", "test-secret-key")
+    from local_ai_brain.main import app
 
+    return app
+
+
+app = _load_app()
 client = TestClient(app)
 
 
