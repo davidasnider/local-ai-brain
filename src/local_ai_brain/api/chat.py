@@ -24,7 +24,10 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
     if model_name != settings.QWEN_MODEL_PATH:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported model: {model_name}. This API only supports {settings.QWEN_MODEL_PATH}",
+            detail=(
+                f"Unsupported model: {model_name}. "
+                f"This API only supports {settings.QWEN_MODEL_PATH}"
+            ),
         )
     logger.info(f"Received chat completion request for model: {model_name}")
 

@@ -30,13 +30,15 @@ async def create_transcription(
     if model_name != settings.WHISPER_MODEL_PATH:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported model: {model_name}. This API only supports {settings.WHISPER_MODEL_PATH}",
+            detail=(
+                f"Unsupported model: {model_name}. "
+                f"This API only supports {settings.WHISPER_MODEL_PATH}"
+            ),
         )
     logger.info(f"Received transcription request for model: {model_name}")
     stt_model = getattr(request.app.state, "stt_model", None)
     if stt_model is None:
         raise HTTPException(status_code=503, detail="STT model is not initialized.")
-
 
     start_time = time.time()
     try:
@@ -85,13 +87,18 @@ async def create_speech(request: Request, body: SpeechRequest):
     if body.response_format and body.response_format != "wav":
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported response_format: {body.response_format}. This API only supports wav.",
+            detail=(
+                f"Unsupported response_format: {body.response_format}. This API only supports wav."
+            ),
         )
     model_name = getattr(body, "model", None) or settings.KOKORO_MODEL_PATH
     if model_name != settings.KOKORO_MODEL_PATH:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported model: {model_name}. This API only supports {settings.KOKORO_MODEL_PATH}",
+            detail=(
+                f"Unsupported model: {model_name}. "
+                f"This API only supports {settings.KOKORO_MODEL_PATH}"
+            ),
         )
     logger.info(f"Received speech request for model: {model_name}, voice: {body.voice}")
     tts_model = getattr(request.app.state, "tts_model", None)

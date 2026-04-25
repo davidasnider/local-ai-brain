@@ -1,17 +1,88 @@
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
-from fastapi.testclient import TestClient
+# Set environment variables BEFORE any imports from the app
+os.environ["TESTING"] = "1"
+os.environ["LOCAL_API_KEY"] = "test-secret-key"
+
+# Mock heavy ML modules to prevent them from being imported/loaded at all
+import numpy as np
+
+mock_vllm = MagicMock()
+mock_batched = MagicMock()
+mock_batched_instance = MagicMock()
 
 
-def _load_app():
-    os.environ.setdefault("LOCAL_API_KEY", "test-secret-key")
-    from local_ai_brain.main import app
-
-    return app
+async def dummy_async():
+    pass
 
 
-app = _load_app()
+mock_batched_instance.start = dummy_async
+mock_batched_instance.stop = dummy_async
+
+
+# Mock for engine.chat
+class MockOutput:
+    def __init__(self):
+        self.text = "Hello from mock!"
+        self.prompt_tokens = 10
+        self.completion_tokens = 20
+        self.finish_reason = "stop"
+
+
+async def mock_chat(*args, **kwargs):
+    return MockOutput()
+
+
+# Mock for engine.stream_chat
+class MockChunk:
+    def __init__(self, text, reason=None):
+        self.new_text = text
+        self.finish_reason = reason
+
+
+async def mock_stream_chat(*args, **kwargs):
+    yield MockChunk("Hello")
+    yield MockChunk(" from")
+    yield MockChunk(" mock!", "stop")
+
+
+mock_batched_instance.chat = mock_chat
+mock_batched_instance.stream_chat = mock_stream_chat
+mock_batched.return_value = mock_batched_instance
+
+mock_vllm.engine.batched.BatchedEngine = mock_batched
+sys.modules["vllm_mlx"] = mock_vllm
+sys.modules["vllm_mlx.engine"] = MagicMock()
+sys.modules["vllm_mlx.engine.batched"] = MagicMock()
+sys.modules["vllm_mlx.engine.batched"].BatchedEngine = mock_batched
+
+mock_whisper = MagicMock()
+mock_whisper.transcribe.return_value = {"text": "Hello from mock Whisper!"}
+sys.modules["mlx_whisper"] = mock_whisper
+
+
+# Kokoro TTS mock
+class MockKokoro:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def create(self, text, voice, speed=1.0):
+        return np.zeros(24000), 24000
+
+
+sys.modules["kokoro_onnx"] = MagicMock()
+sys.modules["kokoro_onnx"].Kokoro = MockKokoro
+
+mock_hf = MagicMock()
+mock_hf.hf_hub_download.return_value = "/tmp/mock_model"
+sys.modules["huggingface_hub"] = mock_hf
+sys.modules["huggingface_hub.utils"] = MagicMock()
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from local_ai_brain.main import app  # noqa: E402
 
 
 def test_health():
@@ -26,6 +97,84 @@ def test_metrics():
         response = client.get("/metrics")
         assert response.status_code == 200
         assert "http_requests_total" in response.text
+
+
+def test_logging_interceptor():
+    import logging
+
+    from loguru import logger
+
+    # Trigger the interceptor logic in main.py
+    with logger.contextualize(test="logging"):
+        logging.getLogger("uvicorn").info("Test uvicorn log interception")
+        logging.getLogger("test_logger").error("Test error log interception")
+
+
+def test_config_validators():
+    import pytest
+
+    from local_ai_brain.config import Settings
+
+    # Test HF_TOKEN warning
+    with patch("local_ai_brain.config.logger") as mock_logger:
+        Settings(LOCAL_API_KEY="test", HF_TOKEN="")
+        mock_logger.warning.assert_called_once()
+
+    # Test missing LOCAL_API_KEY
+    with pytest.raises(ValueError, match="LOCAL_API_KEY is required"):
+        # We use mode='before' validator, so passing None or empty string should trigger it
+        # if the field is required.
+        Settings(LOCAL_API_KEY="")
+
+
+def test_chat_completions_error():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        # Mock chat to raise an exception
+        with patch.object(mock_batched_instance, "chat", side_effect=Exception("Chat failed")):
+            headers = {"Authorization": "Bearer test-secret-key"}
+            response = client.post(
+                "/v1/chat/completions",
+                json={"messages": [{"role": "user", "content": "hi"}]},
+                headers=headers,
+            )
+            assert response.status_code == 500
+
+
+def test_audio_speech_error():
+    with TestClient(app) as client:
+        mock_tts = MagicMock()
+        mock_tts.create.side_effect = Exception("TTS failed")
+        client.app.state.tts_model = mock_tts
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello", "voice": "default"},
+            headers=headers,
+        )
+        assert response.status_code == 500
+
+
+def test_audio_transcription_error():
+    with TestClient(app) as client:
+        client.app.state.stt_model = mock_whisper
+        with patch.object(mock_whisper, "transcribe", side_effect=Exception("Whisper failed")):
+            headers = {"Authorization": "Bearer test-secret-key"}
+            files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
+            response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+            assert response.status_code == 500
+
+
+def test_audio_transcription_duration_failure():
+    with TestClient(app) as client:
+        client.app.state.stt_model = mock_whisper
+        # Mock sf.read to fail
+        with patch("soundfile.read", side_effect=Exception("Read failed")):
+            headers = {"Authorization": "Bearer test-secret-key"}
+            files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
+            response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+            # Should still succeed as it logs warning and continues
+            assert response.status_code == 200
 
 
 def test_unauthorized_access():
@@ -47,6 +196,7 @@ def test_invalid_api_key():
 
 def test_chat_completions():
     with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
         headers = {"Authorization": "Bearer test-secret-key"}
         response = client.post(
             "/v1/chat/completions",
@@ -60,8 +210,43 @@ def test_chat_completions():
         assert body["id"].startswith("chatcmpl-")
 
 
+def test_chat_completions_streaming():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}], "stream": True},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
+
+        # Read the chunks
+        lines = [
+            line.decode("utf-8") if isinstance(line, bytes) else line
+            for line in response.iter_lines()
+            if line
+        ]
+        assert any("data: {" in line for line in lines)
+        assert any("data: [DONE]" in line for line in lines)
+
+
+def test_chat_engine_not_initialized():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = None
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=headers,
+        )
+        assert response.status_code == 503
+
+
 def test_audio_speech():
     with TestClient(app) as client:
+        client.app.state.tts_model = MockKokoro()
         headers = {"Authorization": "Bearer test-secret-key"}
         response = client.post(
             "/v1/audio/speech",
@@ -84,6 +269,7 @@ def test_audio_speech():
 
 def test_audio_transcription():
     with TestClient(app) as client:
+        client.app.state.stt_model = mock_whisper
         headers = {"Authorization": "Bearer test-secret-key"}
         files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
         response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
@@ -100,6 +286,7 @@ def test_memory_guard_rejection(mock_vm):
     mock_vm.return_value = mock_vm_instance
 
     with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
         headers = {"Authorization": "Bearer test-secret-key"}
         # Very large payload to trigger content-length heuristic
         payload = {"messages": [{"role": "user", "content": "a" * 1000000}]}
@@ -109,37 +296,52 @@ def test_memory_guard_rejection(mock_vm):
         assert "Memory limit of 48.0GB exceeded" in response.json()["error"]["message"]
 
 
+def test_memory_guard_invalid_content_length():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key", "Content-Length": "invalid"}
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=headers,
+        )
+        assert response.status_code == 200
+
+
+def test_memory_guard_negative_content_length():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key", "Content-Length": "-100"}
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}]},
+            headers=headers,
+        )
+        assert response.status_code == 200
+
+
 def test_missing_models():
     # Test error handling when models aren't loaded properly
     with TestClient(app) as client:
-        previous_llm_engine = getattr(app.state, "llm_engine", None)
-        previous_stt_model = getattr(app.state, "stt_model", None)
-        previous_tts_model = getattr(app.state, "tts_model", None)
+        client.app.state.llm_engine = None
+        client.app.state.stt_model = None
+        client.app.state.tts_model = None
 
-        try:
-            app.state.llm_engine = None
-            app.state.stt_model = None
-            app.state.tts_model = None
+        headers = {"Authorization": "Bearer test-secret-key"}
 
-            headers = {"Authorization": "Bearer test-secret-key"}
+        resp = client.post("/v1/chat/completions", json={"messages": []}, headers=headers)
+        assert resp.status_code == 503
 
-            resp = client.post("/v1/chat/completions", json={"messages": []}, headers=headers)
-            assert resp.status_code == 503
+        resp = client.post(
+            "/v1/audio/speech",
+            json={"input": "x", "voice": "x"},
+            headers=headers,
+        )
+        assert resp.status_code == 503
 
-            resp = client.post(
-                "/v1/audio/speech",
-                json={"input": "x", "voice": "x"},
-                headers=headers,
-            )
-            assert resp.status_code == 503
-
-            files = {"file": ("test.wav", b"data", "audio/wav")}
-            resp = client.post("/v1/audio/transcriptions", files=files, headers=headers)
-            assert resp.status_code == 503
-        finally:
-            app.state.llm_engine = previous_llm_engine
-            app.state.stt_model = previous_stt_model
-            app.state.tts_model = previous_tts_model
+        files = {"file": ("test.wav", b"data", "audio/wav")}
+        resp = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+        assert resp.status_code == 503
 
 
 def test_unsupported_model_rejection():
