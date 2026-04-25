@@ -34,7 +34,7 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
                         content_length_bytes = 0
                 except ValueError:
                     content_length_bytes = 0
-                projected_cost_gb = content_length_bytes * 0.0001
+                projected_cost_gb = content_length_bytes / (1024**3)
 
         total_projected_gb = used_gb + projected_cost_gb
 
