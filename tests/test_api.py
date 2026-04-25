@@ -2,6 +2,8 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Set environment variables BEFORE any imports from the app
 os.environ["TESTING"] = "1"
 os.environ["LOCAL_API_KEY"] = "test-secret-key"
@@ -99,20 +101,42 @@ def test_metrics():
         assert "http_requests_total" in response.text
 
 
-def test_logging_interceptor():
+def test_logging_interceptor_error_paths():
     import logging
 
-    from loguru import logger
+    # Trigger ValueError in level lookup
+    logging.getLogger("test_unknown_level").log(99, "Test unknown level")
 
-    # Trigger the interceptor logic in main.py
-    with logger.contextualize(test="logging"):
-        logging.getLogger("uvicorn").info("Test uvicorn log interception")
-        logging.getLogger("test_logger").error("Test error log interception")
+    # Trigger shallow stack depth for InterceptHandler
+    # This is tricky, but we can try to call emit directly if needed
+    from local_ai_brain.main import InterceptHandler
+
+    handler = InterceptHandler()
+    record = logging.LogRecord("name", logging.INFO, "pathname", 10, "msg", None, None)
+
+    with patch("sys._getframe", side_effect=ValueError("Shallow stack")):
+        handler.emit(record)
+
+
+def test_chat_completions_streaming_error():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        # Mock stream_chat to raise an exception
+        with patch.object(
+            mock_batched_instance, "stream_chat", side_effect=Exception("Stream failed")
+        ):
+            headers = {"Authorization": "Bearer test-secret-key"}
+            # TestClient with streaming might raise the exception during the post call
+            # if it attempts to start the stream.
+            with pytest.raises(Exception, match="Stream failed"):
+                client.post(
+                    "/v1/chat/completions",
+                    json={"messages": [{"role": "user", "content": "hi"}], "stream": True},
+                    headers=headers,
+                )
 
 
 def test_config_validators():
-    import pytest
-
     from local_ai_brain.config import Settings
 
     # Test HF_TOKEN warning
@@ -168,13 +192,21 @@ def test_audio_transcription_error():
 def test_audio_transcription_duration_failure():
     with TestClient(app) as client:
         client.app.state.stt_model = mock_whisper
-        # Mock sf.read to fail
-        with patch("soundfile.read", side_effect=Exception("Read failed")):
+        # Mock sf.info to fail
+        with patch("local_ai_brain.api.audio.sf.info", side_effect=Exception("Read failed")):
             headers = {"Authorization": "Bearer test-secret-key"}
             files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
             response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
             # Should still succeed as it logs warning and continues
             assert response.status_code == 200
+
+
+def test_health_models_loaded():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json()["models_loaded"] is True
 
 
 def test_unauthorized_access():
