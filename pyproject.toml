@@ -1,0 +1,44 @@
+[project]
+name = "local-ai-brain"
+version = "0.1.0"
+description = "Local AI API hosting on Apple Silicon (MLX)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.1",
+    "kokoro-onnx>=0.5.0",
+    "loguru>=0.7.3",
+    "mlx-whisper>=0.4.3",
+    "opentelemetry-exporter-prometheus>=0.62b1",
+    "opentelemetry-sdk>=1.41.1",
+    "psutil>=7.2.2",
+    "pydantic-settings>=2.14.0",
+    "soundfile>=0.13.1",
+    "uvicorn>=0.46.0",
+    "vllm-mlx",
+]
+
+[tool.uv.sources]
+vllm-mlx = { git = "https://github.com/waybarrios/vllm-mlx.git", rev = "537dcb86303de34f5cddf09b1cd5fbf1b5ab8636" }
+
+[dependency-groups]
+dev = [
+    "detect-secrets>=1.5.0",
+    "pre-commit>=4.6.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.12",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
