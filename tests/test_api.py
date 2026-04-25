@@ -12,6 +12,8 @@ def _load_app():
 
 
 app = _load_app()
+
+
 def test_health():
     with TestClient(app) as client:
         response = client.get("/health")
@@ -110,26 +112,34 @@ def test_memory_guard_rejection(mock_vm):
 def test_missing_models():
     # Test error handling when models aren't loaded properly
     with TestClient(app) as client:
-        # Clear out state manually to simulate failure
-        app.state.llm_engine = None
-        app.state.stt_model = None
-        app.state.tts_model = None
+        previous_llm_engine = getattr(app.state, "llm_engine", None)
+        previous_stt_model = getattr(app.state, "stt_model", None)
+        previous_tts_model = getattr(app.state, "tts_model", None)
 
-        headers = {"Authorization": "Bearer test-secret-key"}
+        try:
+            app.state.llm_engine = None
+            app.state.stt_model = None
+            app.state.tts_model = None
 
-        resp = client.post("/v1/chat/completions", json={"messages": []}, headers=headers)
-        assert resp.status_code == 503
+            headers = {"Authorization": "Bearer test-secret-key"}
 
-        resp = client.post(
-            "/v1/audio/speech",
-            json={"input": "x", "voice": "x"},
-            headers=headers,
-        )
-        assert resp.status_code == 503
+            resp = client.post("/v1/chat/completions", json={"messages": []}, headers=headers)
+            assert resp.status_code == 503
 
-        files = {"file": ("test.wav", b"data", "audio/wav")}
-        resp = client.post("/v1/audio/transcriptions", files=files, headers=headers)
-        assert resp.status_code == 503
+            resp = client.post(
+                "/v1/audio/speech",
+                json={"input": "x", "voice": "x"},
+                headers=headers,
+            )
+            assert resp.status_code == 503
+
+            files = {"file": ("test.wav", b"data", "audio/wav")}
+            resp = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+            assert resp.status_code == 503
+        finally:
+            app.state.llm_engine = previous_llm_engine
+            app.state.stt_model = previous_stt_model
+            app.state.tts_model = previous_tts_model
 
 
 def test_unsupported_model_rejection():

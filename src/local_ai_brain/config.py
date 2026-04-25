@@ -1,7 +1,7 @@
 from typing import Optional
 
 from loguru import logger
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,14 +21,14 @@ class Settings(BaseSettings):
     KOKORO_ONNX_FILE: str = "kokoro-v1.0.onnx"
     KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
 
-    @validator("LOCAL_API_KEY", pre=True, always=True)
+    @field_validator("LOCAL_API_KEY", mode="before")
     def _validate_api_key(cls, v: str) -> str:
         if not v:
             raise ValueError("LOCAL_API_KEY is required in .env")
         return v
 
-    @validator("HF_TOKEN", pre=True, always=True)
-    def _validate_hf_token(cls, v: str) -> str:
+    @field_validator("HF_TOKEN", mode="before")
+    def _validate_hf_token(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             logger.warning("HF_TOKEN not set; downloads may be slow or rate‑limited.")
         return v

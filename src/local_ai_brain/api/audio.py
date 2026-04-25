@@ -37,7 +37,6 @@ async def create_transcription(
     if stt_model is None:
         raise HTTPException(status_code=503, detail="STT model is not initialized.")
 
-    import time
 
     start_time = time.time()
     try:

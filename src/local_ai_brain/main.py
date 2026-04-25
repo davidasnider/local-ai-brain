@@ -56,7 +56,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     return credentials.credentials
 
 
-from .metrics import update_memory_metrics
 
 
 @contextlib.asynccontextmanager
@@ -102,7 +101,6 @@ async def lifespan(app: FastAPI):
     app.state.tts_model = None
 
 
-from .middleware import MetricsMiddleware
 
 app = FastAPI(lifespan=lifespan, title="Local AI Brain")
 
