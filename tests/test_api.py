@@ -368,3 +368,61 @@ def test_unsupported_model_rejection():
             "/v1/audio/transcriptions", data={"model": "llama"}, files=files, headers=headers
         )
         assert resp.status_code == 400
+
+
+def test_audio_transcription_with_language():
+    with patch.object(mock_whisper, "transcribe", return_value={"text": "hello"}):
+        with TestClient(app) as client:
+            client.app.state.stt_model = mock_whisper
+            headers = {"Authorization": "Bearer test-secret-key"}
+            files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
+            response = client.post(
+                "/v1/audio/transcriptions", data={"language": "en"}, files=files, headers=headers
+            )
+            assert response.status_code == 200
+            assert response.json()["text"] == "hello"
+
+
+def test_audio_transcription_error_path():
+    with patch.object(mock_whisper, "transcribe", side_effect=Exception("Whisper error")):
+        with TestClient(app) as client:
+            client.app.state.stt_model = mock_whisper
+            headers = {"Authorization": "Bearer test-secret-key"}
+            files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
+            response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+            assert response.status_code == 500
+
+
+def test_audio_speech_precedence():
+    with TestClient(app) as client:
+        client.app.state.tts_model = MockKokoro()
+        headers = {"Authorization": "Bearer test-secret-key"}
+        # Both character and season provided to trigger precedence log
+        response = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello", "voice": "default", "character": "santa", "season": "winter"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+
+
+def test_chat_completions_list_content():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "hi"},
+                            {"type": "text", "text": " and more"},
+                        ],
+                    }
+                ]
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200

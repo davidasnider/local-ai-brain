@@ -67,7 +67,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                         temperature=body.temperature,
                         top_p=body.top_p,
                     ):
-                        llm_tokens_generated_total.inc(1)
+                        # Note: In streaming mode, we record character counts as a proxy for tokens
+                        llm_tokens_generated_total.inc(len(chunk.new_text))
                         response_chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",

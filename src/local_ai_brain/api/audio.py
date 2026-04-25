@@ -36,6 +36,8 @@ async def create_transcription(
             ),
         )
     logger.info(f"Received transcription request for model: {model_name}")
+    if language:
+        logger.info(f"Requested language: {language}")
     stt_model = getattr(request.app.state, "stt_model", None)
     if stt_model is None:
         raise HTTPException(status_code=503, detail="STT model is not initialized.")
@@ -56,13 +58,14 @@ async def create_transcription(
         # Define a blocking function for whisper
         def run_whisper():
             try:
-                data, samplerate = sf.read(tmp_path)
-                duration_seconds = len(data) / samplerate
-                stt_audio_seconds_transcribed_total.inc(duration_seconds)
+                info = sf.info(tmp_path)
+                if info.samplerate:
+                    duration_seconds = info.frames / info.samplerate
+                    stt_audio_seconds_transcribed_total.inc(duration_seconds)
             except Exception as e:
                 logger.warning(f"Could not calculate audio duration: {e}")
 
-            return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name)
+            return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name, language=language)
 
         result = await asyncio.to_thread(run_whisper)
         audio_processing_latency_seconds.observe(time.time() - start_time)
@@ -106,6 +109,12 @@ async def create_speech(request: Request, body: SpeechRequest):
 
     # Custom dynamic routing logic
     active_voice = body.voice
+    if body.character and body.season:
+        logger.info(
+            f"Both character ({body.character}) and season ({body.season}) were provided; "
+            "season takes precedence over character."
+        )
+
     if body.character:
         logger.info(f"Dynamic routing for character: {body.character}")
         # Map character to voice profile, e.g., "santa" -> "kokoro_santa_profile.pt"
@@ -132,11 +141,11 @@ async def create_speech(request: Request, body: SpeechRequest):
             wav_io = io.BytesIO()
             sf.write(wav_io, audio_array, sample_rate, format="WAV")
             wav_io.seek(0)
-            return wav_io.read()
+            return wav_io
 
-        wav_bytes = await asyncio.to_thread(run_kokoro)
+        wav_io = await asyncio.to_thread(run_kokoro)
         audio_processing_latency_seconds.observe(time.time() - start_time)
-        return StreamingResponse(io.BytesIO(wav_bytes), media_type="audio/wav")
+        return StreamingResponse(wav_io, media_type="audio/wav")
     except Exception as e:
         logger.error(f"Error during TTS generation: {e}")
         raise HTTPException(status_code=500, detail="TTS generation failed")
