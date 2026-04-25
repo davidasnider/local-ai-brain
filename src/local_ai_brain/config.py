@@ -1,0 +1,39 @@
+from typing import Optional
+
+from loguru import logger
+from pydantic import Field, validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    # Core settings
+    LOCAL_API_KEY: str
+    MEMORY_LIMIT_GB: float = 48.0
+
+    # Hugging Face token (optional, for private or rate‑limited repos)
+    HF_TOKEN: Optional[str] = Field(default=None, env="HF_TOKEN")
+
+    # Model paths
+    QWEN_MODEL_PATH: str = "mlx-community/Qwen3.6-35B-A3B-8bit"
+    WHISPER_MODEL_PATH: str = "mlx-community/whisper-large-v3-mlx"
+    KOKORO_MODEL_PATH: str = "kokoro-onnx"
+    KOKORO_HF_REPO: str = "fastrtc/kokoro-onnx"
+    KOKORO_ONNX_FILE: str = "kokoro-v1.0.onnx"
+    KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
+
+    @validator("LOCAL_API_KEY", pre=True, always=True)
+    def _validate_api_key(cls, v: str) -> str:
+        if not v:
+            raise ValueError("LOCAL_API_KEY is required in .env")
+        return v
+
+    @validator("HF_TOKEN", pre=True, always=True)
+    def _validate_hf_token(cls, v: str) -> str:
+        if not v:
+            logger.warning("HF_TOKEN not set; downloads may be slow or rate‑limited.")
+        return v
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+
+settings = Settings()
