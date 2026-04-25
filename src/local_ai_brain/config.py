@@ -32,9 +32,14 @@ class Settings(BaseSettings):
     @field_validator("HF_TOKEN", mode="before")
     @classmethod
     def _validate_hf_token(cls, v: Optional[str]) -> Optional[str]:
-        if not v:
+        normalized = v
+        if isinstance(normalized, str):
+            normalized = normalized.strip() or None
+
+        if normalized is None:
             logger.warning("HF_TOKEN not set; downloads may be slow or rate‑limited.")
-        return v
+
+        return normalized
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
