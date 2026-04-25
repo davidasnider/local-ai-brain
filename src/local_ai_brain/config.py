@@ -23,12 +23,14 @@ class Settings(BaseSettings):
     KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
 
     @field_validator("LOCAL_API_KEY", mode="before")
-    def _validate_api_key(cls, v: str) -> str:
+    @classmethod
+    def _validate_api_key(cls, v: Optional[str]) -> Optional[str]:
         if not v:
-            raise ValueError("LOCAL_API_KEY is required in .env")
+            raise ValueError("LOCAL_API_KEY is required (set env var or .env)")
         return v
 
     @field_validator("HF_TOKEN", mode="before")
+    @classmethod
     def _validate_hf_token(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             logger.warning("HF_TOKEN not set; downloads may be slow or rate‑limited.")

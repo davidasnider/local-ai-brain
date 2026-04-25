@@ -25,7 +25,12 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
 
         projected_cost_gb = 0.0
 
-        if request.url.path == "/v1/chat/completions" and request.method == "POST":
+        # Apply memory projection to potentially large POST requests
+        if request.method == "POST" and request.url.path in [
+            "/v1/chat/completions",
+            "/v1/audio/speech",
+            "/v1/audio/transcriptions",
+        ]:
             content_length = request.headers.get("content-length")
             if content_length:
                 try:

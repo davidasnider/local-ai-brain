@@ -41,37 +41,28 @@ async def create_transcription(
         raise HTTPException(status_code=503, detail="STT model is not initialized.")
 
     start_time = time.time()
+    import os
+    import tempfile
+
+    tmp_path = None
     try:
-        audio_content = await file.read()
+        # Stream the upload directly to a temporary file to avoid memory spikes
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = tmp.name
+            while content := await file.read(1024 * 1024):  # 1MB chunks
+                tmp.write(content)
+            tmp.flush()
 
         # Define a blocking function for whisper
         def run_whisper():
-            import os
-            import tempfile
-
-            tmp_path = None
             try:
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                    tmp.write(audio_content)
-                    tmp.flush()
-                    tmp_path = tmp.name
+                data, samplerate = sf.read(tmp_path)
+                duration_seconds = len(data) / samplerate
+                stt_audio_seconds_transcribed_total.inc(duration_seconds)
+            except Exception as e:
+                logger.warning(f"Could not calculate audio duration: {e}")
 
-                try:
-                    data, samplerate = sf.read(tmp_path)
-                    duration_seconds = len(data) / samplerate
-                    stt_audio_seconds_transcribed_total.inc(duration_seconds)
-                except Exception as e:
-                    logger.warning(f"Could not calculate audio duration: {e}")
-
-                return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name)
-            finally:
-                if tmp_path is not None:
-                    try:
-                        os.unlink(tmp_path)
-                    except FileNotFoundError:
-                        pass
-                    except Exception as e:
-                        logger.warning(f"Could not remove temporary audio file {tmp_path}: {e}")
+            return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name)
 
         result = await asyncio.to_thread(run_whisper)
         audio_processing_latency_seconds.observe(time.time() - start_time)
@@ -80,6 +71,14 @@ async def create_transcription(
     except Exception as e:
         logger.error(f"Error during transcription: {e}")
         raise HTTPException(status_code=500, detail="Transcription failed")
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                logger.warning(f"Could not remove temporary audio file {tmp_path}: {e}")
 
 
 @router.post("/audio/speech")

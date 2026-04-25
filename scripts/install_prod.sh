@@ -20,11 +20,15 @@ fi
 
 # Install uv if not present
 if ! command -v uv &> /dev/null; then
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    if command -v brew &> /dev/null; then
+        brew install uv
+    else
+        echo "uv is required but not installed. Install Homebrew and rerun this script, or install uv manually." >&2
+        exit 1
+    fi
 fi
 
-export PATH="$HOME/.cargo/bin:$PATH"
-uv sync
+uv sync --frozen --no-dev
 
 # Register and enable macOS launchd service
 PLIST_PATH="$HOME/Library/LaunchAgents/com.localbrain.api.plist"

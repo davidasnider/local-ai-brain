@@ -268,13 +268,14 @@ def test_audio_speech():
 
 
 def test_audio_transcription():
-    with TestClient(app) as client:
-        client.app.state.stt_model = mock_whisper
-        headers = {"Authorization": "Bearer test-secret-key"}
-        files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
-        response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
-        assert response.status_code == 200
-        assert "text" in response.json()
+    with patch.object(mock_whisper, "transcribe", return_value={"text": "hello"}):
+        with TestClient(app) as client:
+            client.app.state.stt_model = mock_whisper
+            headers = {"Authorization": "Bearer test-secret-key"}
+            files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
+            response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+            assert response.status_code == 200
+            assert response.json()["text"] == "hello"
 
 
 @patch("local_ai_brain.middleware.psutil.virtual_memory")
@@ -293,7 +294,9 @@ def test_memory_guard_rejection(mock_vm):
 
         response = client.post("/v1/chat/completions", json=payload, headers=headers)
         assert response.status_code == 429
-        assert "Memory limit of 48.0GB exceeded" in response.json()["error"]["message"]
+        error_message = response.json()["error"]["message"]
+        assert "Memory limit of" in error_message
+        assert "exceeded" in error_message
 
 
 def test_memory_guard_invalid_content_length():

@@ -46,7 +46,19 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
             async def generate_stream():
                 nonlocal decremented
                 try:
-                    prompt_len = sum(len(m.get("content", "")) for m in messages_dict)
+                    prompt_len = 0
+                    for m in messages_dict:
+                        content = m.get("content", "")
+                        if isinstance(content, list):
+                            for part in content:
+                                if isinstance(part, dict) and "text" in part:
+                                    prompt_len += len(part["text"])
+                                elif isinstance(part, str):
+                                    prompt_len += len(part)
+                        elif isinstance(content, str):
+                            prompt_len += len(content)
+
+                    completion_id = f"chatcmpl-{uuid.uuid4()}"
                     llm_tokens_consumed_total.inc(prompt_len // 4 or 1)
 
                     async for chunk in engine.stream_chat(
@@ -57,7 +69,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                     ):
                         llm_tokens_generated_total.inc(1)
                         response_chunk = {
-                            "id": f"chatcmpl-{uuid.uuid4()}",
+                            "id": completion_id,
                             "object": "chat.completion.chunk",
                             "created": int(time.time()),
                             "model": model_name,
