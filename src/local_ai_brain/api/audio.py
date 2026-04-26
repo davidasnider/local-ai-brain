@@ -76,12 +76,16 @@ async def create_transcription(
     finally:
         audio_processing_latency_seconds.observe(time.time() - start_time)
         if tmp_path is not None:
-            try:
-                await asyncio.to_thread(os.unlink, tmp_path)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                logger.warning(f"Could not remove temporary audio file {tmp_path}: {e}")
+
+            def _safe_unlink(path: str) -> None:
+                try:
+                    os.unlink(path)
+                except FileNotFoundError:
+                    pass
+                except Exception as e:
+                    logger.warning(f"Could not remove temporary audio file {path}: {e}")
+
+            await asyncio.shield(asyncio.to_thread(_safe_unlink, tmp_path))
 
 
 @router.post("/audio/speech")
