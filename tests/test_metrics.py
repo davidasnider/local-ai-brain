@@ -1,5 +1,5 @@
-from unittest.mock import MagicMock, patch
 import sys
+from unittest.mock import MagicMock, patch
 
 # Standard way to mock missing libraries in environments where they are not installed
 # and still avoid the risks of direct sys.modules manipulation in the main test logic.
@@ -15,6 +15,7 @@ with patch.dict(sys.modules, {"psutil": mock_psutil, "prometheus_client": mock_p
         system_memory_used_bytes,
         update_memory_metrics,
     )
+
 
 def test_update_memory_metrics():
     # Setup mock data
