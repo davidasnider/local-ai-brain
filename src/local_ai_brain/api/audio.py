@@ -1,5 +1,7 @@
 import asyncio
 import io
+import os
+import tempfile
 import time
 from typing import Optional
 
@@ -43,8 +45,6 @@ async def create_transcription(
         raise HTTPException(status_code=503, detail="STT model is not initialized.")
 
     start_time = time.time()
-    import os
-    import tempfile
 
     tmp_path = None
     try:
@@ -75,13 +75,18 @@ async def create_transcription(
         raise HTTPException(status_code=500, detail="Transcription failed")
     finally:
         audio_processing_latency_seconds.observe(time.time() - start_time)
-        if tmp_path is not None:
+
+        def _safe_unlink(path):
             try:
-                os.unlink(tmp_path)
+                os.unlink(path)
             except FileNotFoundError:
                 pass
             except Exception as e:
-                logger.warning(f"Could not remove temporary audio file {tmp_path}: {e}")
+                logger.warning(f"Could not remove temporary audio file {path}: {e}")
+
+        if tmp_path is not None:
+            # Shield the cleanup to ensure it runs even if the request is cancelled
+            asyncio.shield(asyncio.to_thread(_safe_unlink, tmp_path))
 
 
 @router.post("/audio/speech")
