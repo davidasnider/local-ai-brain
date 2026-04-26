@@ -27,7 +27,7 @@ if [ -z "$UV_BIN" ]; then
     echo "uv not found in PATH. Ensure uv is installed and available in $HOME/.cargo/bin or /opt/homebrew/bin."
     exit 1
 fi
-"$UV_BIN" sync --frozen
+"$UV_BIN" sync --frozen --no-dev
 
 echo "Starting server on port 8000..."
 PYTHONPATH=src "$UV_BIN" run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8000

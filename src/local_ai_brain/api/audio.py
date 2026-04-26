@@ -135,7 +135,7 @@ async def create_speech(request: Request, body: SpeechRequest):
         def run_kokoro():
             # Create audio numpy array
             audio_array, sample_rate = tts_model.create(
-                body.input, voice=active_voice, speed=body.speed or 1.0
+                body.input, voice=active_voice, speed=body.speed if body.speed is not None else 1.0
             )
             # Convert to WAV bytes in memory
             wav_io = io.BytesIO()

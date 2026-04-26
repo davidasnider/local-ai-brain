@@ -94,7 +94,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         else:
             output = await engine.chat(
                 messages=messages_dict,
-                max_tokens=body.max_tokens or 2048,
+                max_tokens=body.max_tokens if body.max_tokens is not None else 2048,
                 temperature=body.temperature,
                 top_p=body.top_p,
             )

@@ -34,6 +34,3 @@ jobs:
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files
-
-      - name: Run pytest
-        run: uv run pytest

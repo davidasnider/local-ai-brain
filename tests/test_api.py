@@ -2,6 +2,7 @@ import os
 import sys
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 # Set environment variables BEFORE any imports from the app
@@ -9,8 +10,6 @@ os.environ["TESTING"] = "1"
 os.environ["LOCAL_API_KEY"] = "test-secret-key"
 
 # Mock heavy ML modules to prevent them from being imported/loaded at all
-import numpy as np
-
 mock_vllm = MagicMock()
 mock_batched = MagicMock()
 mock_batched_instance = MagicMock()
@@ -89,14 +88,16 @@ from local_ai_brain.main import app  # noqa: E402
 
 def test_health():
     with TestClient(app) as client:
-        response = client.get("/health")
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.get("/health", headers=headers)
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
 
 
 def test_metrics():
     with TestClient(app) as client:
-        response = client.get("/metrics")
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.get("/metrics", headers=headers)
         assert response.status_code == 200
         assert "http_requests_total" in response.text
 
@@ -204,7 +205,8 @@ def test_audio_transcription_duration_failure():
 def test_health_models_loaded():
     with TestClient(app) as client:
         client.app.state.llm_engine = mock_batched_instance
-        response = client.get("/health")
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.get("/health", headers=headers)
         assert response.status_code == 200
         assert response.json()["models_loaded"] is True
 

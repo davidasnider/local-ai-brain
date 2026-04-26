@@ -40,7 +40,8 @@ if [ -z "$LOCAL_API_KEY" ]; then
     exit 1
 fi
 
-sed "s/__REPLACE_WITH_LOCAL_API_KEY__/$LOCAL_API_KEY/g" com.localbrain.api.plist > "$PLIST_PATH"
+ESCAPED_LOCAL_API_KEY=$(printf '%s' "$LOCAL_API_KEY" | sed 's/[&|\\]/\\&/g')
+sed "s|__REPLACE_WITH_LOCAL_API_KEY__|$ESCAPED_LOCAL_API_KEY|g" com.localbrain.api.plist > "$PLIST_PATH"
 
 # Unload existing instance if present
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
