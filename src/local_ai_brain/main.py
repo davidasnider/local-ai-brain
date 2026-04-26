@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import os
 import secrets
 import sys
 
@@ -40,6 +41,28 @@ class InterceptHandler(logging.Handler):
 
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
+
+logger.remove()
+
+
+def configure_logging(testing: bool = False):
+    if not testing:
+        log_path = os.path.expanduser(
+            os.getenv("LOCAL_AI_BRAIN_LOG_PATH", "~/Library/Logs/local-ai-brain.log")
+        )
+        log_directory = os.path.dirname(log_path)
+        if log_directory:
+            os.makedirs(log_directory, exist_ok=True)
+        logger.add(
+            log_path,
+            level="INFO",
+            rotation="10 MB",
+            retention="14 days",
+            compression="gz",
+        )
+
+
+configure_logging(settings.TESTING)
 
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
