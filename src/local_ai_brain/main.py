@@ -116,8 +116,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, title="Local AI Brain")
 
 # Add Middlewares
-app.add_middleware(MetricsMiddleware)
 app.add_middleware(MemoryGuardMiddleware)
+app.add_middleware(MetricsMiddleware)
 
 # Include Routers with global dependencies for authentication
 app.include_router(chat_router, prefix="/v1", dependencies=[Depends(verify_api_key)])
