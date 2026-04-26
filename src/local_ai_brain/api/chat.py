@@ -59,7 +59,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                             prompt_len += len(content)
 
                     completion_id = f"chatcmpl-{uuid.uuid4()}"
-                    llm_tokens_consumed_total.inc(prompt_len // 4 or 1)
+                    llm_tokens_consumed_total.inc(prompt_len // 4)
 
                     async for chunk in engine.stream_chat(
                         messages=messages_dict,
@@ -68,7 +68,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                         top_p=body.top_p,
                     ):
                         # Heuristic: estimation based on character count
-                        llm_tokens_generated_total.inc(len(chunk.new_text) // 4 or 1)
+                        llm_tokens_generated_total.inc(len(chunk.new_text) // 4)
                         response_chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",

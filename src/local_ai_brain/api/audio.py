@@ -68,13 +68,13 @@ async def create_transcription(
             return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name, language=language)
 
         result = await asyncio.to_thread(run_whisper)
-        audio_processing_latency_seconds.observe(time.time() - start_time)
         text = result.get("text", "")
         return TranscriptionResponse(text=text)
     except Exception as e:
         logger.error(f"Error during transcription: {e}")
         raise HTTPException(status_code=500, detail="Transcription failed")
     finally:
+        audio_processing_latency_seconds.observe(time.time() - start_time)
         if tmp_path is not None:
             try:
                 os.unlink(tmp_path)
@@ -144,8 +144,9 @@ async def create_speech(request: Request, body: SpeechRequest):
             return wav_io
 
         wav_io = await asyncio.to_thread(run_kokoro)
-        audio_processing_latency_seconds.observe(time.time() - start_time)
         return StreamingResponse(wav_io, media_type="audio/wav")
     except Exception as e:
         logger.error(f"Error during TTS generation: {e}")
         raise HTTPException(status_code=500, detail="TTS generation failed")
+    finally:
+        audio_processing_latency_seconds.observe(time.time() - start_time)
