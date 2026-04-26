@@ -312,13 +312,11 @@ def test_audio_speech():
 
 
 def test_audio_speech_input_too_long():
-    from local_ai_brain.config import settings
-
     with TestClient(app) as client:
         client.app.state.tts_model = MockKokoro()
         headers = {"Authorization": "Bearer test-secret-key"}
-        # Exceed default limit
-        long_input = "a" * (settings.TTS_MAX_CHARACTERS + 1)
+        # Exceed default 4096 limit
+        long_input = "a" * 5000
         response = client.post(
             "/v1/audio/speech",
             json={"input": long_input, "voice": "default"},
