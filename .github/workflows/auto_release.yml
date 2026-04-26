@@ -1,10 +1,7 @@
 name: Auto Release
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'pyproject.toml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -21,8 +18,13 @@ jobs:
       - name: Get Version
         id: get_version
         run: |
-          VERSION=$(grep -m 1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(python -c '
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              version = tomllib.load(f)["project"]["version"]
+          print(version)
+          ')
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Check if Release Exists
         id: check_release
@@ -41,5 +43,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v${{ steps.get_version.outputs.VERSION }}" \
+            --target "${{ github.sha }}" \
             --title "v${{ steps.get_version.outputs.VERSION }}" \
             --generate-notes
