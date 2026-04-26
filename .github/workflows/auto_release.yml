@@ -1,7 +1,9 @@
 name: Auto Release
 
 on:
-  push:
+  pull_request:
+    types:
+      - closed
     branches:
       - "main"
     paths:
@@ -13,6 +15,7 @@ permissions:
 
 jobs:
   cut-release:
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
