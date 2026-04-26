@@ -77,7 +77,7 @@ async def create_transcription(
         audio_processing_latency_seconds.observe(time.time() - start_time)
         if tmp_path is not None:
             try:
-                os.unlink(tmp_path)
+                await asyncio.to_thread(os.unlink, tmp_path)
             except FileNotFoundError:
                 pass
             except Exception as e:
