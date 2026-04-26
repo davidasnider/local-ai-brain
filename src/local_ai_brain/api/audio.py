@@ -108,6 +108,17 @@ async def create_speech(request: Request, body: SpeechRequest):
             ),
         )
     logger.info(f"Received speech request for model: {model_name}, voice: {body.voice}")
+
+    input_len = len(body.input)
+    if input_len > settings.TTS_MAX_CHARACTERS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Input text is too long ({input_len} characters). "
+                f"Maximum allowed is {settings.TTS_MAX_CHARACTERS} characters."
+            ),
+        )
+
     tts_model = getattr(request.app.state, "tts_model", None)
     if tts_model is None:
         raise HTTPException(status_code=503, detail="TTS model is not initialized.")
@@ -135,7 +146,7 @@ async def create_speech(request: Request, body: SpeechRequest):
     start_time = time.time()
     try:
         # Increment characters processed
-        tts_characters_processed_total.inc(len(body.input))
+        tts_characters_processed_total.inc(input_len)
 
         def run_kokoro():
             # Create audio numpy array
