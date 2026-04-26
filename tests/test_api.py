@@ -109,7 +109,6 @@ def test_logging_interceptor_error_paths():
     logging.getLogger("test_unknown_level").log(99, "Test unknown level")
 
     # Trigger shallow stack depth for InterceptHandler
-    # This is tricky, but we can try to call emit directly if needed
     from local_ai_brain.main import InterceptHandler
 
     handler = InterceptHandler()
@@ -117,6 +116,17 @@ def test_logging_interceptor_error_paths():
 
     with patch("sys._getframe", side_effect=ValueError("Shallow stack")):
         handler.emit(record)
+
+
+def test_configure_logging():
+    from local_ai_brain.main import configure_logging
+
+    with patch("os.path.expanduser", return_value="/tmp/test-log.log"):
+        with patch("os.makedirs") as mock_makedirs:
+            with patch("loguru.logger.add") as mock_logger_add:
+                configure_logging(testing=False)
+                mock_makedirs.assert_called_once_with("/tmp", exist_ok=True)
+                mock_logger_add.assert_called_once()
 
 
 def test_chat_completions_streaming_error():
