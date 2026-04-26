@@ -42,7 +42,13 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
-logger.add(os.path.expanduser("~/Library/Logs/local-ai-brain.log"), level="INFO", rotation="10 MB")
+logger.add(
+    os.path.expanduser("~/Library/Logs/local-ai-brain.log"),
+    level="INFO",
+    rotation="10 MB",
+    retention="14 days",
+    compression="gz",
+)
 
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
