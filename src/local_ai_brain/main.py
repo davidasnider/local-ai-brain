@@ -42,13 +42,26 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
-logger.add(
-    os.path.expanduser("~/Library/Logs/local-ai-brain.log"),
-    level="INFO",
-    rotation="10 MB",
-    retention="14 days",
-    compression="gz",
-)
+logger.remove()
+
+
+def _configure_file_logging():
+    if sys.platform == "darwin":
+        log_path = os.path.expanduser("~/Library/Logs/local-ai-brain.log")
+    else:
+        log_path = os.path.expanduser("~/.local/state/local-ai-brain/local-ai-brain.log")
+
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    logger.add(
+        log_path,
+        level="INFO",
+        rotation="10 MB",
+        retention="14 days",
+        compression="gz",
+    )
+
+
+_configure_file_logging()
 
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
