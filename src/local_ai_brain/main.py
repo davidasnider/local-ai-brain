@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import os
 import secrets
 import sys
 
@@ -41,6 +42,7 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
+# Configure built-in logging to be intercepted by loguru
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -49,6 +51,22 @@ for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
     logging_logger = logging.getLogger(logger_name)
     logging_logger.handlers = []
     logging_logger.propagate = True
+
+# Configure loguru to log to a file
+log_dir = os.path.expanduser("~/Library/Logs/local-ai-brain")
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "localbrain.log")
+
+# We replace the default stdout handler with our own configuration if needed,
+# or just add the file handler. Let's make sure it still logs to stdout (useful for development)
+# and also logs to the file.
+logger.add(
+    log_file,
+    rotation="10 MB",
+    retention="7 days",
+    level="INFO",
+    enqueue=True, # Thread-safe writing
+)
 
 disable_progress_bars()
 
