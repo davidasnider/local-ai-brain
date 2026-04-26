@@ -1,5 +1,7 @@
 import asyncio
 import io
+import os
+import tempfile
 import time
 from typing import Optional
 
@@ -43,8 +45,6 @@ async def create_transcription(
         raise HTTPException(status_code=503, detail="STT model is not initialized.")
 
     start_time = time.time()
-    import os
-    import tempfile
 
     tmp_path = None
     try:
