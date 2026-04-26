@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     LOCAL_API_KEY: str
     MEMORY_LIMIT_GB: float = 48.0
     TESTING: bool = False
-    LOG_PATH: str = "~/Library/Logs/local-ai-brain.log"
+    LOG_PATH: str = Field(
+        default="~/Library/Logs/local-ai-brain.log",
+        validation_alias="LOCAL_AI_BRAIN_LOG_PATH",
+    )
 
     # Hugging Face token (optional, for private or rate‑limited repos)
     HF_TOKEN: Optional[str] = Field(default=None, validation_alias="HF_TOKEN")

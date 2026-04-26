@@ -66,8 +66,8 @@ def configure_logging(testing: bool = False):
             compression="gz",
             enqueue=True,  # Thread-safe writing
         )
-    except Exception as e:
-        logger.error(f"Failed to configure file logging: {e}")
+    except Exception:
+        logger.exception("Failed to configure file logging")
 
 
 configure_logging(settings.TESTING)
