@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -e
 
+# Get the directory from which the script is being run
+CURRENT_DIR="$(pwd)"
+ENV_FILE="$CURRENT_DIR/.env"
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Error: .env file not found in $CURRENT_DIR." >&2
+    echo "Please create a .env file with the required configuration before running this script." >&2
+    exit 1
+fi
+
+# Source the .env file so variables like LOCAL_API_KEY are available
+source "$ENV_FILE"
+
 PROD_DIR="$HOME/.local/share/local-ai-brain-prod"
 REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
@@ -40,8 +53,8 @@ if [ -z "$LOCAL_API_KEY" ]; then
     exit 1
 fi
 
-# Store the API key in a protected .env file instead of the plist
-echo "LOCAL_API_KEY=$LOCAL_API_KEY" > "$PROD_DIR/.env"
+# Copy the .env file instead of creating a new one
+cp "$ENV_FILE" "$PROD_DIR/.env"
 chmod 600 "$PROD_DIR/.env"
 
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
