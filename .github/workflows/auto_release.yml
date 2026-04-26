@@ -3,9 +3,9 @@ name: Auto Release
 on:
   push:
     branches:
-      - main
+      - "main"
     paths:
-      - 'pyproject.toml'
+      - "pyproject.toml"
   workflow_dispatch:
 
 permissions:
