@@ -53,7 +53,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                             for part in content:
                                 if isinstance(part, dict) and "text" in part:
                                     prompt_len += len(part["text"])
-
+                                elif isinstance(part, str):
+                                    prompt_len += len(part)
                         elif isinstance(content, str):
                             prompt_len += len(content)
 

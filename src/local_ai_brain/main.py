@@ -46,15 +46,10 @@ logger.remove()
 
 
 def configure_logging(testing: bool = False):
-    if testing:
-        logger.add(sys.stderr, level="INFO")
-        return
-
-    # Add a console sink for manual runs and visibility
-    logger.add(sys.stderr, level="INFO")
-
-    try:
-        log_path = os.path.expanduser(settings.LOG_PATH)
+    if not testing:
+        log_path = os.path.expanduser(
+            os.getenv("LOCAL_AI_BRAIN_LOG_PATH", "~/Library/Logs/local-ai-brain.log")
+        )
         log_directory = os.path.dirname(log_path)
         if log_directory:
             os.makedirs(log_directory, exist_ok=True)
@@ -64,10 +59,7 @@ def configure_logging(testing: bool = False):
             rotation="10 MB",
             retention="14 days",
             compression="gz",
-            enqueue=True,  # Thread-safe writing
         )
-    except Exception:
-        logger.exception(f"Failed to configure file logging to {log_path}")
 
 
 configure_logging(settings.TESTING)
