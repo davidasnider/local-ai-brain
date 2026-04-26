@@ -124,12 +124,12 @@ app.include_router(chat_router, prefix="/v1", dependencies=[Depends(verify_api_k
 app.include_router(audio_router, prefix="/v1", dependencies=[Depends(verify_api_key)])
 
 
-@app.get("/health", tags=["System"])
+@app.get("/health", tags=["System"], dependencies=[Depends(verify_api_key)])
 async def health_check():
     return {"status": "ok", "models_loaded": getattr(app.state, "llm_engine", None) is not None}
 
 
-@app.get("/metrics", tags=["System"])
+@app.get("/metrics", tags=["System"], dependencies=[Depends(verify_api_key)])
 async def get_metrics():
     # Expose Prometheus metrics with updated memory states
     from .metrics import METRICS_REGISTRY
