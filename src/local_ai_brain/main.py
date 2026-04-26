@@ -67,7 +67,7 @@ def configure_logging(testing: bool = False):
             enqueue=True,  # Thread-safe writing
         )
     except Exception:
-        logger.exception("Failed to configure file logging")
+        logger.exception(f"Failed to configure file logging to {log_path}")
 
 
 configure_logging(settings.TESTING)
