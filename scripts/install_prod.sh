@@ -1,6 +1,43 @@
 #!/usr/bin/env bash
 set -e
 
+# Get the directory of the script and repo root
+ORIGINAL_PWD="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
+case "$ENV_FILE" in
+    /*) ;;
+    *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
+esac
+
+# Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
+if [ -z "$LOCAL_API_KEY" ]; then
+    if [ -f "$ENV_FILE" ]; then
+        LOCAL_API_KEY="$(
+            awk '
+                /^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=/ {
+                    value = $0
+                    sub(/^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=[[:space:]]*/, "", value)
+                    print value
+                    exit
+                }
+            ' "$ENV_FILE"
+        )"
+
+        case "$LOCAL_API_KEY" in
+            \"*\")
+                LOCAL_API_KEY="${LOCAL_API_KEY#\"}"
+                LOCAL_API_KEY="${LOCAL_API_KEY%\"}"
+                ;;
+            \'*\')
+                LOCAL_API_KEY="${LOCAL_API_KEY#\'}"
+                LOCAL_API_KEY="${LOCAL_API_KEY%\'}"
+                ;;
+        esac
+    fi
+fi
+
 PROD_DIR="$HOME/.local/share/local-ai-brain-prod"
 REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
@@ -40,8 +77,16 @@ if [ -z "$LOCAL_API_KEY" ]; then
     exit 1
 fi
 
-# Store the API key in a protected .env file instead of the plist
-echo "LOCAL_API_KEY=$LOCAL_API_KEY" > "$PROD_DIR/.env"
+# Copy the .env file or create one if it doesn't exist
+if [ -f "$ENV_FILE" ]; then
+    if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
+        echo ".env already exists at destination; skipping copy."
+    else
+        cp "$ENV_FILE" "$PROD_DIR/.env"
+    fi
+else
+    echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+fi
 chmod 600 "$PROD_DIR/.env"
 
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
