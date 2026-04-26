@@ -14,10 +14,6 @@
     <true/>
     <key>KeepAlive</key>
     <true/>
-    <key>StandardOutPath</key>
-    <string>/tmp/localbrain.out</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/localbrain.err</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
