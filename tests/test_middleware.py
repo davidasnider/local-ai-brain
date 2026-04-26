@@ -1,15 +1,15 @@
 import os
+from unittest.mock import MagicMock, patch
+
+from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
+from starlette.types import Scope
 
 # Set environment variables BEFORE any imports from the app
 os.environ["TESTING"] = "1"
 os.environ["LOCAL_API_KEY"] = "test-secret-key"
 
-from unittest.mock import MagicMock, patch
-
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-from local_ai_brain.middleware import MetricsMiddleware
+from local_ai_brain.middleware import MetricsMiddleware  # noqa: E402
 
 
 def test_metrics_middleware_logging():
@@ -24,37 +24,33 @@ def test_metrics_middleware_logging():
     async def metrics_endpoint():
         return "metrics content"
 
-    client = TestClient(app)
+    with TestClient(app) as client:
+        with patch("local_ai_brain.middleware.logger") as mock_logger:
+            # Test normal request logging
+            response = client.get("/test")
+            assert response.status_code == 200
 
-    with patch("local_ai_brain.middleware.logger") as mock_logger:
-        # Test normal request logging
-        response = client.get("/test")
-        assert response.status_code == 200
+            # Check that logger.info was called for /test
+            # The log format is '{} - "{}" {} HTTP/{}" {}'
+            mock_logger.info.assert_called()
+            args = mock_logger.info.call_args[0]
+            assert args[0] == '{} - "{} {} HTTP/{}" {}'
+            # args[1]: host, [2]: method, [3]: path, [4]: version, [5]: status
+            assert args[2] == "GET"
+            assert args[3] == "/test"
+            assert args[5] == "200"
 
-        # Check that logger.info was called for /test
-        # The log format is '{} - "{} {} HTTP/{}" {}'
-        mock_logger.info.assert_called()
-        args = mock_logger.info.call_args[0]
-        assert args[0] == '{} - "{} {} HTTP/{}" {}'
-        # args[1] is host, args[2] is method, args[3] is path, args[4] is version, args[5] is status
-        assert args[2] == "GET"
-        assert args[3] == "/test"
-        assert args[5] == "200"
+            mock_logger.info.reset_mock()
 
-        mock_logger.info.reset_mock()
-
-        # Test /metrics request logging (should be skipped)
-        response = client.get("/metrics")
-        assert response.status_code == 200
-        mock_logger.info.assert_not_called()
+            # Test /metrics request logging (should be skipped)
+            response = client.get("/metrics")
+            assert response.status_code == 200
+            mock_logger.info.assert_not_called()
 
 
 def test_metrics_middleware_sanitization():
     app = FastAPI()
     app.add_middleware(MetricsMiddleware)
-
-    from fastapi import Request
-    from starlette.types import Scope
 
     async def mock_call_next(request):
         return MagicMock(status_code=200)
@@ -94,9 +90,6 @@ def test_metrics_middleware_fallback_host():
 
     # We need to trigger a request where request.client is None
     # TestClient usually sets it. Let's mock the request object in dispatch.
-
-    from fastapi import Request
-    from starlette.types import Scope
 
     async def mock_call_next(request):
         return MagicMock(status_code=200)
