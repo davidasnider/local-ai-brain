@@ -311,6 +311,21 @@ def test_audio_speech():
         assert response2.headers["content-type"] == "audio/wav"
 
 
+def test_audio_speech_input_too_long():
+    with TestClient(app) as client:
+        client.app.state.tts_model = MockKokoro()
+        headers = {"Authorization": "Bearer test-secret-key"}
+        # Exceed default 4096 limit
+        long_input = "a" * 5000
+        response = client.post(
+            "/v1/audio/speech",
+            json={"input": long_input, "voice": "default"},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert "Input text is too long" in response.json()["detail"]
+
+
 def test_audio_transcription():
     with patch.object(mock_whisper, "transcribe", return_value={"text": "hello"}):
         with TestClient(app) as client:

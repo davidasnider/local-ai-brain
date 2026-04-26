@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # Core settings
     LOCAL_API_KEY: str
     MEMORY_LIMIT_GB: float = 48.0
+    TTS_MAX_CHARACTERS: int = 4096
     TESTING: bool = False
 
     # Hugging Face token (optional, for private or rate‑limited repos)

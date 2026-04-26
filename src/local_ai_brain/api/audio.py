@@ -103,6 +103,16 @@ async def create_speech(request: Request, body: SpeechRequest):
             ),
         )
     logger.info(f"Received speech request for model: {model_name}, voice: {body.voice}")
+
+    if len(body.input) > settings.TTS_MAX_CHARACTERS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Input text is too long ({len(body.input)} characters). "
+                f"Maximum allowed is {settings.TTS_MAX_CHARACTERS} characters."
+            ),
+        )
+
     tts_model = getattr(request.app.state, "tts_model", None)
     if tts_model is None:
         raise HTTPException(status_code=503, detail="TTS model is not initialized.")
