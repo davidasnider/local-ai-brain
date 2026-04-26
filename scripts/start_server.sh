@@ -30,7 +30,4 @@ fi
 "$UV_BIN" sync --frozen --no-dev
 
 echo "Starting server on port 8000..."
-if [ -f "$PROD_DIR/.env" ]; then
-    source "$PROD_DIR/.env"
-fi
 PYTHONPATH=src "$UV_BIN" run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8000

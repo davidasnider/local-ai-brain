@@ -1,18 +1,37 @@
 #!/usr/bin/env bash
 set -e
 
-# Get the directory from which the script is being run
-CURRENT_DIR="$(pwd)"
-ENV_FILE="$CURRENT_DIR/.env"
+# Get the directory of the script and repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
 
-if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: .env file not found in $CURRENT_DIR." >&2
-    echo "Please create a .env file with the required configuration before running this script." >&2
-    exit 1
+# Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
+if [ -z "$LOCAL_API_KEY" ]; then
+    if [ -f "$ENV_FILE" ]; then
+        LOCAL_API_KEY="$(
+            awk '
+                /^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=/ {
+                    value = $0
+                    sub(/^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=[[:space:]]*/, "", value)
+                    print value
+                    exit
+                }
+            ' "$ENV_FILE"
+        )"
+
+        case "$LOCAL_API_KEY" in
+            \"*\")
+                LOCAL_API_KEY="${LOCAL_API_KEY#\"}"
+                LOCAL_API_KEY="${LOCAL_API_KEY%\"}"
+                ;;
+            \'*\')
+                LOCAL_API_KEY="${LOCAL_API_KEY#\'}"
+                LOCAL_API_KEY="${LOCAL_API_KEY%\'}"
+                ;;
+        esac
+    fi
 fi
-
-# Source the .env file so variables like LOCAL_API_KEY are available
-source "$ENV_FILE"
 
 PROD_DIR="$HOME/.local/share/local-ai-brain-prod"
 REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
@@ -53,8 +72,12 @@ if [ -z "$LOCAL_API_KEY" ]; then
     exit 1
 fi
 
-# Copy the .env file instead of creating a new one
-cp "$ENV_FILE" "$PROD_DIR/.env"
+# Copy the .env file or create one if it doesn't exist
+if [ -f "$ENV_FILE" ]; then
+    cp "$ENV_FILE" "$PROD_DIR/.env"
+else
+    echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+fi
 chmod 600 "$PROD_DIR/.env"
 
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
