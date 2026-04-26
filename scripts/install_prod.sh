@@ -44,10 +44,6 @@ fi
 echo "LOCAL_API_KEY=$LOCAL_API_KEY" > "$PROD_DIR/.env"
 chmod 600 "$PROD_DIR/.env"
 
-# Register and enable macOS launchd service
-PLIST_PATH="$HOME/Library/LaunchAgents/com.localbrain.api.plist"
-echo "Registering macOS LaunchAgent to $PLIST_PATH..."
-
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
 perl -0pe 's/\n[ \t]*<key>LOCAL_API_KEY<\/key>[ \t]*\n[ \t]*<string>__REPLACE_WITH_LOCAL_API_KEY__<\/string>[ \t]*\n/\n/g' com.localbrain.api.plist > "$PLIST_PATH"
 
