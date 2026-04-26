@@ -2,9 +2,14 @@
 set -e
 
 # Get the directory of the script and repo root
+ORIGINAL_PWD="$(pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
+case "$ENV_FILE" in
+    /*) ;;
+    *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
+esac
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -74,7 +79,11 @@ fi
 
 # Copy the .env file or create one if it doesn't exist
 if [ -f "$ENV_FILE" ]; then
-    cp "$ENV_FILE" "$PROD_DIR/.env"
+    if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
+        echo ".env already exists at destination; skipping copy."
+    else
+        cp "$ENV_FILE" "$PROD_DIR/.env"
+    fi
 else
     echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
 fi
