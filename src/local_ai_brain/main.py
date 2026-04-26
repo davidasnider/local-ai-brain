@@ -65,7 +65,7 @@ logger.add(
     rotation="10 MB",
     retention="7 days",
     level="INFO",
-    enqueue=True, # Thread-safe writing
+    enqueue=True,  # Thread-safe writing
 )
 
 disable_progress_bars()
