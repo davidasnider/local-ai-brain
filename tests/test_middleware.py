@@ -1,3 +1,9 @@
+import os
+
+# Set environment variables BEFORE any imports from the app
+os.environ["TESTING"] = "1"
+os.environ["LOCAL_API_KEY"] = "test-secret-key"
+
 from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
@@ -26,12 +32,14 @@ def test_metrics_middleware_logging():
         assert response.status_code == 200
 
         # Check that logger.info was called for /test
-        # The log format is '{client_host} - "{method} {url_path} HTTP/{http_version}"'
-        # followed by the status code.
-        # TestClient uses 'testclient' as host usually, or it might be None
+        # The log format is '{} - "{} {} HTTP/{}" {}'
         mock_logger.info.assert_called()
-        log_msg = mock_logger.info.call_args[0][0]
-        assert '"GET /test HTTP/1.1" 200' in log_msg
+        args = mock_logger.info.call_args[0]
+        assert args[0] == '{} - "{} {} HTTP/{}" {}'
+        # args[1] is host, args[2] is method, args[3] is path, args[4] is version, args[5] is status
+        assert args[2] == "GET"
+        assert args[3] == "/test"
+        assert args[5] == "200"
 
         mock_logger.info.reset_mock()
 
@@ -56,7 +64,7 @@ def test_metrics_middleware_sanitization():
     scope: Scope = {
         "type": "http",
         "method": "GET\n",
-        "path": "/malicious\npath",
+        "path": "/malicious\rpath",
         "headers": [],
         "http_version": "1.1",
     }
@@ -68,10 +76,12 @@ def test_metrics_middleware_sanitization():
         asyncio.run(middleware.dispatch(request, mock_call_next))
 
         mock_logger.info.assert_called()
-        log_msg = mock_logger.info.call_args[0][0]
-        # Verify both method and path are sanitized
-        assert "\\n" in log_msg
-        assert "\n" not in log_msg
+        args = mock_logger.info.call_args[0]
+        # Verify both method and path are sanitized in the arguments passed to logger
+        assert "\\n" in args[2]
+        assert "\n" not in args[2]
+        # If \r survives, it should be escaped. If it's stripped, we just ensure no \r.
+        assert "\\r" in args[3] or "\r" not in args[3]
 
 
 def test_metrics_middleware_fallback_host():
@@ -109,5 +119,6 @@ def test_metrics_middleware_fallback_host():
         asyncio.run(middleware.dispatch(request, mock_call_next))
 
         mock_logger.info.assert_called()
-        log_msg = mock_logger.info.call_args[0][0]
-        assert log_msg.startswith("- -")
+        args = mock_logger.info.call_args[0]
+        # args[1] is the client host
+        assert args[1] == "-"

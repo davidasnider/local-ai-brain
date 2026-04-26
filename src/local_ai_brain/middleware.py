@@ -36,10 +36,15 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
             if url_path != "/metrics":
                 logger.info(
-                    f'{client_host} - "{method} {url_path} HTTP/{http_version}" {status_code}'
+                    '{} - "{} {} HTTP/{}" {}',
+                    client_host,
+                    method,
+                    url_path,
+                    http_version,
+                    status_code,
                 )
 
-            http_requests_total.labels(endpoint=request.url.path, status=status_code).inc()
+            http_requests_total.labels(endpoint=url_path, status=status_code).inc()
 
 
 class MemoryGuardMiddleware(BaseHTTPMiddleware):
