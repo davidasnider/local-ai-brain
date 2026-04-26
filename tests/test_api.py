@@ -126,7 +126,7 @@ def test_configure_logging():
             with patch("loguru.logger.add") as mock_logger_add:
                 configure_logging(testing=False)
                 mock_makedirs.assert_called_once_with("/tmp", exist_ok=True)
-                mock_logger_add.assert_called_once()
+                assert mock_logger_add.call_count == 2
 
 
 def test_chat_completions_streaming_error():
@@ -313,13 +313,16 @@ def test_audio_speech():
 
 def test_audio_transcription():
     with patch.object(mock_whisper, "transcribe", return_value={"text": "hello"}):
-        with TestClient(app) as client:
-            client.app.state.stt_model = mock_whisper
-            headers = {"Authorization": "Bearer test-secret-key"}
-            files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
-            response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
-            assert response.status_code == 200
-            assert response.json()["text"] == "hello"
+        with patch("local_ai_brain.api.audio.sf.info") as mock_sf_info:
+            mock_sf_info.return_value.samplerate = 16000
+            mock_sf_info.return_value.frames = 16000
+            with TestClient(app) as client:
+                client.app.state.stt_model = mock_whisper
+                headers = {"Authorization": "Bearer test-secret-key"}
+                files = {"file": ("test.wav", b"fake-audio-data", "audio/wav")}
+                response = client.post("/v1/audio/transcriptions", files=files, headers=headers)
+                assert response.status_code == 200
+                assert response.json()["text"] == "hello"
 
 
 @patch("local_ai_brain.middleware.psutil.virtual_memory")
@@ -466,6 +469,40 @@ def test_chat_completions_list_content():
                         ],
                     }
                 ]
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200
+
+
+def test_audio_speech_unsupported_format():
+    with TestClient(app) as client:
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.post(
+            "/v1/audio/speech",
+            json={"input": "hello", "voice": "default", "response_format": "mp3"},
+            headers=headers,
+        )
+        assert response.status_code == 400
+
+
+def test_chat_completions_streaming_list_content():
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "stream": True,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "hi"},
+                            {"type": "text", "text": " and more"},
+                        ],
+                    }
+                ],
             },
             headers=headers,
         )
