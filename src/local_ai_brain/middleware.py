@@ -29,11 +29,16 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         except Exception:
             raise
         finally:
-            client_host = request.client.host if request.client else "127.0.0.1"
-            method = request.method
-            url_path = request.url.path
+            client_host = request.client.host if request.client else "-"
+            method = request.method.replace("\n", "\\n").replace("\r", "\\r")
+            url_path = request.url.path.replace("\n", "\\n").replace("\r", "\\r")
             http_version = request.scope.get("http_version", "1.1")
-            logger.info(f'{client_host} - "{method} {url_path} HTTP/{http_version}" {status_code}')
+
+            if url_path != "/metrics":
+                logger.info(
+                    f'{client_host} - "{method} {url_path} HTTP/{http_version}" {status_code}'
+                )
+
             http_requests_total.labels(endpoint=request.url.path, status=status_code).inc()
 
 
