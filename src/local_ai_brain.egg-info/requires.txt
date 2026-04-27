@@ -1,0 +1,10 @@
+fastapi>=0.136.1
+kokoro-onnx>=0.5.0
+loguru>=0.7.3
+mlx-whisper>=0.4.3
+prometheus-client>=0.25.0
+psutil>=7.2.2
+pydantic-settings>=2.14.0
+soundfile>=0.13.1
+uvicorn>=0.46.0
+vllm-mlx
