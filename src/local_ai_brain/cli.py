@@ -54,7 +54,7 @@ def stt(filepath: str, base_url: str, api_key: str):
     url = f"{base_url}/audio/transcriptions"
 
     # Simple multipart/form-data creation
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"  # pragma: allowlist secret
 
     with open(filepath, "rb") as f:
         file_content = f.read()
@@ -147,43 +147,45 @@ def main():
 
     while True:
         try:
-            user_input = input(f"\n{COLOR_PROMPT}❯ {COLOR_RESET}").strip()
+            user_input = input(f"\n{COLOR_PROMPT}❯ {COLOR_RESET}")
         except (KeyboardInterrupt, EOFError):
             print()
             break
 
-        if not user_input:
+        if not user_input.strip():
             continue
 
-        if user_input.lower() in ("/exit", "quit", "exit"):
+        user_input_stripped = user_input.strip()
+
+        if user_input_stripped.lower() in ("/exit", "quit", "exit"):
             break
 
-        if user_input.lower() == "/help":
+        if user_input_stripped.lower() == "/help":
             print_help()
             continue
 
-        if user_input.lower() == "/clear":
+        if user_input_stripped.lower() == "/clear":
             messages = []
             print(f"{COLOR_SYSTEM}Chat history cleared.{COLOR_RESET}")
             continue
 
-        if user_input.startswith("/tts "):
-            text = user_input[5:].strip()
+        if user_input_stripped.startswith("/tts"):
+            text = user_input_stripped[4:].strip()
             if text:
                 tts(text, base_url, api_key)
             else:
                 print(f"{COLOR_ERROR}Usage: /tts <text>{COLOR_RESET}")
             continue
 
-        if user_input.startswith("/stt "):
-            filepath = user_input[5:].strip()
+        if user_input_stripped.startswith("/stt"):
+            filepath = user_input_stripped[4:].strip()
             if filepath:
                 stt(filepath, base_url, api_key)
             else:
                 print(f"{COLOR_ERROR}Usage: /stt <filepath>{COLOR_RESET}")
             continue
 
-        if user_input.startswith("/"):
+        if user_input_stripped.startswith("/"):
             print(f"{COLOR_ERROR}Unknown command. Type /help for available commands.{COLOR_RESET}")
             continue
 
