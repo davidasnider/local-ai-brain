@@ -59,7 +59,7 @@ def stt(filepath: str, base_url: str, api_key: str):
     url = f"{base_url}/audio/transcriptions"
 
     # Simple multipart/form-data creation
-    boundary = uuid.uuid4().hex
+    boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
 
     with open(filepath, "rb") as f:
         file_content = f.read()
