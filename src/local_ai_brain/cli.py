@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import urllib.request
+import uuid
 from typing import Dict, List
 
 # ANSI escape codes for colors
@@ -13,17 +14,21 @@ COLOR_SYSTEM = "\033[93m"  # Yellow
 COLOR_ERROR = "\033[91m"  # Red
 COLOR_PROMPT = "\033[1;36m"  # Cyan bold
 
+DEFAULT_TIMEOUT = 30  # seconds
+
 
 def get_api_key() -> str:
-    key = os.environ.get("LOCAL_API_KEY")
+    key = os.environ.get("LOCAL_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not key:
-        print(f"{COLOR_ERROR}Error: LOCAL_API_KEY environment variable is not set.{COLOR_RESET}")
+        print(
+            f"{COLOR_ERROR}Error: neither LOCAL_API_KEY nor OPENAI_API_KEY environment variable is set.{COLOR_RESET}"
+        )
         sys.exit(1)
     return key
 
 
 def get_base_url() -> str:
-    return os.environ.get("OPENAI_API_BASE", "http://localhost:8000/v1")
+    return os.environ.get("OPENAI_API_BASE", "http://localhost:8000/v1").rstrip("/")
 
 
 def tts(text: str, base_url: str, api_key: str):
@@ -37,7 +42,7 @@ def tts(text: str, base_url: str, api_key: str):
 
     try:
         print(f"{COLOR_SYSTEM}Generating audio...{COLOR_RESET}")
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as response:
             output_file = "speech.wav"
             with open(output_file, "wb") as f:
                 f.write(response.read())
@@ -54,7 +59,7 @@ def stt(filepath: str, base_url: str, api_key: str):
     url = f"{base_url}/audio/transcriptions"
 
     # Simple multipart/form-data creation
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"  # pragma: allowlist secret
+    boundary = uuid.uuid4().hex
 
     with open(filepath, "rb") as f:
         file_content = f.read()
@@ -79,7 +84,7 @@ def stt(filepath: str, base_url: str, api_key: str):
 
     try:
         print(f"{COLOR_SYSTEM}Transcribing...{COLOR_RESET}")
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as response:
             result = json.loads(response.read().decode("utf-8"))
             print(f"{COLOR_ASSISTANT}Transcription: {result.get('text', '')}{COLOR_RESET}")
     except Exception as e:
@@ -98,11 +103,13 @@ def chat(messages: List[Dict[str, str]], base_url: str, api_key: str):
 
     try:
         print(f"{COLOR_ASSISTANT}Assistant: {COLOR_RESET}", end="", flush=True)
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as response:
             full_response = ""
             for line in response:
                 line = line.decode("utf-8").strip()
-                if line.startswith("data: ") and line != "data: [DONE]":
+                if line == "data: [DONE]":
+                    break
+                if line.startswith("data: "):
                     try:
                         chunk = json.loads(line[6:])
                         if chunk["choices"] and chunk["choices"][0].get("delta", {}).get("content"):

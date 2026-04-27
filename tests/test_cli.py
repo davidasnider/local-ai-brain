@@ -13,12 +13,22 @@ def test_get_api_key(monkeypatch):
     assert get_api_key() == "test_key"
 
 
+def test_get_api_key_fallback_openai(monkeypatch):
+    monkeypatch.delenv("LOCAL_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "openai_key")
+    assert get_api_key() == "openai_key"
+
+
 def test_get_api_key_missing(monkeypatch):
     monkeypatch.delenv("LOCAL_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with patch("sys.exit") as mock_exit:
         with patch("builtins.print") as mock_print:
             get_api_key()
             mock_print.assert_called_once()
+            call_args = mock_print.call_args[0][0]
+            assert "LOCAL_API_KEY" in call_args
+            assert "OPENAI_API_KEY" in call_args
             mock_exit.assert_called_once_with(1)
 
 
@@ -27,6 +37,9 @@ def test_get_base_url(monkeypatch):
     assert get_base_url() == "http://localhost:8000/v1"
 
     monkeypatch.setenv("OPENAI_API_BASE", "http://test:9000/v1")
+    assert get_base_url() == "http://test:9000/v1"
+
+    monkeypatch.setenv("OPENAI_API_BASE", "http://test:9000/v1/")
     assert get_base_url() == "http://test:9000/v1"
 
 
