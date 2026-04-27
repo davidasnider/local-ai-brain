@@ -14,25 +14,24 @@ COLOR_SYSTEM = "\033[93m"  # Yellow
 COLOR_ERROR = "\033[91m"  # Red
 COLOR_PROMPT = "\033[1;36m"  # Cyan bold
 
-DEFAULT_TIMEOUT = 30  # seconds
-
 
 def get_api_key() -> str:
     key = os.environ.get("LOCAL_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not key:
         print(
-            f"{COLOR_ERROR}Error: neither LOCAL_API_KEY nor OPENAI_API_KEY environment variable is set.{COLOR_RESET}"
+            f"{COLOR_ERROR}Error: neither LOCAL_API_KEY nor OPENAI_API_KEY "
+            f"environment variable is set.{COLOR_RESET}"
         )
         sys.exit(1)
     return key
 
 
 def get_base_url() -> str:
-    return os.environ.get("OPENAI_API_BASE", "http://localhost:8000/v1").rstrip("/")
+    return os.environ.get("OPENAI_API_BASE", "http://localhost:8000/v1")
 
 
 def tts(text: str, base_url: str, api_key: str):
-    url = f"{base_url}/audio/speech"
+    url = f"{base_url.rstrip('/')}/audio/speech"
     data = {"model": "kokoro-onnx", "input": text, "voice": "af_heart"}
     req = urllib.request.Request(
         url,
@@ -42,7 +41,7 @@ def tts(text: str, base_url: str, api_key: str):
 
     try:
         print(f"{COLOR_SYSTEM}Generating audio...{COLOR_RESET}")
-        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as response:
+        with urllib.request.urlopen(req, timeout=60) as response:
             output_file = "speech.wav"
             with open(output_file, "wb") as f:
                 f.write(response.read())
@@ -56,10 +55,10 @@ def stt(filepath: str, base_url: str, api_key: str):
         print(f"{COLOR_ERROR}Error: File not found: {filepath}{COLOR_RESET}")
         return
 
-    url = f"{base_url}/audio/transcriptions"
+    url = f"{base_url.rstrip('/')}/audio/transcriptions"
 
     # Simple multipart/form-data creation
-    boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
+    boundary = uuid.uuid4().hex
 
     with open(filepath, "rb") as f:
         file_content = f.read()
@@ -84,7 +83,7 @@ def stt(filepath: str, base_url: str, api_key: str):
 
     try:
         print(f"{COLOR_SYSTEM}Transcribing...{COLOR_RESET}")
-        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as response:
+        with urllib.request.urlopen(req, timeout=60) as response:
             result = json.loads(response.read().decode("utf-8"))
             print(f"{COLOR_ASSISTANT}Transcription: {result.get('text', '')}{COLOR_RESET}")
     except Exception as e:
@@ -92,7 +91,7 @@ def stt(filepath: str, base_url: str, api_key: str):
 
 
 def chat(messages: List[Dict[str, str]], base_url: str, api_key: str):
-    url = f"{base_url}/chat/completions"
+    url = f"{base_url.rstrip('/')}/chat/completions"
     data = {"model": "mlx-community/Qwen3.6-35B-A3B-8bit", "messages": messages, "stream": True}
 
     req = urllib.request.Request(
@@ -103,7 +102,7 @@ def chat(messages: List[Dict[str, str]], base_url: str, api_key: str):
 
     try:
         print(f"{COLOR_ASSISTANT}Assistant: {COLOR_RESET}", end="", flush=True)
-        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as response:
+        with urllib.request.urlopen(req, timeout=60) as response:
             full_response = ""
             for line in response:
                 line = line.decode("utf-8").strip()
