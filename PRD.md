@@ -48,3 +48,9 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Secret Scanning:** To ensure the local API key is never committed.
   * **Auto-formatting & Linting:** Running `ruff`.
   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
+
+
+## 7. Interactive CLI
+* An interactive CLI tool (`local-brain`) must be provided for directly interacting with and testing the API endpoints.
+* It should be built using only standard Python libraries (e.g., `urllib.request`) to minimize dependencies.
+* Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
