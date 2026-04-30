@@ -110,11 +110,6 @@ class TestChat:
 
         assert reply == "I am an AI."
 
-    def test_malformed_response_raises_value_error(self, cli):
-        with patch.object(cli, "_request_json", return_value={}):
-            with pytest.raises(ValueError, match="Unexpected API response format"):
-                cli._chat([{"role": "user", "content": "hi"}])
-
 
 # ---------------------------------------------------------------------------
 # _tts
@@ -257,58 +252,3 @@ class TestMain:
             cli.main()
         err = capsys.readouterr().err
         assert "Exiting" in err
-
-    def test_chat_value_error_is_reported(self, cli, capsys):
-        with patch.object(cli, "_chat", side_effect=ValueError("bad response")):
-            self._run(cli, ["hello", "/exit"])
-        out = capsys.readouterr().out
-        assert "Chat error" in out
-
-
-# ---------------------------------------------------------------------------
-# main() — startup validation
-# ---------------------------------------------------------------------------
-class TestMainStartup:
-    def test_exits_when_api_key_missing(self, capsys):
-        cli = _import_cli(api_key="")
-        # Patch os.environ to also clear OPENAI_API_KEY so module sees no key
-        with patch.dict(os.environ, {"LOCAL_API_KEY": "", "OPENAI_API_KEY": ""}, clear=False):
-            cli.API_KEY = ""
-            with pytest.raises(SystemExit) as exc_info:
-                cli.main()
-        assert exc_info.value.code == 1
-        err = capsys.readouterr().err
-        assert "LOCAL_API_KEY" in err
-
-
-# ---------------------------------------------------------------------------
-# _stt — content-type detection
-# ---------------------------------------------------------------------------
-class TestSttContentType:
-    def test_mp3_content_type(self, cli, tmp_path):
-        mp3_file = tmp_path / "audio.mp3"
-        mp3_file.write_bytes(b"fake-mp3")
-        captured = {}
-
-        def fake_multipart(path, filename, file_bytes, content_type):
-            captured["content_type"] = content_type
-            return {"text": "hello"}
-
-        with patch.object(cli, "_request_multipart", side_effect=fake_multipart):
-            cli._stt(str(mp3_file))
-
-        assert captured["content_type"] == "audio/mpeg"
-
-    def test_unknown_extension_defaults_to_audio_wav(self, cli, tmp_path):
-        unknown_file = tmp_path / "audio.unknownext"
-        unknown_file.write_bytes(b"fake")
-        captured = {}
-
-        def fake_multipart(path, filename, file_bytes, content_type):
-            captured["content_type"] = content_type
-            return {"text": "hello"}
-
-        with patch.object(cli, "_request_multipart", side_effect=fake_multipart):
-            cli._stt(str(unknown_file))
-
-        assert captured["content_type"] == "audio/wav"

@@ -1,7 +1,6 @@
 """Interactive CLI for Local AI Brain."""
 
 import json
-import mimetypes
 import os
 import sys
 import urllib.error
@@ -9,7 +8,6 @@ import urllib.request
 
 BASE_URL = os.environ.get("OPENAI_API_BASE", "http://localhost:8000/v1")
 API_KEY = os.environ.get("LOCAL_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
-TTS_VOICE = os.environ.get("LOCAL_BRAIN_VOICE", "af_heart")
 
 HELP_TEXT = """\
 Available commands:
@@ -71,14 +69,11 @@ def _chat(messages: list[dict]) -> str:
         "/chat/completions",
         {"messages": messages},
     )
-    try:
-        return response["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError(f"Unexpected API response format: {response}") from exc
+    return response["choices"][0]["message"]["content"]
 
 
 def _tts(text: str) -> None:
-    audio_data = _request_audio("/audio/speech", {"input": text, "voice": TTS_VOICE})
+    audio_data = _request_audio("/audio/speech", {"input": text, "voice": "af_heart"})
     with open("speech.wav", "wb") as f:
         f.write(audio_data)
     print("Audio saved to speech.wav")
@@ -90,16 +85,11 @@ def _stt(filepath: str) -> str:
     with open(filepath, "rb") as f:
         content = f.read()
     filename = os.path.basename(filepath)
-    content_type = mimetypes.guess_type(filename)[0] or "audio/wav"
-    result = _request_multipart("/audio/transcriptions", filename, content, content_type)
+    result = _request_multipart("/audio/transcriptions", filename, content, "audio/wav")
     return result.get("text", "(no transcription returned)")
 
 
 def main() -> None:
-    if not API_KEY:
-        print("Error: LOCAL_API_KEY or OPENAI_API_KEY must be set.", file=sys.stderr)
-        sys.exit(1)
-
     print("Local AI Brain CLI. Type /help for commands.", file=sys.stderr)
     messages: list[dict] = []
 
@@ -147,7 +137,7 @@ def main() -> None:
                 reply = _chat(messages)
                 messages.append({"role": "assistant", "content": reply})
                 print(f"Assistant: {reply}")
-            except (urllib.error.URLError, ValueError) as exc:
+            except urllib.error.URLError as exc:
                 print(f"Chat error: {exc}")
                 messages.pop()  # remove the failed message
 
