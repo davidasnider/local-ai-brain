@@ -6,6 +6,12 @@ import urllib.request
 import uuid
 from typing import Dict, List
 
+# Maximum audio file size accepted by the STT upload (25 MB)
+MAX_STT_FILE_SIZE = 25 * 1024 * 1024
+
+# Chunk size used when streaming TTS audio to disk (8 KB)
+_TTS_CHUNK_SIZE = 8 * 1024
+
 # ANSI escape codes for colors
 COLOR_RESET = "\033[0m"
 COLOR_USER = "\033[94m"  # Blue
@@ -32,7 +38,10 @@ def get_base_url() -> str:
 
 def tts(text: str, base_url: str, api_key: str):
     url = f"{base_url.rstrip('/')}/audio/speech"
-    data = {"model": "kokoro-onnx", "input": text, "voice": "af_heart"}
+    data: Dict = {"input": text, "voice": "af_heart"}
+    tts_model = os.environ.get("LOCAL_BRAIN_TTS_MODEL")
+    if tts_model:
+        data["model"] = tts_model
     req = urllib.request.Request(
         url,
         data=json.dumps(data).encode("utf-8"),
@@ -44,7 +53,11 @@ def tts(text: str, base_url: str, api_key: str):
         with urllib.request.urlopen(req, timeout=60) as response:
             output_file = "speech.wav"
             with open(output_file, "wb") as f:
-                f.write(response.read())
+                while True:
+                    chunk = response.read(_TTS_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    f.write(chunk)
             print(f"{COLOR_SYSTEM}Saved TTS output to {output_file}{COLOR_RESET}")
     except Exception as e:
         print(f"{COLOR_ERROR}TTS Error: {e}{COLOR_RESET}")
@@ -53,6 +66,15 @@ def tts(text: str, base_url: str, api_key: str):
 def stt(filepath: str, base_url: str, api_key: str):
     if not os.path.exists(filepath):
         print(f"{COLOR_ERROR}Error: File not found: {filepath}{COLOR_RESET}")
+        return
+
+    file_size = os.path.getsize(filepath)
+    if file_size > MAX_STT_FILE_SIZE:
+        print(
+            f"{COLOR_ERROR}Error: File too large "
+            f"({file_size / 1024 / 1024:.1f} MB). "
+            f"Maximum allowed is {MAX_STT_FILE_SIZE // (1024 * 1024)} MB.{COLOR_RESET}"
+        )
         return
 
     url = f"{base_url.rstrip('/')}/audio/transcriptions"
@@ -92,7 +114,10 @@ def stt(filepath: str, base_url: str, api_key: str):
 
 def chat(messages: List[Dict[str, str]], base_url: str, api_key: str):
     url = f"{base_url.rstrip('/')}/chat/completions"
-    data = {"model": "mlx-community/Qwen3.6-35B-A3B-8bit", "messages": messages, "stream": True}
+    data: Dict = {"messages": messages, "stream": True}
+    chat_model = os.environ.get("LOCAL_BRAIN_CHAT_MODEL")
+    if chat_model:
+        data["model"] = chat_model
 
     req = urllib.request.Request(
         url,
