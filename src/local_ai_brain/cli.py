@@ -38,10 +38,14 @@ def _request_multipart(path: str, filename: str, file_bytes: bytes, content_type
     url = f"{BASE_URL.rstrip('/')}/{path.lstrip('/')}"
     boundary = "----LocalBrainBoundary"
     body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: {content_type}\r\n\r\n"
-    ).encode() + file_bytes + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: {content_type}\r\n\r\n"
+        ).encode()
+        + file_bytes
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": f"multipart/form-data; boundary={boundary}",
