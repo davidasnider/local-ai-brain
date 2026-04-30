@@ -1,0 +1,2 @@
+[console_scripts]
+local-brain = local_ai_brain.cli:main
