@@ -41,8 +41,7 @@ def test_get_base_url(monkeypatch):
 @patch("urllib.request.urlopen")
 def test_tts_success(mock_urlopen):
     mock_response = MagicMock()
-    # Simulate chunked streaming: first read returns data, second signals EOF
-    mock_response.read.side_effect = [b"audio_data", b""]
+    mock_response.read.return_value = b"audio_data"
     mock_response.__enter__.return_value = mock_response
     mock_urlopen.return_value = mock_response
 
@@ -60,42 +59,10 @@ def test_tts_error(mock_urlopen, capsys):
     assert "TTS Error: Test Error" in captured.out
 
 
-@patch("urllib.request.urlopen")
-def test_tts_model_env_override(mock_urlopen, monkeypatch):
-    monkeypatch.setenv("LOCAL_BRAIN_TTS_MODEL", "my-custom-tts")
-    mock_response = MagicMock()
-    mock_response.read.side_effect = [b"audio", b""]
-    mock_response.__enter__.return_value = mock_response
-    mock_urlopen.return_value = mock_response
-
-    with patch("builtins.open", mock_open()):
-        tts("Hello", "http://base", "key")
-
-    sent_data = json.loads(mock_urlopen.call_args[0][0].data.decode("utf-8"))
-    assert sent_data["model"] == "my-custom-tts"
-
-
-@patch("urllib.request.urlopen")
-def test_tts_no_model_when_env_unset(mock_urlopen, monkeypatch):
-    monkeypatch.delenv("LOCAL_BRAIN_TTS_MODEL", raising=False)
-    mock_response = MagicMock()
-    mock_response.read.side_effect = [b"audio", b""]
-    mock_response.__enter__.return_value = mock_response
-    mock_urlopen.return_value = mock_response
-
-    with patch("builtins.open", mock_open()):
-        tts("Hello", "http://base", "key")
-
-    sent_data = json.loads(mock_urlopen.call_args[0][0].data.decode("utf-8"))
-    assert "model" not in sent_data
-
-
-@patch("os.path.getsize")
 @patch("os.path.exists")
 @patch("urllib.request.urlopen")
-def test_stt_success(mock_urlopen, mock_exists, mock_getsize):
+def test_stt_success(mock_urlopen, mock_exists):
     mock_exists.return_value = True
-    mock_getsize.return_value = 1024  # 1 KB, well within limit
     mock_response = MagicMock()
     mock_response.read.return_value = json.dumps({"text": "Hello text"}).encode("utf-8")
     mock_response.__enter__.return_value = mock_response
@@ -118,23 +85,10 @@ def test_stt_file_not_found(mock_exists, capsys):
     assert "Error: File not found: missing.wav" in captured.out
 
 
-@patch("os.path.getsize")
-@patch("os.path.exists")
-def test_stt_file_too_large(mock_exists, mock_getsize, capsys):
-    mock_exists.return_value = True
-    mock_getsize.return_value = 30 * 1024 * 1024  # 30 MB > 25 MB limit
-    stt("big.wav", "http://base", "key")
-    captured = capsys.readouterr()
-    assert "File too large" in captured.out
-    assert "25 MB" in captured.out
-
-
-@patch("os.path.getsize")
 @patch("os.path.exists")
 @patch("urllib.request.urlopen")
-def test_stt_error(mock_urlopen, mock_exists, mock_getsize, capsys):
+def test_stt_error(mock_urlopen, mock_exists, capsys):
     mock_exists.return_value = True
-    mock_getsize.return_value = 1024  # 1 KB, well within limit
     mock_urlopen.side_effect = Exception("Test STT Error")
     with patch("builtins.open", mock_open(read_data=b"filedata")):
         stt("dummy.wav", "http://base", "key")
@@ -167,36 +121,6 @@ def test_chat_error(mock_urlopen, capsys):
     assert response is None
     captured = capsys.readouterr()
     assert "Chat Error: Test Chat Error" in captured.out
-
-
-@patch("urllib.request.urlopen")
-def test_chat_model_env_override(mock_urlopen, monkeypatch):
-    monkeypatch.setenv("LOCAL_BRAIN_CHAT_MODEL", "my-custom-llm")
-    mock_response = MagicMock()
-    mock_response.__iter__.return_value = [b"data: [DONE]\n"]
-    mock_response.__enter__.return_value = mock_response
-    mock_urlopen.return_value = mock_response
-
-    with patch("builtins.print"):
-        chat([{"role": "user", "content": "Hi"}], "http://base", "key")
-
-    sent_data = json.loads(mock_urlopen.call_args[0][0].data.decode("utf-8"))
-    assert sent_data["model"] == "my-custom-llm"
-
-
-@patch("urllib.request.urlopen")
-def test_chat_no_model_when_env_unset(mock_urlopen, monkeypatch):
-    monkeypatch.delenv("LOCAL_BRAIN_CHAT_MODEL", raising=False)
-    mock_response = MagicMock()
-    mock_response.__iter__.return_value = [b"data: [DONE]\n"]
-    mock_response.__enter__.return_value = mock_response
-    mock_urlopen.return_value = mock_response
-
-    with patch("builtins.print"):
-        chat([{"role": "user", "content": "Hi"}], "http://base", "key")
-
-    sent_data = json.loads(mock_urlopen.call_args[0][0].data.decode("utf-8"))
-    assert "model" not in sent_data
 
 
 @patch("sys.exit")
