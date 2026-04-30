@@ -8,3 +8,4 @@ __pycache__/
 scratch.py
 .agents/
 test_speech.mp3
+*.egg-info/
