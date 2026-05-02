@@ -7,41 +7,34 @@ from ..config import settings
 router = APIRouter()
 
 
+def get_valid_models():
+    return [
+        settings.QWEN_MODEL_PATH,
+        settings.WHISPER_MODEL_PATH,
+        settings.KOKORO_MODEL_PATH,
+    ]
+
+
 @router.get("/models")
 async def list_models():
+    created = int(time.time())
     return {
         "object": "list",
         "data": [
             {
-                "id": settings.QWEN_MODEL_PATH,
+                "id": model_id,
                 "object": "model",
-                "created": int(time.time()),
+                "created": created,
                 "owned_by": "local-ai-brain",
-            },
-            {
-                "id": settings.WHISPER_MODEL_PATH,
-                "object": "model",
-                "created": int(time.time()),
-                "owned_by": "local-ai-brain",
-            },
-            {
-                "id": settings.KOKORO_MODEL_PATH,
-                "object": "model",
-                "created": int(time.time()),
-                "owned_by": "local-ai-brain",
-            },
+            }
+            for model_id in get_valid_models()
         ],
     }
 
 
 @router.get("/models/{model_id:path}")
 async def get_model(model_id: str):
-    valid_models = [
-        settings.QWEN_MODEL_PATH,
-        settings.WHISPER_MODEL_PATH,
-        settings.KOKORO_MODEL_PATH,
-    ]
-    if model_id in valid_models:
+    if model_id in get_valid_models():
         return {
             "id": model_id,
             "object": "model",
