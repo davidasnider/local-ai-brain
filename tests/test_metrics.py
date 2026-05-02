@@ -1,8 +1,12 @@
 import importlib
+import os
 import sys
 from unittest.mock import MagicMock, patch
 
 from opentelemetry.metrics import Observation
+
+# Ensure TESTING is set before any metrics imports
+os.environ["TESTING"] = "1"
 
 
 def test_otel_memory_callbacks():
