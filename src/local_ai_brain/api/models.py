@@ -9,15 +9,16 @@ router = APIRouter()
 
 def get_valid_models():
     created_time = int(time.time())
+    max_tokens = settings.MAX_CONTEXT_TOKENS
     return [
         {
             "id": settings.QWEN_MODEL_PATH,
             "object": "model",
             "created": created_time,
             "owned_by": "local-ai-brain",
-            "max_model_len": settings.MAX_CONTEXT_WINDOW,
-            "context_window": settings.MAX_CONTEXT_WINDOW,
-            "max_position_embeddings": settings.MAX_CONTEXT_WINDOW,
+            "max_model_len": max_tokens,
+            "context_window": max_tokens,
+            "max_position_embeddings": max_tokens,
         },
         {
             "id": settings.WHISPER_MODEL_PATH,
