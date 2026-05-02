@@ -302,45 +302,41 @@ def test_chat_engine_not_initialized():
 
 
 def test_batched_engine_receives_scheduler_config():
-    """Ensure BatchedEngine is initialised with KV cache quantization settings."""
+    """Verify lifespan() passes the correct SchedulerConfig to BatchedEngine."""
+    from unittest.mock import AsyncMock, MagicMock, patch
 
-    import local_ai_brain.main as main_module
     from local_ai_brain.config import settings
 
-    captured_calls = []
+    captured_kwargs = {}
 
-    class CapturingEngine:
-        def __init__(self, **kwargs):
-            captured_calls.append(kwargs)
-            self.scheduler_config = kwargs.get("scheduler_config")
+    mock_engine_instance = MagicMock()
+    mock_engine_instance.start = AsyncMock()
+    mock_engine_instance.stop = AsyncMock()
 
-        async def start(self):
-            pass
+    def capturing_engine_cls(model_name, scheduler_config=None, **kwargs):
+        captured_kwargs["model_name"] = model_name
+        captured_kwargs["scheduler_config"] = scheduler_config
+        return mock_engine_instance
 
-        async def stop(self):
-            pass
+    mock_whisper_module = MagicMock()
+    mock_kokoro_instance = MagicMock()
+    mock_kokoro_instance.create = MagicMock(return_value=(b"", 24000))
 
-    original_engine_cls = main_module.BatchedEngine
-    main_module.BatchedEngine = CapturingEngine
-    try:
+    with (
+        patch("local_ai_brain.main.settings.TESTING", False),
+        patch("local_ai_brain.main.BatchedEngine", side_effect=capturing_engine_cls),
+        patch("local_ai_brain.main.mlx_whisper", mock_whisper_module),
+        patch("local_ai_brain.main.hf_hub_download", return_value="/tmp/mock"),
+        patch("local_ai_brain.main.Kokoro", return_value=mock_kokoro_instance),
+    ):
         with TestClient(app):
             pass
-    except Exception:
-        pass
-    finally:
-        main_module.BatchedEngine = original_engine_cls
 
-    # In TESTING mode the engine is skipped, so we directly verify config wiring
-    from local_ai_brain.main import SchedulerConfig  # noqa: F401
-
-    sc = SchedulerConfig(
-        kv_cache_quantization=settings.LLM_KV_CACHE_QUANTIZATION,
-        kv_cache_quantization_bits=settings.LLM_KV_CACHE_BITS,
-    )
+    assert captured_kwargs.get("model_name") == settings.QWEN_MODEL_PATH
+    sc = captured_kwargs.get("scheduler_config")
+    assert sc is not None, "scheduler_config was not passed to BatchedEngine"
     assert sc.kv_cache_quantization == settings.LLM_KV_CACHE_QUANTIZATION
     assert sc.kv_cache_quantization_bits == settings.LLM_KV_CACHE_BITS
-    assert settings.LLM_KV_CACHE_QUANTIZATION is True
-    assert settings.LLM_KV_CACHE_BITS == 4
 
 
 def test_chat_completions_legacy_model_alias():
