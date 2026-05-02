@@ -24,7 +24,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * Use `uv sync` to keep the environment updated.
 
 2. **Configuration Management:**
-   * Use `pydantic-settings` to manage the `LOCAL_API_KEY`, the 48GB memory limit threshold, `TTS_MAX_CHARACTERS`, and model paths.
+   * Use `pydantic-settings` to manage the `LOCAL_API_KEY`, the memory limit threshold (`MEMORY_LIMIT_GB`, defaults to 54GB), `TTS_MAX_CHARACTERS`, and model paths.
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
 3. **OpenAI Compatibility & Security:**
@@ -33,9 +33,9 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * All routes — including `/health` and `/metrics` — must require a valid Bearer token. There are no unauthenticated endpoints.
 
 4. **Memory Guard & Logging (Crucial):**
-   * The host machine has a hard 48GB RAM limit dedicated to this API. 
+   * The host machine's RAM limit for this API is controlled by the `MEMORY_LIMIT_GB` setting (defaults to **54GB**). 
    * Ensure model quantization configurations (e.g., 4-bit/8-bit) are set explicitly during MLX model initialization.
-   * Implement a middleware using `psutil` and `loguru` to log the exact RAM usage before and after requests. Safely reject requests with a `429` status code if the projected cost threatens the 48GB limit.
+   * Implement a middleware using `psutil` and `loguru` to log the exact RAM usage before and after requests. Safely reject requests with a `429` status code if the projected cost threatens the `MEMORY_LIMIT_GB` limit.
    * Standard library logging should be intercepted and routed to `loguru`, with rotating log files configured.
    * Models must remain loaded 24/7.
 

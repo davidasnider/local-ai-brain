@@ -343,8 +343,8 @@ def test_audio_transcription():
 def test_memory_guard_rejection(mock_vm):
     # Mock psutil to return very high memory usage
     mock_vm_instance = MagicMock()
-    # 48.1 GB to exceed 48.0 limit
-    mock_vm_instance.used = 48.1 * (1024**3)
+    # 54.1 GB to exceed 54.0 limit
+    mock_vm_instance.used = 54.1 * (1024**3)
     mock_vm.return_value = mock_vm_instance
 
     with TestClient(app) as client:
