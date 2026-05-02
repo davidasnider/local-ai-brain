@@ -497,9 +497,10 @@ def test_list_models():
         assert response.status_code == 200
         data = response.json()
         assert data["object"] == "list"
-        assert len(data["data"]) == 3
         ids = [m["id"] for m in data["data"]]
         assert settings.QWEN_MODEL_PATH in ids
+        assert settings.WHISPER_MODEL_PATH in ids
+        assert settings.KOKORO_MODEL_PATH in ids
 
 
 def test_get_model():
