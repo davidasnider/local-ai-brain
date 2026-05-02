@@ -1208,7 +1208,7 @@ wheels = [
 [[package]]
 name = "local-ai-brain"
 version = "0.1.9"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "kokoro-onnx" },

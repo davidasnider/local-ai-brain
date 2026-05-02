@@ -99,6 +99,31 @@ curl http://localhost:8000/v1/audio/speech \
   --output speech.wav
 ```
 
+
+## CLI Application
+
+Local AI Brain includes an interactive CLI application for testing the local AI models directly from your terminal without needing external tools.
+
+### Running the CLI
+
+You can start the CLI using `uv`:
+
+```bash
+uv run local-brain
+```
+
+### CLI Features
+
+The CLI connects to your local instance (default: `http://localhost:8000/v1`) and requires the `LOCAL_API_KEY` (or `OPENAI_API_KEY`) to be set in your environment.
+
+Available commands inside the CLI:
+- `/help` - Show available commands.
+- `/clear` - Clear the current chat history.
+- `/tts <text>` - Generate a Text-to-Speech audio file (`speech.wav`).
+- `/stt <filepath>` - Transcribe an audio file using Speech-to-Text.
+- `/exit` or `quit` - Exit the CLI.
+- Standard text input will be treated as a chat message to the LLM.
+
 ## Integration Notes
 
 ### Upstream Tools (Hermes, Gemini CLI, etc.)

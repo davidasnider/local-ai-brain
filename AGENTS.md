@@ -41,3 +41,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
 
 8. **Code Style:** * Write clean, asynchronous (`async def`) Python code. 
    * Use dependency injection for model loading to ensure models load on startup and stay hot in memory, rather than reloading on each request.
+
+
+9. **Interactive CLI Tool:** * Maintain the `local-brain` CLI tool located in `src/local_ai_brain/cli.py`.
+   * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
