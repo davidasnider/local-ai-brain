@@ -1,58 +1,68 @@
+import importlib
+import os
 import sys
 from unittest.mock import MagicMock, patch
 
-# This test is designed to be extremely isolated to avoid interference with other tests
-# and to pass even in environments where hardware-specific dependencies (psutil)
-# or monitoring libraries (prometheus_client) are not installed.
+from opentelemetry.metrics import Observation
+
+# Ensure TESTING is set before any metrics imports
+os.environ["TESTING"] = "1"
 
 
-def test_update_memory_metrics():
+def test_otel_memory_callbacks():
     """
-    Test that update_memory_metrics correctly retrieves memory info from psutil
-    and updates the corresponding Prometheus gauges.
+    Test that the memory callbacks correctly retrieve memory info from psutil.
     """
-    # Create isolated mocks for the dependencies
-    mock_psutil = MagicMock()
-    mock_prometheus = MagicMock()
-    # Ensure each Gauge created returns a unique MagicMock
-    # so we can track .set() calls independently
-    mock_prometheus.Gauge.side_effect = lambda *args, **kwargs: MagicMock()
+    # Setup mock data
+    mock_rss = 12345678
+    mock_system_used = 87654321
 
-    # Use patch.dict to temporarily redirect imports of these libraries to our mocks.
-    # This is necessary to avoid ImportError if metrics.py is imported for the first time here.
-    with patch.dict(sys.modules, {"psutil": mock_psutil, "prometheus_client": mock_prometheus}):
-        # We need to import metrics here so we can patch its internal references
+    # Patch psutil functions directly where they are used in local_ai_brain.metrics
+    with (
+        patch("psutil.Process") as mock_process_class,
+        patch("psutil.virtual_memory") as mock_vm_func,
+    ):
+        # Configure mock process
+        mock_process_instance = MagicMock()
+        mock_process_instance.memory_info.return_value.rss = mock_rss
+        mock_process_class.return_value = mock_process_instance
+
+        # Configure mock virtual memory
+        mock_vm_instance = MagicMock()
+        mock_vm_instance.used = mock_system_used
+        mock_vm_func.return_value = mock_vm_instance
+
+        # Import metrics (ensuring it uses the patched psutil)
+        if "local_ai_brain.metrics" in sys.modules:
+            importlib.reload(sys.modules["local_ai_brain.metrics"])
         import local_ai_brain.metrics
 
-        # Now we patch the specific references within the metrics module to ensure
-        # that even if the module was already imported by another test, we are
-        # using fresh, isolated mocks for THIS test.
-        with (
-            patch.object(local_ai_brain.metrics, "psutil", mock_psutil),
-            patch.object(local_ai_brain.metrics, "process_memory_used_bytes") as mock_process_gauge,
-            patch.object(local_ai_brain.metrics, "system_memory_used_bytes") as mock_system_gauge,
-        ):
-            # Setup mock data
-            mock_rss = 12345678
-            mock_system_used = 87654321
+        # Test get_process_memory callback
+        process_observations = local_ai_brain.metrics.get_process_memory(None)
 
-            # Configure the nested mock structure: psutil.Process().memory_info().rss
-            mock_process_instance = MagicMock()
-            mock_process_instance.memory_info.return_value.rss = mock_rss
-            mock_psutil.Process.return_value = mock_process_instance
+        # Verify psutil was called and values match
+        mock_process_class.assert_called_once()
+        assert len(process_observations) == 1
+        assert isinstance(process_observations[0], Observation)
+        assert process_observations[0].value == mock_rss
 
-            # Configure the nested mock structure: psutil.virtual_memory().used
-            mock_vm = MagicMock()
-            mock_vm.used = mock_system_used
-            mock_psutil.virtual_memory.return_value = mock_vm
+        # Test get_system_memory callback
+        system_observations = local_ai_brain.metrics.get_system_memory(None)
+        mock_vm_func.assert_called_once()
+        assert len(system_observations) == 1
+        assert isinstance(system_observations[0], Observation)
+        assert system_observations[0].value == mock_system_used
 
-            # Call the function under test
-            local_ai_brain.metrics.update_memory_metrics()
+    # Cleanup: remove from sys.modules to avoid polluting other tests
+    if "local_ai_brain.metrics" in sys.modules:
+        del sys.modules["local_ai_brain.metrics"]
 
-            # Verify psutil was called correctly
-            mock_psutil.Process.assert_called_once()
-            mock_psutil.virtual_memory.assert_called_once()
 
-            # Verify the Prometheus gauges were updated with the expected values
-            mock_process_gauge.set.assert_called_once_with(mock_rss)
-            mock_system_gauge.set.assert_called_once_with(mock_system_used)
+def test_update_memory_metrics_is_noop():
+    import local_ai_brain.metrics
+
+    local_ai_brain.metrics.update_memory_metrics()
+
+    # Cleanup
+    if "local_ai_brain.metrics" in sys.modules:
+        del sys.modules["local_ai_brain.metrics"]

@@ -5,22 +5,15 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import settings
-from .metrics import http_requests_total, memory_rejections_total
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware for tracking HTTP request metrics and logging access requests."""
 
     async def dispatch(self, request: Request, call_next):
-        """Dispatches the request and records metrics and access logs.
+        """Dispatches the request and records metrics and access logs."""
+        from .metrics import http_requests_total
 
-        Args:
-            request: The incoming FastAPI request.
-            call_next: The next handler in the middleware chain.
-
-        Returns:
-            The response from the next handler.
-        """
         status_code = "500"
         try:
             response = await call_next(request)
@@ -44,11 +37,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                     status_code,
                 )
 
-            http_requests_total.labels(endpoint=url_path, status=status_code).inc()
+            http_requests_total.add(1, {"endpoint": url_path, "status": status_code})
 
 
 class MemoryGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        from .metrics import memory_rejections_total
+
         # Calculate current memory usage in GB
         vm = psutil.virtual_memory()
         used_gb = vm.used / (1024**3)
@@ -84,7 +79,7 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
                 f"Request rejected. Memory limit {settings.MEMORY_LIMIT_GB}GB exceeded. "
                 f"Total projected: {total_projected_gb:.2f}GB"
             )
-            memory_rejections_total.inc()
+            memory_rejections_total.add(1)
             return JSONResponse(
                 status_code=429,
                 content={
