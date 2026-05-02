@@ -505,6 +505,11 @@ def test_list_models():
         assert settings.WHISPER_MODEL_PATH in ids
         assert settings.KOKORO_MODEL_PATH in ids
 
+        qwen_model = next(m for m in data["data"] if m["id"] == settings.QWEN_MODEL_PATH)
+        assert qwen_model["max_model_len"] == settings.MAX_CONTEXT_TOKENS
+        assert qwen_model["context_window"] == settings.MAX_CONTEXT_TOKENS
+        assert qwen_model["max_position_embeddings"] == settings.MAX_CONTEXT_TOKENS
+
 
 def test_get_model():
     from fastapi.testclient import TestClient
@@ -521,6 +526,9 @@ def test_get_model():
         data = response.json()
         assert data["id"] == settings.QWEN_MODEL_PATH
         assert data["object"] == "model"
+        assert data["max_model_len"] == settings.MAX_CONTEXT_TOKENS
+        assert data["context_window"] == settings.MAX_CONTEXT_TOKENS
+        assert data["max_position_embeddings"] == settings.MAX_CONTEXT_TOKENS
 
 
 def test_get_model_not_found():
