@@ -44,7 +44,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                     status_code,
                 )
 
-            http_requests_total.labels(endpoint=url_path, status=status_code).inc()
+            http_requests_total.add(1, {"endpoint": url_path, "status": status_code})
 
 
 class MemoryGuardMiddleware(BaseHTTPMiddleware):
@@ -84,7 +84,7 @@ class MemoryGuardMiddleware(BaseHTTPMiddleware):
                 f"Request rejected. Memory limit {settings.MEMORY_LIMIT_GB}GB exceeded. "
                 f"Total projected: {total_projected_gb:.2f}GB"
             )
-            memory_rejections_total.inc()
+            memory_rejections_total.add(1)
             return JSONResponse(
                 status_code=429,
                 content={

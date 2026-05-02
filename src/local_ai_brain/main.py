@@ -18,7 +18,6 @@ from vllm_mlx.engine.batched import BatchedEngine
 from .api.audio import router as audio_router
 from .api.chat import router as chat_router
 from .config import settings
-from .metrics import update_memory_metrics
 from .middleware import MemoryGuardMiddleware, MetricsMiddleware
 
 
@@ -154,8 +153,7 @@ async def health_check():
 
 @app.get("/metrics", tags=["System"], dependencies=[Depends(verify_api_key)])
 async def get_metrics():
-    # Expose Prometheus metrics with updated memory states
-    from .metrics import METRICS_REGISTRY
+    # Expose Prometheus metrics from OpenTelemetry
+    from prometheus_client import REGISTRY
 
-    update_memory_metrics()
-    return Response(generate_latest(METRICS_REGISTRY), media_type=CONTENT_TYPE_LATEST)
+    return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)

@@ -35,7 +35,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
     if engine is None:
         raise HTTPException(status_code=503, detail="LLM engine is not initialized.")
 
-    llm_active_requests.inc()
+    llm_active_requests.add(1)
     start_time = time.time()
     decremented = False
     try:
@@ -59,7 +59,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                             prompt_len += len(content)
 
                     completion_id = f"chatcmpl-{uuid.uuid4()}"
-                    llm_tokens_consumed_total.inc(prompt_len // 4)
+                    llm_tokens_consumed_total.add(prompt_len // 4)
 
                     async for chunk in engine.stream_chat(
                         messages=messages_dict,
@@ -68,7 +68,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                         top_p=body.top_p,
                     ):
                         # Heuristic: estimation based on character count
-                        llm_tokens_generated_total.inc(len(chunk.new_text) // 4)
+                        llm_tokens_generated_total.add(len(chunk.new_text) // 4)
                         response_chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",
@@ -86,8 +86,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                     yield "data: [DONE]\n\n"
                 finally:
                     if not decremented:
-                        llm_active_requests.dec()
-                        llm_generation_latency_seconds.observe(time.time() - start_time)
+                        llm_active_requests.add(-1)
+                        llm_generation_latency_seconds.record(time.time() - start_time)
                         decremented = True
 
             return StreamingResponse(generate_stream(), media_type="text/event-stream")
@@ -100,8 +100,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
             )
             prompt_toks = getattr(output, "prompt_tokens", 0)
             gen_toks = getattr(output, "completion_tokens", 0)
-            llm_tokens_consumed_total.inc(prompt_toks)
-            llm_tokens_generated_total.inc(gen_toks)
+            llm_tokens_consumed_total.add(prompt_toks)
+            llm_tokens_generated_total.add(gen_toks)
 
             return {
                 "id": f"chatcmpl-{uuid.uuid4()}",
@@ -129,6 +129,6 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         if not body.stream and not decremented:
-            llm_active_requests.dec()
-            llm_generation_latency_seconds.observe(time.time() - start_time)
+            llm_active_requests.add(-1)
+            llm_generation_latency_seconds.record(time.time() - start_time)
             decremented = True

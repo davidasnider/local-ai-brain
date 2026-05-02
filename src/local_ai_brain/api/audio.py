@@ -61,7 +61,7 @@ async def create_transcription(
                 info = sf.info(tmp_path)
                 if info.samplerate:
                     duration_seconds = info.frames / info.samplerate
-                    stt_audio_seconds_transcribed_total.inc(duration_seconds)
+                    stt_audio_seconds_transcribed_total.add(duration_seconds)
             except Exception as e:
                 logger.warning(f"Could not calculate audio duration: {e}")
 
@@ -74,7 +74,7 @@ async def create_transcription(
         logger.error(f"Error during transcription: {e}")
         raise HTTPException(status_code=500, detail="Transcription failed")
     finally:
-        audio_processing_latency_seconds.observe(time.time() - start_time)
+        audio_processing_latency_seconds.record(time.time() - start_time)
 
         def _safe_unlink(path):
             try:
@@ -146,7 +146,7 @@ async def create_speech(request: Request, body: SpeechRequest):
     start_time = time.time()
     try:
         # Increment characters processed
-        tts_characters_processed_total.inc(input_len)
+        tts_characters_processed_total.add(input_len)
 
         def run_kokoro():
             # Create audio numpy array
@@ -165,4 +165,4 @@ async def create_speech(request: Request, body: SpeechRequest):
         logger.error(f"Error during TTS generation: {e}")
         raise HTTPException(status_code=500, detail="TTS generation failed")
     finally:
-        audio_processing_latency_seconds.observe(time.time() - start_time)
+        audio_processing_latency_seconds.record(time.time() - start_time)
