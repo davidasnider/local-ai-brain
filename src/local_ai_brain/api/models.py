@@ -15,6 +15,9 @@ def get_valid_models():
             "object": "model",
             "created": created_time,
             "owned_by": "local-ai-brain",
+            "max_model_len": settings.MAX_CONTEXT_WINDOW,
+            "context_window": settings.MAX_CONTEXT_WINDOW,
+            "max_position_embeddings": settings.MAX_CONTEXT_WINDOW,
         },
         {
             "id": settings.WHISPER_MODEL_PATH,
