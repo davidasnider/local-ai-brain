@@ -42,7 +42,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
 5. **Dynamic TTS Routing:**
    * Build a simple dictionary/router for the Kokoro TTS endpoint that maps "season" or "character" string parameters to their respective Kokoro voice embedding files.
 
-6. **Telemetry Endpoint:**
+6. Telemetry Endpoint:
    * Expose a `/metrics` route using OpenTelemetry and `opentelemetry-exporter-prometheus`. Track precise metrics: `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, latencies, and process/system memory consumption. The endpoint requires Bearer token authentication like all other routes.
 
 7. **Background Service:**
