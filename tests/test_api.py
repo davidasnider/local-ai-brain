@@ -533,3 +533,18 @@ def test_get_model_not_found():
             "/v1/models/non-existent-model", headers={"Authorization": "Bearer test-secret-key"}
         )
         assert response.status_code == 404
+
+
+def test_models_unauthorized():
+    from fastapi.testclient import TestClient
+
+    from local_ai_brain.main import app
+
+    with TestClient(app) as client:
+        # No header
+        response = client.get("/v1/models")
+        assert response.status_code == 401
+
+        # Bad key
+        response = client.get("/v1/models", headers={"Authorization": "Bearer bad-key"})
+        assert response.status_code == 401
