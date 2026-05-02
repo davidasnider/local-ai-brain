@@ -487,3 +487,44 @@ def test_chat_completions_list_content():
             headers=headers,
         )
         assert response.status_code == 200
+
+
+def test_list_models():
+    from fastapi.testclient import TestClient
+    from local_ai_brain.main import app
+
+    client = TestClient(app)
+    response = client.get("/v1/models", headers={"Authorization": "Bearer test-secret-key"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["object"] == "list"
+    assert len(data["data"]) == 3
+    ids = [m["id"] for m in data["data"]]
+    assert "mlx-community/Qwen3.6-35B-A3B-8bit" in ids
+
+
+def test_get_model():
+    from fastapi.testclient import TestClient
+    from local_ai_brain.main import app
+    from local_ai_brain.config import settings
+
+    client = TestClient(app)
+    response = client.get(
+        f"/v1/models/{settings.QWEN_MODEL_PATH}",
+        headers={"Authorization": "Bearer test-secret-key"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == settings.QWEN_MODEL_PATH
+    assert data["object"] == "model"
+
+
+def test_get_model_not_found():
+    from fastapi.testclient import TestClient
+    from local_ai_brain.main import app
+
+    client = TestClient(app)
+    response = client.get(
+        "/v1/models/non-existent-model", headers={"Authorization": "Bearer test-secret-key"}
+    )
+    assert response.status_code == 404
