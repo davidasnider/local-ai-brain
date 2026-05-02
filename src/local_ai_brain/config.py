@@ -1,7 +1,7 @@
 from typing import Optional
 
 from loguru import logger
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     MEMORY_LIMIT_GB: float = Field(default=54.0, gt=0)
     TTS_MAX_CHARACTERS: int = Field(default=4096, gt=0)
     MAX_CONTEXT_TOKENS: int = Field(default=65536, gt=0)
+    DEFAULT_MAX_TOKENS: int = Field(default=16384, gt=0)
     TESTING: bool = False
 
     # Hugging Face token (optional, for private or rate‑limited repos)
@@ -49,6 +50,15 @@ class Settings(BaseSettings):
             logger.warning("HF_TOKEN not set; downloads may be slow or rate‑limited.")
 
         return normalized
+
+    @model_validator(mode="after")
+    def _validate_max_tokens(self) -> "Settings":
+        if self.DEFAULT_MAX_TOKENS > self.MAX_CONTEXT_TOKENS:
+            raise ValueError(
+                f"DEFAULT_MAX_TOKENS ({self.DEFAULT_MAX_TOKENS}) cannot exceed "
+                f"MAX_CONTEXT_TOKENS ({self.MAX_CONTEXT_TOKENS})"
+            )
+        return self
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

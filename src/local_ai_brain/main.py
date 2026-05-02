@@ -68,6 +68,7 @@ configure_logging(settings.TESTING)
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("vllm_mlx.scheduler").setLevel(logging.WARNING)
 
 for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
     logging_logger = logging.getLogger(logger_name)

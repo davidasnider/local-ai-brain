@@ -17,6 +17,9 @@ from ..schemas import ChatCompletionRequest
 
 router = APIRouter()
 
+# Conservative chars-per-token heuristic for context window safety and metrics
+TOKEN_ESTIMATION_FACTOR = 3
+
 
 @router.post("/chat/completions")
 async def chat_completions(request: Request, body: ChatCompletionRequest):
@@ -48,34 +51,54 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
     try:
         messages_dict = [msg.model_dump(exclude_none=True) for msg in body.messages]
 
+        # Calculate prompt length (heuristic)
+        prompt_len = 0
+        for m in messages_dict:
+            content = m.get("content", "")
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and "text" in part:
+                        prompt_len += len(part["text"])
+                    elif isinstance(part, str):
+                        prompt_len += len(part)
+            elif isinstance(content, str):
+                prompt_len += len(content)
+
+        # Determine effective max tokens
+        estimated_prompt_tokens = prompt_len // TOKEN_ESTIMATION_FACTOR
+        if estimated_prompt_tokens >= settings.MAX_CONTEXT_TOKENS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Prompt is too long (estimated {estimated_prompt_tokens} tokens). "
+                    f"Maximum context size is {settings.MAX_CONTEXT_TOKENS} tokens."
+                ),
+            )
+
+        requested_max = (
+            body.max_tokens if body.max_tokens is not None else settings.DEFAULT_MAX_TOKENS
+        )
+        available_window = settings.MAX_CONTEXT_TOKENS - estimated_prompt_tokens
+        effective_max_tokens = min(requested_max, available_window)
+
         if body.stream:
 
             async def generate_stream():
                 nonlocal decremented
                 try:
-                    prompt_len = 0
-                    for m in messages_dict:
-                        content = m.get("content", "")
-                        if isinstance(content, list):
-                            for part in content:
-                                if isinstance(part, dict) and "text" in part:
-                                    prompt_len += len(part["text"])
-                                elif isinstance(part, str):
-                                    prompt_len += len(part)
-                        elif isinstance(content, str):
-                            prompt_len += len(content)
-
                     completion_id = f"chatcmpl-{uuid.uuid4()}"
-                    llm_tokens_consumed_total.add(prompt_len // 4)
+                    llm_tokens_consumed_total.add(estimated_prompt_tokens)
 
                     async for chunk in engine.stream_chat(
                         messages=messages_dict,
-                        max_tokens=body.max_tokens if body.max_tokens is not None else 2048,
+                        max_tokens=effective_max_tokens,
                         temperature=body.temperature,
                         top_p=body.top_p,
                     ):
                         # Heuristic: estimation based on character count
-                        llm_tokens_generated_total.add(len(chunk.new_text) // 4)
+                        llm_tokens_generated_total.add(
+                            len(chunk.new_text) // TOKEN_ESTIMATION_FACTOR
+                        )
                         response_chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",
@@ -101,7 +124,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         else:
             output = await engine.chat(
                 messages=messages_dict,
-                max_tokens=body.max_tokens if body.max_tokens is not None else 2048,
+                max_tokens=effective_max_tokens,
                 temperature=body.temperature,
                 top_p=body.top_p,
             )
@@ -131,6 +154,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                     "total_tokens": prompt_toks + gen_toks,
                 },
             }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error during chat completion: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
