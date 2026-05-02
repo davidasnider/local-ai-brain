@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     LLM_KV_CACHE_QUANTIZATION: bool = True
     LLM_KV_CACHE_BITS: int = Field(default=4, ge=4, le=8)
 
+    # Legacy model ID aliases (accepted in addition to QWEN_MODEL_PATH)
+    QWEN_MODEL_ALIASES: list[str] = Field(default=["mlx-community/Qwen3.6-35B-A3B-8bit"])
+
     @field_validator("LOCAL_API_KEY", mode="before")
     @classmethod
     def _validate_api_key(cls, v: Optional[str]) -> Optional[str]:

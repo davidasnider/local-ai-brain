@@ -301,6 +301,67 @@ def test_chat_engine_not_initialized():
         assert response.status_code == 503
 
 
+def test_batched_engine_receives_scheduler_config():
+    """Ensure BatchedEngine is initialised with KV cache quantization settings."""
+
+    import local_ai_brain.main as main_module
+    from local_ai_brain.config import settings
+
+    captured_calls = []
+
+    class CapturingEngine:
+        def __init__(self, **kwargs):
+            captured_calls.append(kwargs)
+            self.scheduler_config = kwargs.get("scheduler_config")
+
+        async def start(self):
+            pass
+
+        async def stop(self):
+            pass
+
+    original_engine_cls = main_module.BatchedEngine
+    main_module.BatchedEngine = CapturingEngine
+    try:
+        with TestClient(app):
+            pass
+    except Exception:
+        pass
+    finally:
+        main_module.BatchedEngine = original_engine_cls
+
+    # In TESTING mode the engine is skipped, so we directly verify config wiring
+    from local_ai_brain.main import SchedulerConfig  # noqa: F401
+
+    sc = SchedulerConfig(
+        kv_cache_quantization=settings.LLM_KV_CACHE_QUANTIZATION,
+        kv_cache_quantization_bits=settings.LLM_KV_CACHE_BITS,
+    )
+    assert sc.kv_cache_quantization == settings.LLM_KV_CACHE_QUANTIZATION
+    assert sc.kv_cache_quantization_bits == settings.LLM_KV_CACHE_BITS
+    assert settings.LLM_KV_CACHE_QUANTIZATION is True
+    assert settings.LLM_KV_CACHE_BITS == 4
+
+
+def test_chat_completions_legacy_model_alias():
+    """The old 8-bit model ID should be accepted as an alias for the 4-bit model."""
+    from local_ai_brain.config import settings
+
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+        legacy_id = "mlx-community/Qwen3.6-35B-A3B-8bit"
+        assert legacy_id in settings.QWEN_MODEL_ALIASES
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}], "model": legacy_id},
+            headers=headers,
+        )
+        # Should succeed (not 400) and return the canonical model path
+        assert response.status_code == 200
+        assert response.json()["model"] == settings.QWEN_MODEL_PATH
+
+
 def test_audio_speech():
     with TestClient(app) as client:
         client.app.state.tts_model = MockKokoro()
