@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 import uuid
 from typing import Dict, List
@@ -52,6 +53,15 @@ def tts(text: str, base_url: str, api_key: str):
                 while chunk := response.read(8192):
                     f.write(chunk)
             print(f"{COLOR_SYSTEM}Saved TTS output to {output_file}{COLOR_RESET}")
+    except urllib.error.HTTPError as e:
+        error_msg = e.reason
+        try:
+            err_data = json.loads(e.read().decode("utf-8"))
+            if "detail" in err_data:
+                error_msg = err_data["detail"]
+        except Exception:
+            pass
+        print(f"{COLOR_ERROR}TTS HTTP Error: {e.code} - {error_msg}{COLOR_RESET}")
     except Exception as e:
         print(f"{COLOR_ERROR}TTS Error: {e}{COLOR_RESET}")
 
@@ -89,11 +99,11 @@ def stt(filepath: str, base_url: str, api_key: str):
         def read(self, size=-1):
             try:
                 if size < 0:
-                    res = self.current_chunk
+                    res = bytearray(self.current_chunk)
                     self.current_chunk = b""
                     for chunk in self.gen:
-                        res += chunk
-                    return res
+                        res.extend(chunk)
+                    return bytes(res)
 
                 if not self.current_chunk:
                     self.current_chunk = next(self.gen)
@@ -133,6 +143,15 @@ def stt(filepath: str, base_url: str, api_key: str):
         with urllib.request.urlopen(req, timeout=60) as response:
             result = json.loads(response.read().decode("utf-8"))
             print(f"{COLOR_ASSISTANT}Transcription: {result.get('text', '')}{COLOR_RESET}")
+    except urllib.error.HTTPError as e:
+        error_msg = e.reason
+        try:
+            err_data = json.loads(e.read().decode("utf-8"))
+            if "detail" in err_data:
+                error_msg = err_data["detail"]
+        except Exception:
+            pass
+        print(f"{COLOR_ERROR}STT HTTP Error: {e.code} - {error_msg}{COLOR_RESET}")
     except Exception as e:
         print(f"{COLOR_ERROR}STT Error: {e}{COLOR_RESET}")
 
@@ -170,6 +189,16 @@ def chat(messages: List[Dict[str, str]], base_url: str, api_key: str):
                         pass
             print()
             return full_response
+    except urllib.error.HTTPError as e:
+        error_msg = e.reason
+        try:
+            err_data = json.loads(e.read().decode("utf-8"))
+            if "detail" in err_data:
+                error_msg = err_data["detail"]
+        except Exception:
+            pass
+        print(f"\n{COLOR_ERROR}Chat HTTP Error: {e.code} - {error_msg}{COLOR_RESET}")
+        return None
     except Exception as e:
         print(f"\n{COLOR_ERROR}Chat Error: {e}{COLOR_RESET}")
         return None

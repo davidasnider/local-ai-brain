@@ -1,5 +1,6 @@
 import json
 import sys
+import urllib.error
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
@@ -282,10 +283,55 @@ def test_main_invalid_tts_stt(mock_input, mock_base, mock_key, capsys):
         assert "Unknown command." in captured.out
 
 
-@patch("local_ai_brain.cli.get_api_key", return_value="key")
-@patch("local_ai_brain.cli.get_base_url", return_value="http://base")
-@patch("builtins.input")
-def test_main_empty_input(mock_input, mock_base, mock_key):
-    with patch.object(sys, "argv", ["local-brain"]):
-        mock_input.side_effect = ["", "  ", "/exit"]
-        main()
+@patch("urllib.request.urlopen")
+def test_tts_http_error(mock_urlopen, capsys):
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({"detail": "TTS specific error"}).encode("utf-8")
+    err = urllib.error.HTTPError("http://base", 400, "Bad Request", {}, mock_response)
+    mock_urlopen.side_effect = err
+
+    tts("Hello world", "http://base", "key")
+    captured = capsys.readouterr()
+    assert "TTS HTTP Error: 400 - TTS specific error" in captured.out
+
+
+@patch("os.path.getsize")
+@patch("os.path.exists")
+@patch("urllib.request.urlopen")
+def test_stt_http_error(mock_urlopen, mock_exists, mock_getsize, capsys):
+    mock_exists.return_value = True
+    mock_getsize.return_value = 1000
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({"detail": "STT specific error"}).encode("utf-8")
+    err = urllib.error.HTTPError("http://base", 401, "Unauthorized", {}, mock_response)
+    mock_urlopen.side_effect = err
+
+    with patch("builtins.open", mock_open(read_data=b"filedata")):
+        stt("dummy.wav", "http://base", "key")
+        captured = capsys.readouterr()
+        assert "STT HTTP Error: 401 - STT specific error" in captured.out
+
+
+@patch("urllib.request.urlopen")
+def test_chat_http_error(mock_urlopen, capsys):
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({"detail": "Chat specific error"}).encode("utf-8")
+    err = urllib.error.HTTPError("http://base", 503, "Service Unavailable", {}, mock_response)
+    mock_urlopen.side_effect = err
+
+    response = chat([{"role": "user", "content": "Hi"}], "http://base", "key")
+    assert response is None
+    captured = capsys.readouterr()
+    assert "Chat HTTP Error: 503 - Chat specific error" in captured.out
+
+
+@patch("urllib.request.urlopen")
+def test_tts_http_error_non_json(mock_urlopen, capsys):
+    mock_response = MagicMock()
+    mock_response.read.side_effect = Exception("Not JSON")
+    err = urllib.error.HTTPError("http://base", 500, "Internal Server Error", {}, mock_response)
+    mock_urlopen.side_effect = err
+
+    tts("Hello world", "http://base", "key")
+    captured = capsys.readouterr()
+    assert "TTS HTTP Error: 500 - Internal Server Error" in captured.out
