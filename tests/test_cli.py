@@ -24,8 +24,10 @@ def test_get_api_key_missing(monkeypatch):
     monkeypatch.delenv("LOCAL_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with patch("sys.exit") as mock_exit:
+        mock_exit.side_effect = SystemExit(1)
         with patch("builtins.print") as mock_print:
-            get_api_key()
+            with pytest.raises(SystemExit):
+                get_api_key()
             mock_print.assert_called_once()
             mock_exit.assert_called_once_with(1)
 
@@ -41,7 +43,7 @@ def test_get_base_url(monkeypatch):
 @patch("urllib.request.urlopen")
 def test_tts_success(mock_urlopen):
     mock_response = MagicMock()
-    mock_response.read.return_value = b"audio_data"
+    mock_response.read.side_effect = [b"audio_data", b""]
     mock_response.__enter__.return_value = mock_response
     mock_urlopen.return_value = mock_response
 
@@ -59,10 +61,12 @@ def test_tts_error(mock_urlopen, capsys):
     assert "TTS Error: Test Error" in captured.out
 
 
+@patch("os.path.getsize")
 @patch("os.path.exists")
 @patch("urllib.request.urlopen")
-def test_stt_success(mock_urlopen, mock_exists):
+def test_stt_success(mock_urlopen, mock_exists, mock_getsize):
     mock_exists.return_value = True
+    mock_getsize.return_value = 1000
     mock_response = MagicMock()
     mock_response.read.return_value = json.dumps({"text": "Hello text"}).encode("utf-8")
     mock_response.__enter__.return_value = mock_response
@@ -85,10 +89,22 @@ def test_stt_file_not_found(mock_exists, capsys):
     assert "Error: File not found: missing.wav" in captured.out
 
 
+@patch("os.path.getsize")
+@patch("os.path.exists")
+def test_stt_file_too_large(mock_exists, mock_getsize, capsys):
+    mock_exists.return_value = True
+    mock_getsize.return_value = 30 * 1024 * 1024  # 30MB
+    stt("large.wav", "http://base", "key")
+    captured = capsys.readouterr()
+    assert "Error: File too large (> 25MB)" in captured.out
+
+
+@patch("os.path.getsize")
 @patch("os.path.exists")
 @patch("urllib.request.urlopen")
-def test_stt_error(mock_urlopen, mock_exists, capsys):
+def test_stt_error(mock_urlopen, mock_exists, mock_getsize, capsys):
     mock_exists.return_value = True
+    mock_getsize.return_value = 1000
     mock_urlopen.side_effect = Exception("Test STT Error")
     with patch("builtins.open", mock_open(read_data=b"filedata")):
         stt("dummy.wav", "http://base", "key")
@@ -183,6 +199,75 @@ def test_main_commands(mock_chat, mock_input, mock_base, mock_key, capsys):
                 assert messages[0] == {"role": "user", "content": "hello"}
 
 
+@patch("urllib.request.urlopen")
+def test_tts_with_model_env(mock_urlopen, monkeypatch):
+    monkeypatch.setenv("LOCAL_BRAIN_TTS_MODEL", "custom-tts-model")
+    mock_response = MagicMock()
+    mock_response.read.side_effect = [b"audio_data", b""]
+    mock_response.__enter__.return_value = mock_response
+    mock_urlopen.return_value = mock_response
+
+    with patch("builtins.open", mock_open()):
+        tts("Hello world", "http://base", "key")
+        # Check that the model was included in the request data
+        args, kwargs = mock_urlopen.call_args
+        req = args[0]
+        data = json.loads(req.data.decode("utf-8"))
+        assert data["model"] == "custom-tts-model"
+
+
+@patch("urllib.request.urlopen")
+def test_chat_with_model_env(mock_urlopen, monkeypatch):
+    monkeypatch.setenv("LOCAL_BRAIN_CHAT_MODEL", "custom-chat-model")
+    mock_response = MagicMock()
+    mock_response.__iter__.return_value = [b"data: [DONE]\n"]
+    mock_response.__enter__.return_value = mock_response
+    mock_urlopen.return_value = mock_response
+
+    with patch("builtins.print"):
+        chat([{"role": "user", "content": "Hi"}], "http://base", "key")
+        args, kwargs = mock_urlopen.call_args
+        req = args[0]
+        data = json.loads(req.data.decode("utf-8"))
+        assert data["model"] == "custom-chat-model"
+
+
+@patch("urllib.request.urlopen")
+def test_chat_json_decode_error(mock_urlopen, capsys):
+    mock_response = MagicMock()
+    mock_response.__iter__.return_value = [b"data: invalid-json\n", b"data: [DONE]\n"]
+    mock_response.__enter__.return_value = mock_response
+    mock_urlopen.return_value = mock_response
+
+    with patch("builtins.print"):
+        chat([{"role": "user", "content": "Hi"}], "http://base", "key")
+        # Should not crash and should skip the invalid JSON
+
+
+@patch("os.path.getsize")
+@patch("os.path.exists")
+@patch("urllib.request.urlopen")
+def test_stt_streaming_read(mock_urlopen, mock_exists, mock_getsize):
+    mock_exists.return_value = True
+    mock_getsize.return_value = 100
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({"text": "done"}).encode("utf-8")
+    mock_response.__enter__.return_value = mock_response
+    mock_urlopen.return_value = mock_response
+
+    with patch("builtins.open", mock_open(read_data=b"filedata")):
+        stt("dummy.wav", "http://base", "key")
+        args, kwargs = mock_urlopen.call_args
+        req = args[0]
+        # Read from StreamingBody to ensure all paths are covered
+        body = req.data
+        chunk1 = body.read(10)
+        assert len(chunk1) == 10
+        chunk2 = body.read()  # read the rest
+        assert len(chunk2) > 0
+        assert body.read() == b""  # EOF
+
+
 @patch("local_ai_brain.cli.get_api_key", return_value="key")
 @patch("local_ai_brain.cli.get_base_url", return_value="http://base")
 @patch("builtins.input")
@@ -195,3 +280,12 @@ def test_main_invalid_tts_stt(mock_input, mock_base, mock_key, capsys):
         assert "Usage: /tts <text>" in captured.out
         assert "Usage: /stt <filepath>" in captured.out
         assert "Unknown command." in captured.out
+
+
+@patch("local_ai_brain.cli.get_api_key", return_value="key")
+@patch("local_ai_brain.cli.get_base_url", return_value="http://base")
+@patch("builtins.input")
+def test_main_empty_input(mock_input, mock_base, mock_key):
+    with patch.object(sys, "argv", ["local-brain"]):
+        mock_input.side_effect = ["", "  ", "/exit"]
+        main()

@@ -32,7 +32,12 @@ def get_base_url() -> str:
 
 def tts(text: str, base_url: str, api_key: str):
     url = f"{base_url.rstrip('/')}/audio/speech"
-    data = {"model": "kokoro-onnx", "input": text, "voice": "af_heart"}
+    data = {"input": text, "voice": "af_heart"}
+
+    model = os.environ.get("LOCAL_BRAIN_TTS_MODEL")
+    if model:
+        data["model"] = model
+
     req = urllib.request.Request(
         url,
         data=json.dumps(data).encode("utf-8"),
@@ -44,7 +49,8 @@ def tts(text: str, base_url: str, api_key: str):
         with urllib.request.urlopen(req, timeout=60) as response:
             output_file = "speech.wav"
             with open(output_file, "wb") as f:
-                f.write(response.read())
+                while chunk := response.read(8192):
+                    f.write(chunk)
             print(f"{COLOR_SYSTEM}Saved TTS output to {output_file}{COLOR_RESET}")
     except Exception as e:
         print(f"{COLOR_ERROR}TTS Error: {e}{COLOR_RESET}")
@@ -55,29 +61,70 @@ def stt(filepath: str, base_url: str, api_key: str):
         print(f"{COLOR_ERROR}Error: File not found: {filepath}{COLOR_RESET}")
         return
 
-    url = f"{base_url.rstrip('/')}/audio/transcriptions"
+    # Enforce 25MB limit
+    if os.path.getsize(filepath) > 25 * 1024 * 1024:
+        print(f"{COLOR_ERROR}Error: File too large (> 25MB): {filepath}{COLOR_RESET}")
+        return
 
-    # Simple multipart/form-data creation
+    url = f"{base_url.rstrip('/')}/audio/transcriptions"
     boundary = uuid.uuid4().hex
 
-    with open(filepath, "rb") as f:
-        file_content = f.read()
+    def body_generator():
+        yield f"--{boundary}\r\n".encode("utf-8")
+        filename = os.path.basename(filepath)
+        yield (f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n').encode(
+            "utf-8"
+        )
+        yield b"Content-Type: audio/wav\r\n\r\n"
+        with open(filepath, "rb") as f:
+            while chunk := f.read(8192):
+                yield chunk
+        yield f"\r\n--{boundary}--\r\n".encode("utf-8")
 
-    body = bytearray()
-    body.extend(f"--{boundary}\r\n".encode("utf-8"))
+    class StreamingBody:
+        def __init__(self, gen):
+            self.gen = gen
+            self.current_chunk = b""
+
+        def read(self, size=-1):
+            try:
+                if size < 0:
+                    res = self.current_chunk
+                    self.current_chunk = b""
+                    for chunk in self.gen:
+                        res += chunk
+                    return res
+
+                if not self.current_chunk:
+                    self.current_chunk = next(self.gen)
+
+                chunk = self.current_chunk[:size]
+                self.current_chunk = self.current_chunk[size:]
+                return chunk
+            except StopIteration:
+                return b""
+
+    # urllib.request.urlopen can take an iterable/file-like object for data
+    # but it needs a __len__ or it won't set Content-Length, which might be okay
+    # or it might require a file-like object with read().
+
+    # Calculate Content-Length for the multipart body
     filename = os.path.basename(filepath)
-    content_disp = f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-    body.extend(content_disp.encode("utf-8"))
-    body.extend(b"Content-Type: audio/wav\r\n\r\n")
-    body.extend(file_content)
-    body.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+    header = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        "Content-Type: audio/wav\r\n\r\n"
+    ).encode("utf-8")
+    footer = f"\r\n--{boundary}--\r\n".encode("utf-8")
+    content_length = len(header) + os.path.getsize(filepath) + len(footer)
 
     req = urllib.request.Request(
         url,
-        data=body,
+        data=StreamingBody(body_generator()),
         headers={
             "Content-Type": f"multipart/form-data; boundary={boundary}",
             "Authorization": f"Bearer {api_key}",
+            "Content-Length": str(content_length),
         },
     )
 
@@ -92,7 +139,11 @@ def stt(filepath: str, base_url: str, api_key: str):
 
 def chat(messages: List[Dict[str, str]], base_url: str, api_key: str):
     url = f"{base_url.rstrip('/')}/chat/completions"
-    data = {"model": "mlx-community/Qwen3.6-35B-A3B-8bit", "messages": messages, "stream": True}
+    data = {"messages": messages, "stream": True}
+
+    model = os.environ.get("LOCAL_BRAIN_CHAT_MODEL")
+    if model:
+        data["model"] = model
 
     req = urllib.request.Request(
         url,
