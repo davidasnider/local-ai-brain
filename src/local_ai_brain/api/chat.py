@@ -75,11 +75,39 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 ),
             )
 
-        requested_max = (
-            body.max_tokens if body.max_tokens is not None else settings.DEFAULT_MAX_TOKENS
-        )
+        # Determine effective max tokens, preferring the newer max_completion_tokens
+        # but falling back to max_tokens or the system default.
+        raw_max = body.max_completion_tokens or body.max_tokens
+        requested_max = raw_max if raw_max is not None else settings.DEFAULT_MAX_TOKENS
+
+        # Clamp max tokens to the available context window
         available_window = settings.MAX_CONTEXT_TOKENS - estimated_prompt_tokens
         effective_max_tokens = min(requested_max, available_window)
+
+        # Normalize stop tokens: vllm-mlx expects a list of strings.
+        stop_tokens = body.stop
+        if isinstance(stop_tokens, str):
+            stop_tokens = [stop_tokens]
+        elif stop_tokens is None:
+            stop_tokens = []
+
+        # Prepare sampling params for engine. These are passed as kwargs to
+        # engine.chat or engine.stream_chat, which then populates SamplingParams.
+        sampling_kwargs = {
+            "max_tokens": effective_max_tokens,
+            "temperature": body.temperature,
+            "top_p": body.top_p,
+            "stop": stop_tokens,
+            "presence_penalty": body.presence_penalty,
+            "repetition_penalty": body.repetition_penalty,
+            "min_p": body.min_p,
+            "top_k": body.top_k,
+            "seed": body.seed,
+            "tools": body.tools,
+            "tool_choice": body.tool_choice,
+            "response_format": body.response_format,
+            "logit_bias": body.logit_bias,
+        }
 
         if body.stream:
 
@@ -91,9 +119,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
 
                     async for chunk in engine.stream_chat(
                         messages=messages_dict,
-                        max_tokens=effective_max_tokens,
-                        temperature=body.temperature,
-                        top_p=body.top_p,
+                        **sampling_kwargs,
                     ):
                         # Heuristic: estimation based on character count
                         llm_tokens_generated_total.add(
@@ -124,9 +150,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         else:
             output = await engine.chat(
                 messages=messages_dict,
-                max_tokens=effective_max_tokens,
-                temperature=body.temperature,
-                top_p=body.top_p,
+                **sampling_kwargs,
             )
             prompt_toks = getattr(output, "prompt_tokens", 0)
             gen_toks = getattr(output, "completion_tokens", 0)
