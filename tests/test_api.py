@@ -490,7 +490,10 @@ def test_chat_completions_list_content():
 
 
 def test_list_models():
+    from fastapi.testclient import TestClient
+
     from local_ai_brain.config import settings
+    from local_ai_brain.main import app
 
     with TestClient(app) as client:
         response = client.get("/v1/models", headers={"Authorization": "Bearer test-secret-key"})
@@ -504,7 +507,10 @@ def test_list_models():
 
 
 def test_get_model():
+    from fastapi.testclient import TestClient
+
     from local_ai_brain.config import settings
+    from local_ai_brain.main import app
 
     with TestClient(app) as client:
         response = client.get(
@@ -518,6 +524,10 @@ def test_get_model():
 
 
 def test_get_model_not_found():
+    from fastapi.testclient import TestClient
+
+    from local_ai_brain.main import app
+
     with TestClient(app) as client:
         response = client.get(
             "/v1/models/non-existent-model", headers={"Authorization": "Bearer test-secret-key"}

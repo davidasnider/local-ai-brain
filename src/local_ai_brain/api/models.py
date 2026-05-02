@@ -8,37 +8,41 @@ router = APIRouter()
 
 
 def get_valid_models():
+    created_time = int(time.time())
     return [
-        settings.QWEN_MODEL_PATH,
-        settings.WHISPER_MODEL_PATH,
-        settings.KOKORO_MODEL_PATH,
+        {
+            "id": settings.QWEN_MODEL_PATH,
+            "object": "model",
+            "created": created_time,
+            "owned_by": "local-ai-brain",
+        },
+        {
+            "id": settings.WHISPER_MODEL_PATH,
+            "object": "model",
+            "created": created_time,
+            "owned_by": "local-ai-brain",
+        },
+        {
+            "id": settings.KOKORO_MODEL_PATH,
+            "object": "model",
+            "created": created_time,
+            "owned_by": "local-ai-brain",
+        },
     ]
 
 
 @router.get("/models")
 async def list_models():
-    created = int(time.time())
     return {
         "object": "list",
-        "data": [
-            {
-                "id": model_id,
-                "object": "model",
-                "created": created,
-                "owned_by": "local-ai-brain",
-            }
-            for model_id in get_valid_models()
-        ],
+        "data": get_valid_models(),
     }
 
 
 @router.get("/models/{model_id:path}")
 async def get_model(model_id: str):
-    if model_id in get_valid_models():
-        return {
-            "id": model_id,
-            "object": "model",
-            "created": int(time.time()),
-            "owned_by": "local-ai-brain",
-        }
+    models = get_valid_models()
+    for m in models:
+        if m["id"] == model_id:
+            return m
     raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
