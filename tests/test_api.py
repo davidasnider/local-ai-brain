@@ -59,6 +59,19 @@ sys.modules["vllm_mlx.engine"] = MagicMock()
 sys.modules["vllm_mlx.engine.batched"] = MagicMock()
 sys.modules["vllm_mlx.engine.batched"].BatchedEngine = mock_batched
 
+# Mock vllm_mlx.scheduler with a real SchedulerConfig stub
+mock_scheduler_module = MagicMock()
+
+
+class MockSchedulerConfig:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+mock_scheduler_module.SchedulerConfig = MockSchedulerConfig
+sys.modules["vllm_mlx.scheduler"] = mock_scheduler_module
+
 mock_whisper = MagicMock()
 mock_whisper.transcribe.return_value = {"text": "Hello from mock Whisper!"}
 sys.modules["mlx_whisper"] = mock_whisper
