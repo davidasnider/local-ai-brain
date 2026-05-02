@@ -21,7 +21,12 @@ router = APIRouter()
 @router.post("/chat/completions")
 async def chat_completions(request: Request, body: ChatCompletionRequest):
     model_name = getattr(body, "model", None) or settings.QWEN_MODEL_PATH
-    if model_name != settings.QWEN_MODEL_PATH:
+    # Accept the canonical path plus any configured aliases. Aliases are only
+    # valid when they were historically pointing at the current model; if
+    # QWEN_MODEL_PATH has been overridden to a different model the legacy IDs
+    # should not silently route to it.
+    accepted_ids = {settings.QWEN_MODEL_PATH} | set(settings.QWEN_MODEL_ALIASES)
+    if model_name not in accepted_ids:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -29,6 +34,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 f"This API only supports {settings.QWEN_MODEL_PATH}"
             ),
         )
+    # Normalize any alias to the canonical model path so response is consistent
+    model_name = settings.QWEN_MODEL_PATH
     logger.info(f"Received chat completion request for model: {model_name}")
 
     engine = getattr(request.app.state, "llm_engine", None)

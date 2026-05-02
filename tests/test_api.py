@@ -59,6 +59,19 @@ sys.modules["vllm_mlx.engine"] = MagicMock()
 sys.modules["vllm_mlx.engine.batched"] = MagicMock()
 sys.modules["vllm_mlx.engine.batched"].BatchedEngine = mock_batched
 
+# Mock vllm_mlx.scheduler with a real SchedulerConfig stub
+mock_scheduler_module = MagicMock()
+
+
+class MockSchedulerConfig:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+mock_scheduler_module.SchedulerConfig = MockSchedulerConfig
+sys.modules["vllm_mlx.scheduler"] = mock_scheduler_module
+
 mock_whisper = MagicMock()
 mock_whisper.transcribe.return_value = {"text": "Hello from mock Whisper!"}
 sys.modules["mlx_whisper"] = mock_whisper
@@ -286,6 +299,63 @@ def test_chat_engine_not_initialized():
             headers=headers,
         )
         assert response.status_code == 503
+
+
+def test_batched_engine_receives_scheduler_config():
+    """Verify lifespan() passes the correct SchedulerConfig to BatchedEngine."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from local_ai_brain.config import settings
+
+    captured_kwargs = {}
+
+    mock_engine_instance = MagicMock()
+    mock_engine_instance.start = AsyncMock()
+    mock_engine_instance.stop = AsyncMock()
+
+    def capturing_engine_cls(model_name, scheduler_config=None, **kwargs):
+        captured_kwargs["model_name"] = model_name
+        captured_kwargs["scheduler_config"] = scheduler_config
+        return mock_engine_instance
+
+    mock_whisper_module = MagicMock()
+    mock_kokoro_instance = MagicMock()
+    mock_kokoro_instance.create = MagicMock(return_value=(b"", 24000))
+
+    with (
+        patch("local_ai_brain.main.settings.TESTING", False),
+        patch("local_ai_brain.main.BatchedEngine", side_effect=capturing_engine_cls),
+        patch("local_ai_brain.main.mlx_whisper", mock_whisper_module),
+        patch("local_ai_brain.main.hf_hub_download", return_value="/tmp/mock"),
+        patch("local_ai_brain.main.Kokoro", return_value=mock_kokoro_instance),
+    ):
+        with TestClient(app):
+            pass
+
+    assert captured_kwargs.get("model_name") == settings.QWEN_MODEL_PATH
+    sc = captured_kwargs.get("scheduler_config")
+    assert sc is not None, "scheduler_config was not passed to BatchedEngine"
+    assert sc.kv_cache_quantization == settings.LLM_KV_CACHE_QUANTIZATION
+    assert sc.kv_cache_quantization_bits == settings.LLM_KV_CACHE_BITS
+
+
+def test_chat_completions_legacy_model_alias():
+    """The old 8-bit model ID should be accepted as an alias for the 4-bit model."""
+    from local_ai_brain.config import settings
+
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+        legacy_id = "mlx-community/Qwen3.6-35B-A3B-8bit"
+        assert legacy_id in settings.QWEN_MODEL_ALIASES
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}], "model": legacy_id},
+            headers=headers,
+        )
+        # Should succeed (not 400) and return the canonical model path
+        assert response.status_code == 200
+        assert response.json()["model"] == settings.QWEN_MODEL_PATH
 
 
 def test_audio_speech():

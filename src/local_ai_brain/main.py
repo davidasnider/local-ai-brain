@@ -14,6 +14,7 @@ from kokoro_onnx import Kokoro
 from loguru import logger
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from vllm_mlx.engine.batched import BatchedEngine
+from vllm_mlx.scheduler import SchedulerConfig
 
 from .api.audio import router as audio_router
 from .api.chat import router as chat_router
@@ -102,7 +103,14 @@ async def lifespan(app: FastAPI):
             f"Loading LLM {settings.QWEN_MODEL_PATH}. If missing from cache, "
             "it will be redownloaded automatically..."
         )
-        app.state.llm_engine = BatchedEngine(model_name=settings.QWEN_MODEL_PATH)
+        scheduler_config = SchedulerConfig(
+            kv_cache_quantization=settings.LLM_KV_CACHE_QUANTIZATION,
+            kv_cache_quantization_bits=settings.LLM_KV_CACHE_BITS,
+        )
+        app.state.llm_engine = BatchedEngine(
+            model_name=settings.QWEN_MODEL_PATH,
+            scheduler_config=scheduler_config,
+        )
         await app.state.llm_engine.start()
 
         logger.info(f"Loading Whisper STT {settings.WHISPER_MODEL_PATH}...")

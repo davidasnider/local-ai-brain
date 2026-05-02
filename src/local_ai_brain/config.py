@@ -17,12 +17,19 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = Field(default=None, validation_alias="HF_TOKEN")
 
     # Model paths
-    QWEN_MODEL_PATH: str = "mlx-community/Qwen3.6-35B-A3B-8bit"
+    QWEN_MODEL_PATH: str = "mlx-community/Qwen3.6-35B-A3B-4bit"
     WHISPER_MODEL_PATH: str = "mlx-community/whisper-large-v3-mlx"
     KOKORO_MODEL_PATH: str = "kokoro-onnx"
     KOKORO_HF_REPO: str = "fastrtc/kokoro-onnx"
     KOKORO_ONNX_FILE: str = "kokoro-v1.0.onnx"
     KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
+
+    # LLM engine settings
+    LLM_KV_CACHE_QUANTIZATION: bool = True
+    LLM_KV_CACHE_BITS: int = Field(default=4, ge=4, le=8)
+
+    # Legacy model ID aliases (accepted in addition to QWEN_MODEL_PATH)
+    QWEN_MODEL_ALIASES: list[str] = Field(default=["mlx-community/Qwen3.6-35B-A3B-8bit"])
 
     @field_validator("LOCAL_API_KEY", mode="before")
     @classmethod

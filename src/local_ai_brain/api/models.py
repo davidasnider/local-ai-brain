@@ -46,6 +46,13 @@ async def list_models():
 @router.get("/models/{model_id:path}")
 async def get_model(model_id: str):
     models = get_valid_models()
+    # Accept the canonical ID or any configured aliases
+    accepted_ids = {settings.QWEN_MODEL_PATH} | set(settings.QWEN_MODEL_ALIASES)
+    if model_id in accepted_ids:
+        # Always return the canonical Qwen model entry
+        for m in models:
+            if m["id"] == settings.QWEN_MODEL_PATH:
+                return m
     for m in models:
         if m["id"] == model_id:
             return m
