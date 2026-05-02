@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     LOCAL_API_KEY: str
     MEMORY_LIMIT_GB: float = 48.0
     TTS_MAX_CHARACTERS: int = Field(default=4096, gt=0)
-    MAX_CONTEXT_TOKENS: int = Field(default=32768, gt=0)
+    MAX_CONTEXT_TOKENS: int = Field(default=65536, gt=0)
     TESTING: bool = False
 
     # Hugging Face token (optional, for private or rate‑limited repos)
