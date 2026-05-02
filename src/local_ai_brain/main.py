@@ -153,7 +153,7 @@ async def health_check():
 
 @app.get("/metrics", tags=["System"], dependencies=[Depends(verify_api_key)])
 async def get_metrics():
-    # Expose Prometheus metrics from OpenTelemetry
-    from prometheus_client import REGISTRY
+    # Expose Prometheus metrics from OpenTelemetry custom registry
+    from .metrics import OTEL_REGISTRY
 
-    return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
+    return Response(generate_latest(OTEL_REGISTRY), media_type=CONTENT_TYPE_LATEST)
