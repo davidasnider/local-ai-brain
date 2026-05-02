@@ -626,3 +626,79 @@ def test_models_unauthorized():
         # Bad key
         response = client.get("/v1/models", headers={"Authorization": "Bearer bad-key"})
         assert response.status_code == 401
+
+
+def test_chat_completions_max_tokens_default_and_clamping():
+    """Verify that max_tokens defaults to DEFAULT_MAX_TOKENS and is clamped to context window."""
+    from local_ai_brain.config import settings
+
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+
+        # 1. Test default behavior (no max_tokens provided)
+        # With "hi", prompt_len is 2, estimated_tokens = 0.
+        # So effective_max should be settings.DEFAULT_MAX_TOKENS.
+        with patch.object(mock_batched_instance, "chat", side_effect=mock_chat) as mock_chat_call:
+            response = client.post(
+                "/v1/chat/completions",
+                json={"messages": [{"role": "user", "content": "hi"}]},
+                headers=headers,
+            )
+            assert response.status_code == 200
+            kwargs = mock_chat_call.call_args.kwargs
+            assert kwargs["max_tokens"] == settings.DEFAULT_MAX_TOKENS
+
+        # 2. Test clamping to context window
+        # settings.MAX_CONTEXT_TOKENS is 65536.
+        # Prompt of 180,000 chars -> estimated_tokens = 60,000 (180k // 3).
+        # available_window = 65536 - 60000 = 5536.
+        long_prompt = "a" * 180000
+        with patch.object(mock_batched_instance, "chat", side_effect=mock_chat) as mock_chat_call:
+            response = client.post(
+                "/v1/chat/completions",
+                json={"messages": [{"role": "user", "content": long_prompt}]},
+                headers=headers,
+            )
+            assert response.status_code == 200
+            kwargs = mock_chat_call.call_args.kwargs
+            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - 60000)
+
+        # 3. Test user-provided max_tokens is also clamped
+        with patch.object(mock_batched_instance, "chat", side_effect=mock_chat) as mock_chat_call:
+            response = client.post(
+                "/v1/chat/completions",
+                json={
+                    "messages": [{"role": "user", "content": long_prompt}],
+                    "max_tokens": 10000,
+                },
+                headers=headers,
+            )
+            assert response.status_code == 200
+            kwargs = mock_chat_call.call_args.kwargs
+            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - 60000)
+
+
+def test_chat_completions_streaming_max_tokens_clamping():
+    """Verify that max_tokens clamping also applies to the streaming path."""
+    from local_ai_brain.config import settings
+
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+
+        long_prompt = "a" * 180000
+        # available_window = 65536 - 60000 = 5536.
+        with patch.object(
+            mock_batched_instance, "stream_chat", side_effect=mock_stream_chat
+        ) as mock_stream_call:
+            response = client.post(
+                "/v1/chat/completions",
+                json={"messages": [{"role": "user", "content": long_prompt}], "stream": True},
+                headers=headers,
+            )
+            assert response.status_code == 200
+            # Exhaust the stream to ensure the function is fully called if needed
+            list(response.iter_lines())
+            kwargs = mock_stream_call.call_args.kwargs
+            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - 60000)

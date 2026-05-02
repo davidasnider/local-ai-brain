@@ -48,31 +48,39 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
     try:
         messages_dict = [msg.model_dump(exclude_none=True) for msg in body.messages]
 
+        # Calculate prompt length (heuristic)
+        prompt_len = 0
+        for m in messages_dict:
+            content = m.get("content", "")
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and "text" in part:
+                        prompt_len += len(part["text"])
+                    elif isinstance(part, str):
+                        prompt_len += len(part)
+            elif isinstance(content, str):
+                prompt_len += len(content)
+
+        # Determine effective max tokens
+        # 3 chars per token is a conservative estimate for clamping
+        estimated_prompt_tokens = prompt_len // 3
+        requested_max = (
+            body.max_tokens if body.max_tokens is not None else settings.DEFAULT_MAX_TOKENS
+        )
+        available_window = max(1, settings.MAX_CONTEXT_TOKENS - estimated_prompt_tokens)
+        effective_max_tokens = min(requested_max, available_window)
+
         if body.stream:
 
             async def generate_stream():
                 nonlocal decremented
                 try:
-                    prompt_len = 0
-                    for m in messages_dict:
-                        content = m.get("content", "")
-                        if isinstance(content, list):
-                            for part in content:
-                                if isinstance(part, dict) and "text" in part:
-                                    prompt_len += len(part["text"])
-                                elif isinstance(part, str):
-                                    prompt_len += len(part)
-                        elif isinstance(content, str):
-                            prompt_len += len(content)
-
                     completion_id = f"chatcmpl-{uuid.uuid4()}"
                     llm_tokens_consumed_total.add(prompt_len // 4)
 
                     async for chunk in engine.stream_chat(
                         messages=messages_dict,
-                        max_tokens=body.max_tokens
-                        if body.max_tokens is not None
-                        else settings.MAX_CONTEXT_TOKENS,
+                        max_tokens=effective_max_tokens,
                         temperature=body.temperature,
                         top_p=body.top_p,
                     ):
@@ -103,9 +111,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         else:
             output = await engine.chat(
                 messages=messages_dict,
-                max_tokens=body.max_tokens
-                if body.max_tokens is not None
-                else settings.MAX_CONTEXT_TOKENS,
+                max_tokens=effective_max_tokens,
                 temperature=body.temperature,
                 top_p=body.top_p,
             )
