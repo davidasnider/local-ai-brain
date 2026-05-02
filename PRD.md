@@ -6,7 +6,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 ## 2. Core Requirements & Constraints
 * **Framework:** Python 3.12+ with FastAPI.
 * **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup).
-* **Hardware Limit:** Must strictly cap unified memory usage at **48GB maximum**.
+* **Hardware Limit:** Must cap unified memory usage using a configurable threshold (defaults to **54GB**, set via `MEMORY_LIMIT_GB`).
 * **Audio Constraints:** Text-to-Speech (TTS) input length must be restricted by the configurable `TTS_MAX_CHARACTERS` setting (defaults to 4096) to prevent extended blocking of resources.
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access.
@@ -41,7 +41,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 
 ## 5. Memory Management
 * The FastAPI app must include a memory guard middleware (`MemoryGuardMiddleware`) to track the unified memory footprint using `psutil`.
-* If a request's projected memory usage (current + estimated payload size) threatens to push the unified memory past the 48GB limit, the API should safely reject the request with a `429 Too Many Requests` error rather than crashing the system, incrementing the `memory_rejections_total` metric.
+* If a request's projected memory usage (current + estimated payload size) threatens to push the unified memory past the `MEMORY_LIMIT_GB` threshold (default: 54GB), the API should safely reject the request with a `429 Too Many Requests` error rather than crashing the system, incrementing the `memory_rejections_total` metric.
 
 ## 6. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
