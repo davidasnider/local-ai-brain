@@ -654,6 +654,7 @@ def test_chat_completions_max_tokens_default_and_clamping():
         # Prompt of 180,000 chars -> estimated_tokens = 60,000 (180k // 3).
         # available_window = 65536 - 60000 = 5536.
         long_prompt = "a" * 180000
+        estimated_prompt_tokens = len(long_prompt) // 3
         with patch.object(mock_batched_instance, "chat", side_effect=mock_chat) as mock_chat_call:
             response = client.post(
                 "/v1/chat/completions",
@@ -662,7 +663,7 @@ def test_chat_completions_max_tokens_default_and_clamping():
             )
             assert response.status_code == 200
             kwargs = mock_chat_call.call_args.kwargs
-            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - 60000)
+            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - estimated_prompt_tokens)
 
         # 3. Test user-provided max_tokens is also clamped
         with patch.object(mock_batched_instance, "chat", side_effect=mock_chat) as mock_chat_call:
@@ -676,7 +677,7 @@ def test_chat_completions_max_tokens_default_and_clamping():
             )
             assert response.status_code == 200
             kwargs = mock_chat_call.call_args.kwargs
-            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - 60000)
+            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - estimated_prompt_tokens)
 
 
 def test_chat_completions_streaming_max_tokens_clamping():
@@ -688,6 +689,7 @@ def test_chat_completions_streaming_max_tokens_clamping():
         headers = {"Authorization": "Bearer test-secret-key"}
 
         long_prompt = "a" * 180000
+        estimated_prompt_tokens = len(long_prompt) // 3
         # available_window = 65536 - 60000 = 5536.
         with patch.object(
             mock_batched_instance, "stream_chat", side_effect=mock_stream_chat
@@ -701,4 +703,25 @@ def test_chat_completions_streaming_max_tokens_clamping():
             # Exhaust the stream to ensure the function is fully called if needed
             list(response.iter_lines())
             kwargs = mock_stream_call.call_args.kwargs
-            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - 60000)
+            assert kwargs["max_tokens"] == (settings.MAX_CONTEXT_TOKENS - estimated_prompt_tokens)
+
+
+def test_chat_completions_prompt_too_long():
+    """Verify that a 400 error is returned when the prompt is too long for the context window."""
+    from local_ai_brain.config import settings
+
+    with TestClient(app) as client:
+        client.app.state.llm_engine = mock_batched_instance
+        headers = {"Authorization": "Bearer test-secret-key"}
+
+        # Prompt of 300,000 chars -> estimated_tokens = 100,000.
+        # This exceeds MAX_CONTEXT_TOKENS (65536).
+        huge_prompt = "a" * 300000
+        response = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": huge_prompt}]},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert "Prompt is too long" in response.json()["detail"]
+        assert str(settings.MAX_CONTEXT_TOKENS) in response.json()["detail"]
