@@ -17,6 +17,7 @@ from vllm_mlx.engine.batched import BatchedEngine
 
 from .api.audio import router as audio_router
 from .api.chat import router as chat_router
+from .api.models import router as models_router
 from .config import settings
 from .metrics import update_memory_metrics
 from .middleware import MemoryGuardMiddleware, MetricsMiddleware
@@ -143,6 +144,7 @@ app.add_middleware(MemoryGuardMiddleware)
 app.add_middleware(MetricsMiddleware)
 
 # Include Routers with global dependencies for authentication
+app.include_router(models_router, prefix="/v1", dependencies=[Depends(verify_api_key)])
 app.include_router(chat_router, prefix="/v1", dependencies=[Depends(verify_api_key)])
 app.include_router(audio_router, prefix="/v1", dependencies=[Depends(verify_api_key)])
 

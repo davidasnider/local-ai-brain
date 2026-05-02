@@ -487,3 +487,64 @@ def test_chat_completions_list_content():
             headers=headers,
         )
         assert response.status_code == 200
+
+
+def test_list_models():
+    from fastapi.testclient import TestClient
+
+    from local_ai_brain.config import settings
+    from local_ai_brain.main import app
+
+    with TestClient(app) as client:
+        response = client.get("/v1/models", headers={"Authorization": "Bearer test-secret-key"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["object"] == "list"
+        ids = [m["id"] for m in data["data"]]
+        assert settings.QWEN_MODEL_PATH in ids
+        assert settings.WHISPER_MODEL_PATH in ids
+        assert settings.KOKORO_MODEL_PATH in ids
+
+
+def test_get_model():
+    from fastapi.testclient import TestClient
+
+    from local_ai_brain.config import settings
+    from local_ai_brain.main import app
+
+    with TestClient(app) as client:
+        response = client.get(
+            f"/v1/models/{settings.QWEN_MODEL_PATH}",
+            headers={"Authorization": "Bearer test-secret-key"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == settings.QWEN_MODEL_PATH
+        assert data["object"] == "model"
+
+
+def test_get_model_not_found():
+    from fastapi.testclient import TestClient
+
+    from local_ai_brain.main import app
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/v1/models/non-existent-model", headers={"Authorization": "Bearer test-secret-key"}
+        )
+        assert response.status_code == 404
+
+
+def test_models_unauthorized():
+    from fastapi.testclient import TestClient
+
+    from local_ai_brain.main import app
+
+    with TestClient(app) as client:
+        # No header
+        response = client.get("/v1/models")
+        assert response.status_code == 401
+
+        # Bad key
+        response = client.get("/v1/models", headers={"Authorization": "Bearer bad-key"})
+        assert response.status_code == 401
