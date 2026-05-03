@@ -10,7 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config import settings
 from .logging import configure_logging
-from .middleware import MemoryGuardMiddleware, MetricsMiddleware
+from .middleware import MetricsMiddleware
 
 # Standardize logging using our centralized configuration
 configure_logging(settings.TESTING)
@@ -42,7 +42,6 @@ app = FastAPI(
 )
 
 # Add Middlewares
-app.add_middleware(MemoryGuardMiddleware)
 app.add_middleware(MetricsMiddleware)
 
 
@@ -55,7 +54,7 @@ async def proxy_request(request: Request, target_url: str):
         url = f"{url}?{query}"
 
     headers = dict(request.headers)
-    # Strip hop-by-hop and client auth headers before proxying
+    # Strip hop-by-hop, content-length, and client auth headers before proxying
     headers_to_strip = [
         "host",
         "connection",
@@ -67,6 +66,7 @@ async def proxy_request(request: Request, target_url: str):
         "transfer-encoding",
         "upgrade",
         "authorization",
+        "content-length",
     ]
     for h in headers_to_strip:
         headers.pop(h, None)
