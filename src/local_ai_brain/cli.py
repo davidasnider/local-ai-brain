@@ -214,18 +214,6 @@ def print_help():
     print("  /exit or quit   - Exit the application")
 
 
-def shutdown_processes(processes):
-    """Gracefully terminate and then kill subprocesses."""
-    for p in processes:
-        if p.poll() is None:
-            p.terminate()
-    for p in processes:
-        try:
-            p.wait(timeout=5)
-        except Exception:
-            p.kill()
-
-
 def serve():
     import shutil
     import subprocess
@@ -320,21 +308,35 @@ def serve():
             for p in processes:
                 if p.poll() is not None:
                     print(
-                        f"{COLOR_ERROR}Subprocess exited unexpectedly (exit code {p.returncode}). "
-                        f"Shutting down...{COLOR_RESET}"
+                        f"{COLOR_ERROR}A subprocess exited unexpectedly "
+                        f"(exit code {p.returncode}). Shutting down...{COLOR_RESET}"
                     )
-                    shutdown_processes(processes)
+                    # Terminate and wait for all processes
+                    for proc in processes:
+                        if proc.poll() is None:
+                            proc.terminate()
+                    for proc in processes:
+                        try:
+                            proc.wait(timeout=5)
+                        except Exception:
+                            proc.kill()
                     sys.exit(1)
             time.sleep(1)
 
     except KeyboardInterrupt:
         print(f"{COLOR_SYSTEM}Shutting down servers...{COLOR_RESET}")
-        shutdown_processes(processes)
+        for p in processes:
+            if p.poll() is None:
+                p.terminate()
+        for p in processes:
+            p.wait()
         # Normal exit on Ctrl+C
         sys.exit(0)
     except Exception as e:
         print(f"{COLOR_ERROR}Fatal error in serve: {e}{COLOR_RESET}")
-        shutdown_processes(processes)
+        for p in processes:
+            if p.poll() is None:
+                p.terminate()
         sys.exit(1)
 
 
@@ -345,7 +347,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("serve", help="Start the API servers")
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     if args.command == "serve":
         serve()

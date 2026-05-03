@@ -13,10 +13,6 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
 - **Security:** Authenticated via a static `LOCAL_API_KEY` Bearer token.
 
-## Architecture
-
-![Local AI Brain Architecture](architecture.svg)
-
 ## Prerequisites
 
 - **OS:** macOS (Apple Silicon strongly recommended).

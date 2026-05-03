@@ -122,7 +122,8 @@ async def create_transcription(
                 logger.warning(f"Could not remove temporary audio file {path}: {e}")
 
         if tmp_path is not None:
-            await asyncio.to_thread(_safe_unlink, tmp_path)
+            # Use create_task to ensure it runs independently in the background
+            asyncio.create_task(asyncio.to_thread(_safe_unlink, tmp_path))
 
 
 @app.get("/health")
