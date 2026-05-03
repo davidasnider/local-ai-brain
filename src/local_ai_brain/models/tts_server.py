@@ -4,7 +4,7 @@ import secrets
 import time
 
 import soundfile as sf
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security
+from fastapi import Depends, FastAPI, HTTPException, Response, Security
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
@@ -22,8 +22,12 @@ from local_ai_brain.schemas import SpeechRequest
 configure_logging(settings.TESTING)
 
 
-async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False))):
-    if credentials is None or not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
+):
+    if credentials is None or not secrets.compare_digest(
+        credentials.credentials, settings.LOCAL_API_KEY
+    ):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
 

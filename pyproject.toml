@@ -28,7 +28,7 @@ local-brain = "local_ai_brain.cli:main"
 package = true
 
 [tool.uv.sources]
-vllm-mlx = { git = "https://github.com/waybarrios/vllm-mlx.git", rev = "e69435608fa625b0dd4853cc118c968470a1b530" }
+vllm-mlx = { git = "https://github.com/waybarrios/vllm-mlx.git", rev = "e69435608fa625b0dd4853cc118c968470a1b530" } # pragma: allowlist secret
 
 [dependency-groups]
 dev = [

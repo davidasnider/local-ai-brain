@@ -215,9 +215,9 @@ def print_help():
 
 
 def serve():
+    import shutil
     import subprocess
     import time
-    import shutil
 
     print(f"{COLOR_SYSTEM}Starting Local AI Brain Microservices...{COLOR_RESET}")
 
@@ -229,9 +229,7 @@ def serve():
 
         from local_ai_brain.config import settings
 
-        print(
-            f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}"
-        )
+        print(f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}")
         p_vllm = subprocess.Popen(
             [
                 uv_bin,
@@ -247,12 +245,6 @@ def serve():
                 settings.QWEN_MODEL_PATH,
                 "--api-key",
                 settings.LOCAL_API_KEY,
-                "--max-tokens",
-                str(settings.DEFAULT_MAX_TOKENS),
-                "--max-request-tokens",
-                str(settings.MAX_CONTEXT_TOKENS),
-                "--reasoning-parser",
-                "qwen3",
             ],
             env=env_vars,
         )
@@ -316,8 +308,8 @@ def serve():
             for p in processes:
                 if p.poll() is not None:
                     print(
-                        f"{COLOR_ERROR}A subprocess exited unexpectedly (exit code {p.returncode}). "
-                        f"Shutting down...{COLOR_RESET}"
+                        f"{COLOR_ERROR}A subprocess exited unexpectedly "
+                        f"(exit code {p.returncode}). Shutting down...{COLOR_RESET}"
                     )
                     # Terminate and wait for all processes
                     for proc in processes:

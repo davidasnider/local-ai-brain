@@ -16,8 +16,12 @@ from .middleware import MemoryGuardMiddleware, MetricsMiddleware
 configure_logging(settings.TESTING)
 
 
-async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False))):
-    if credentials is None or not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
+):
+    if credentials is None or not secrets.compare_digest(
+        credentials.credentials, settings.LOCAL_API_KEY
+    ):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
 
@@ -83,7 +87,7 @@ async def proxy_request(request: Request, target_url: str):
 
         async def stream_generator():
             try:
-                # Use aiter_bytes() to ensure httpx handles decompression if the 
+                # Use aiter_bytes() to ensure httpx handles decompression if the
                 # content-encoding header was stripped or modified.
                 async for chunk in response.aiter_bytes():
                     yield chunk
@@ -110,23 +114,11 @@ async def proxy_request(request: Request, target_url: str):
         raise HTTPException(status_code=502, detail="Bad Gateway")
 
 
-@app.post("/v1/chat/completions")
-async def chat_completions(request: Request):
-    """Explicitly handle chat completions to log request parameters for debugging."""
-    try:
-        # We peek at the body without fully consuming it if possible, 
-        # or we just log that it's a chat request.
-        logger.info("[REQUEST] POST /v1/chat/completions")
-    except Exception:
-        pass
-    return await proxy_request(request, settings.VLLM_URL)
-
-
 @app.api_route(
     "/v1/chat/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE"],
 )
-async def proxy_vllm_chat_any(request: Request, path: str):
+async def proxy_vllm_chat(request: Request, path: str):
     return await proxy_request(request, settings.VLLM_URL)
 
 
@@ -145,9 +137,7 @@ async def list_models(request: Request):
         client = request.app.state.client
         # Add internal auth to backend request and use a short timeout
         headers = {"Authorization": f"Bearer {settings.LOCAL_API_KEY}"}
-        vllm_resp = await client.get(
-            f"{settings.VLLM_URL}/v1/models", headers=headers, timeout=5.0
-        )
+        vllm_resp = await client.get(f"{settings.VLLM_URL}/v1/models", headers=headers, timeout=5.0)
         vllm_resp.raise_for_status()
         data = vllm_resp.json()
     except Exception as e:
@@ -184,9 +174,7 @@ async def get_model(model_id: str, request: Request):
     model_id = unquote(model_id)
 
     # Check against our configured models
-    is_qwen = (
-        model_id == settings.QWEN_MODEL_PATH or model_id in settings.QWEN_MODEL_ALIASES
-    )
+    is_qwen = model_id == settings.QWEN_MODEL_PATH or model_id in settings.QWEN_MODEL_ALIASES
     is_stt = model_id == settings.WHISPER_MODEL_PATH
     is_tts = model_id == settings.KOKORO_MODEL_PATH
 
@@ -199,11 +187,13 @@ async def get_model(model_id: str, request: Request):
             "type": "llm" if is_qwen else ("stt" if is_stt else "tts"),
         }
         if is_qwen:
-            resp.update({
-                "max_model_len": settings.MAX_CONTEXT_TOKENS,
-                "context_window": settings.MAX_CONTEXT_TOKENS,
-                "max_position_embeddings": settings.MAX_CONTEXT_TOKENS,
-            })
+            resp.update(
+                {
+                    "max_model_len": settings.MAX_CONTEXT_TOKENS,
+                    "context_window": settings.MAX_CONTEXT_TOKENS,
+                    "max_position_embeddings": settings.MAX_CONTEXT_TOKENS,
+                }
+            )
         return resp
 
     # Fallback: proxy to vLLM

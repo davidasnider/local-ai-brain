@@ -6,7 +6,16 @@ import time
 from typing import Optional
 
 import soundfile as sf
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, Security, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    Security,
+    UploadFile,
+)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -23,8 +32,12 @@ from local_ai_brain.schemas import TranscriptionResponse
 configure_logging(settings.TESTING)
 
 
-async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False))):
-    if credentials is None or not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
+):
+    if credentials is None or not secrets.compare_digest(
+        credentials.credentials, settings.LOCAL_API_KEY
+    ):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
 
