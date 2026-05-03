@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     DEFAULT_MAX_TOKENS: int = Field(default=16384, gt=0)
     TESTING: bool = False
 
+    # Microservices URLs
+    VLLM_URL: str = "http://127.0.0.1:8001"
+    STT_URL: str = "http://127.0.0.1:8002"
+    TTS_URL: str = "http://127.0.0.1:8003"
+
     # Hugging Face token (optional, for private or rate‑limited repos)
     HF_TOKEN: Optional[str] = Field(default=None, validation_alias="HF_TOKEN")
 

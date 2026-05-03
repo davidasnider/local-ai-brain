@@ -335,3 +335,39 @@ def test_tts_http_error_non_json(mock_urlopen, capsys):
     tts("Hello world", "http://base", "key")
     captured = capsys.readouterr()
     assert "TTS HTTP Error: 500 - Internal Server Error" in captured.out
+
+
+@patch("time.sleep")
+@patch("subprocess.Popen")
+def test_main_serve(mock_popen, mock_sleep, capsys):
+    mock_sleep.side_effect = KeyboardInterrupt()
+
+    mock_process = MagicMock()
+    mock_process.poll.return_value = None
+    mock_popen.return_value = mock_process
+
+    with patch.object(sys, "argv", ["local-brain", "serve"]):
+        with pytest.raises(SystemExit) as e:
+            main()
+        assert e.value.code == 0
+
+    assert mock_popen.call_count == 4
+    assert mock_process.terminate.call_count == 4
+    assert mock_process.wait.call_count == 4
+
+
+@patch("time.sleep")
+@patch("subprocess.Popen")
+def test_main_serve_subprocess_exit(mock_popen, mock_sleep, capsys):
+    mock_process = MagicMock()
+    # It will hit the poll() and return 1, which causes SystemExit(1) to be raised by our code
+    mock_process.poll.return_value = 1
+    mock_popen.return_value = mock_process
+
+    with patch.object(sys, "argv", ["local-brain", "serve"]):
+        with pytest.raises(SystemExit) as e:
+            main()
+        assert e.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "A subprocess exited unexpectedly" in captured.out

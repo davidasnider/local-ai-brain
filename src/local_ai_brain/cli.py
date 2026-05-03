@@ -214,10 +214,142 @@ def print_help():
     print("  /exit or quit   - Exit the application")
 
 
+def shutdown_processes(processes):
+    """Gracefully terminate and then kill subprocesses."""
+    for p in processes:
+        if p.poll() is None:
+            p.terminate()
+    for p in processes:
+        try:
+            p.wait(timeout=5)
+        except Exception:
+            p.kill()
+
+
+def serve():
+    import shutil
+    import subprocess
+    import time
+
+    print(f"{COLOR_SYSTEM}Starting Local AI Brain Microservices...{COLOR_RESET}")
+
+    uv_bin = shutil.which("uv") or "uv"
+
+    processes = []
+    try:
+        env_vars = dict(os.environ, PYTHONPATH="src")
+
+        from local_ai_brain.config import settings
+
+        print(f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}")
+        p_vllm = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "python",
+                "-m",
+                "vllm_mlx.server",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8001",
+                "--model",
+                settings.QWEN_MODEL_PATH,
+                "--api-key",
+                settings.LOCAL_API_KEY,
+            ],
+            env=env_vars,
+        )
+        processes.append(p_vllm)
+
+        print(f"{COLOR_SYSTEM}Starting STT Server on port 8002...{COLOR_RESET}")
+        p_stt = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "uvicorn",
+                "local_ai_brain.models.stt_server:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8002",
+            ],
+            env=env_vars,
+        )
+        processes.append(p_stt)
+
+        print(f"{COLOR_SYSTEM}Starting TTS Server on port 8003...{COLOR_RESET}")
+        p_tts = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "uvicorn",
+                "local_ai_brain.models.tts_server:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8003",
+            ],
+            env=env_vars,
+        )
+        processes.append(p_tts)
+
+        print(f"{COLOR_SYSTEM}Starting API Gateway (Proxy) on port 8000...{COLOR_RESET}")
+        proxy_env = dict(
+            env_vars,
+            VLLM_URL="http://127.0.0.1:8001",
+            STT_URL="http://127.0.0.1:8002",
+            TTS_URL="http://127.0.0.1:8003",
+        )
+        p_proxy = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "uvicorn",
+                "local_ai_brain.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+            ],
+            env=proxy_env,
+        )
+        processes.append(p_proxy)
+
+        while True:
+            for p in processes:
+                if p.poll() is not None:
+                    print(
+                        f"{COLOR_ERROR}A subprocess exited unexpectedly "
+                        f"(exit code {p.returncode}). Shutting down...{COLOR_RESET}"
+                    )
+                    shutdown_processes(processes)
+                    sys.exit(1)
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print(f"{COLOR_SYSTEM}Shutting down servers...{COLOR_RESET}")
+        shutdown_processes(processes)
+        # Normal exit on Ctrl+C
+        sys.exit(0)
+    except Exception as e:
+        print(f"{COLOR_ERROR}Fatal error in serve: {e}{COLOR_RESET}")
+        shutdown_processes(processes)
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Local AI Brain CLI")
     parser.add_argument("--help-cmd", action="store_true", help="Print help and exit")
+
+    subparsers = parser.add_subparsers(dest="command")
+    subparsers.add_parser("serve", help="Start the API servers")
+
     args = parser.parse_args()
+
+    if args.command == "serve":
+        serve()
+        return
 
     if args.help_cmd:
         print_help()
