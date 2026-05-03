@@ -137,6 +137,7 @@ def test_proxy_stt(mock_send, client):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
 
     async def async_iter():
         yield b'{"text": "hello"}'
@@ -160,6 +161,7 @@ def test_proxy_tts(mock_send, client):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
 
     async def async_iter():
         yield b"audio_data"
@@ -180,6 +182,7 @@ def test_proxy_chat(mock_send, client):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
 
     async def async_iter():
         yield b'{"id": "chat-1"}'

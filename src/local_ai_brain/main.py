@@ -73,14 +73,11 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     return credentials.credentials
 
 
-# Set up the HTTPX async client
-client = httpx.AsyncClient(timeout=300.0)
-
-
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.client = httpx.AsyncClient(timeout=300.0)
     yield
-    await client.aclose()
+    await app.state.client.aclose()
 
 
 app = FastAPI(lifespan=lifespan, title="Local AI Brain Proxy")
@@ -96,11 +93,15 @@ TTS_URL = os.environ.get("TTS_URL", "http://127.0.0.1:8003")
 
 async def proxy_request(request: Request, base_url: str):
     path = request.url.path
+    query = request.url.query
     url = f"{base_url.rstrip('/')}{path}"
+    if query:
+        url = f"{url}?{query}"
 
     headers = dict(request.headers)
     headers.pop("host", None)
 
+    client = request.app.state.client
     req = client.build_request(
         method=request.method,
         url=url,
@@ -110,8 +111,27 @@ async def proxy_request(request: Request, base_url: str):
 
     try:
         response = await client.send(req, stream=True)
+
+        async def stream_generator():
+            try:
+                async for chunk in response.aiter_raw():
+                    yield chunk
+            finally:
+                await response.aclose()
+
+        resp_headers = dict(response.headers)
+        hop_by_hop_headers = [
+            "connection",
+            "keep-alive",
+            "transfer-encoding",
+            "content-length",
+            "content-encoding",
+        ]
+        for h in hop_by_hop_headers:
+            resp_headers.pop(h, None)
+
         return StreamingResponse(
-            response.aiter_raw(), status_code=response.status_code, headers=dict(response.headers)
+            stream_generator(), status_code=response.status_code, headers=resp_headers
         )
     except httpx.RequestError as e:
         logger.error(f"Proxy error to {url}: {e}")
@@ -134,6 +154,7 @@ async def proxy_vllm_chat(request: Request, path: str):
 )
 async def list_models(request: Request):
     try:
+        client = request.app.state.client
         vllm_resp = await client.get(f"{VLLM_URL}/v1/models")
         vllm_resp.raise_for_status()
         data = vllm_resp.json()
@@ -192,13 +213,14 @@ async def health_check():
 
 
 @app.get("/metrics", tags=["System"], dependencies=[Depends(verify_api_key)])
-async def get_metrics():
+async def get_metrics(request: Request):
     # Expose Prometheus metrics from OpenTelemetry custom registry
     from .metrics import OTEL_REGISTRY
 
     proxy_metrics = generate_latest(OTEL_REGISTRY)
     combined_metrics = proxy_metrics
 
+    client = request.app.state.client
     for name, url in [("vLLM", VLLM_URL), ("STT", STT_URL), ("TTS", TTS_URL)]:
         try:
             resp = await client.get(f"{url}/metrics", timeout=2.0)
