@@ -1,0 +1,247 @@
+<svg viewBox="0 0 1000 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+    </marker>
+    <marker id="arrowhead-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+    </marker>
+    <marker id="arrowhead-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+    </marker>
+    <marker id="arrowhead-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+    </marker>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Background Grid -->
+  <rect width="100%" height="100%" fill="url(#grid)" />
+
+  <!-- =================================================================
+       LAYER 1: External Clients (slate - external)
+       ================================================================= -->
+  <!-- Users (Browser/Mobile/Terminal) -->
+  <rect x="30" y="50" width="130" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="95" y="72" fill="white" font-size="11" font-weight="600" text-anchor="middle">External Users</text>
+  <text x="95" y="88" fill="#94a3b8" font-size="9" text-anchor="middle">Browser / Mobile / CLI</text>
+
+  <!-- Hermes CLI -->
+  <rect x="30" y="120" width="130" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="95" y="142" fill="white" font-size="11" font-weight="600" text-anchor="middle">Hermes Agent</text>
+  <text x="95" y="158" fill="#94a3b8" font-size="9" text-anchor="middle">OpenAI-compatible</text>
+
+  <!-- Home Assistant -->
+  <rect x="30" y="190" width="130" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="95" y="212" fill="white" font-size="11" font-weight="600" text-anchor="middle">Home Assistant</text>
+  <text x="95" y="228" fill="#94a3b8" font-size="9" text-anchor="middle">Extended OpenAI Conv.</text>
+
+  <!-- Gemini CLI / Other Tools -->
+  <rect x="30" y="260" width="130" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="95" y="282" fill="white" font-size="11" font-weight="600" text-anchor="middle">Other Clients</text>
+  <text x="95" y="298" fill="#94a3b8" font-size="9" text-anchor="middle">Gemini CLI / curl / API</text>
+
+  <p class="subtitle">Microservices architecture: FastAPI Gateway + vLLM-MLX (LLM) + Whisper (STT) + Kokoro (TTS) on Apple Silicon (MLX)</p>
+  
+  <!-- =================================================================
+       LAYER 2: Security / Auth (rose - security)
+       ================================================================= -->
+  <!-- Auth Layer - spans full width of gateway -->
+  <rect x="190" y="55" width="170" height="260" rx="8" fill="rgba(136, 19, 55, 0.15)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/>
+  <text x="275" y="72" fill="#fb7185" font-size="9" font-weight="600" text-anchor="middle">AUTHENTICATION</text>
+  <text x="275" y="86" fill="#fb7185" font-size="8" text-anchor="middle">Bearer Token Required</text>
+  <text x="275" y="100" fill="#fb7185" font-size="8" text-anchor="middle">on ALL endpoints</text>
+  <text x="275" y="116" fill="#fb7185" font-size="8" text-anchor="middle">(incl. /health, /metrics)</text>
+
+  <!-- Auth verification box inside -->
+  <rect x="230" y="130" width="90" height="55" rx="4" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="275" y="152" fill="white" font-size="10" font-weight="600" text-anchor="middle">LOCAL_API_KEY</text>
+  <text x="275" y="168" fill="#fb7185" font-size="8" text-anchor="middle">Static Bearer Token</text>
+
+  <!-- OS Memory Management (security overlay) -->
+  <rect x="230" y="195" width="90" height="55" rx="4" fill="rgba(136, 19, 55, 0.2)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <text x="275" y="217" fill="white" font-size="10" font-weight="600" text-anchor="middle">OS Memory</text>
+  <text x="275" y="233" fill="#fb7185" font-size="8" text-anchor="middle">Managed by</text>
+  <text x="275" y="247" fill="#fb7185" font-size="8" text-anchor="middle">Host System</text>
+
+  <!-- =================================================================
+       LAYER 3: API Gateway (emerald - backend)
+       ================================================================= -->
+  <!-- API Gateway -->
+  <rect x="390" y="80" width="230" height="120" rx="8" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="505" y="105" fill="white" font-size="13" font-weight="700" text-anchor="middle">API Gateway</text>
+  <text x="505" y="125" fill="#34d399" font-size="9" text-anchor="middle">FastAPI Proxy</text>
+  <text x="505" y="142" fill="#94a3b8" font-size="9" text-anchor="middle">0.0.0.0:8000</text>
+  <text x="505" y="158" fill="#94a3b8" font-size="8" text-anchor="middle">OpenAI-Compatible Interface</text>
+  <text x="505" y="175" fill="#94a3b8" font-size="8" text-anchor="middle">Unified routing to backends</text>
+
+  <!-- =================================================================
+       LAYER 4: Backend Services (emerald - backend)
+       ================================================================= -->
+  <!-- Service routing labels -->
+  <text x="505" y="220" fill="#475569" font-size="8" text-anchor="middle">— Route by Endpoint —</text>
+
+  <!-- vLLM MLX (LLM Service) -->
+  <rect x="390" y="240" width="230" height="70" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="505" y="262" fill="white" font-size="11" font-weight="600" text-anchor="middle">vLLM MLX (LLM Service)</text>
+  <text x="505" y="278" fill="#34d399" font-size="9" text-anchor="middle">127.0.0.1:8001 — /v1/chat/completions</text>
+  <text x="505" y="294" fill="#94a3b8" font-size="8" text-anchor="middle">async def, models loaded 24/7, hot in memory</text>
+
+  <!-- STT Server (Whisper) -->
+  <rect x="390" y="330" width="230" height="70" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="505" y="352" fill="white" font-size="11" font-weight="600" text-anchor="middle">STT Server (Whisper)</text>
+  <text x="505" y="368" fill="#34d399" font-size="9" text-anchor="middle">127.0.0.1:8002 — /v1/audio/transcriptions</text>
+  <text x="505" y="384" fill="#94a3b8" font-size="8" text-anchor="middle">MLX Whisper / Lightning Whisper MLX</text>
+
+  <!-- TTS Server (Kokoro) -->
+  <rect x="390" y="420" width="230" height="70" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="505" y="442" fill="white" font-size="11" font-weight="600" text-anchor="middle">TTS Server (Kokoro)</text>
+  <text x="505" y="458" fill="#34d399" font-size="9" text-anchor="middle">127.0.0.1:8003 — /v1/audio/speech</text>
+  <text x="505" y="474" fill="#94a3b8" font-size="8" text-anchor="middle">ONNX + dynamic voice routing (char/season)</text>
+
+  <!-- =================================================================
+       LAYER 5: Models (violet - database/capabilities)
+       ================================================================= -->
+  <!-- LLM Model -->
+  <rect x="680" y="240" width="200" height="70" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="780" y="262" fill="white" font-size="11" font-weight="600" text-anchor="middle">Qwen 3.6 35B</text>
+  <text x="780" y="278" fill="#a78bfa" font-size="9" text-anchor="middle">4-bit / 8-bit MLX Quantized</text>
+  <text x="780" y="294" fill="#94a3b8" font-size="8" text-anchor="middle">Text / Reasoning / Vision</text>
+
+  <!-- STT Model -->
+  <rect x="680" y="330" width="200" height="70" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="780" y="352" fill="white" font-size="11" font-weight="600" text-anchor="middle">MLX Whisper</text>
+  <text x="780" y="368" fill="#a78bfa" font-size="9" text-anchor="middle">Lightning Whisper MLX</text>
+  <text x="780" y="384" fill="#94a3b8" font-size="8" text-anchor="middle">High-speed transcription</text>
+
+  <!-- TTS Model -->
+  <rect x="680" y="420" width="200" height="70" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="780" y="442" fill="white" font-size="11" font-weight="600" text-anchor="middle">Kokoro ONNX</text>
+  <text x="780" y="458" fill="#a78bfa" font-size="9" text-anchor="middle">Voice Embedding Router</text>
+  <text x="780" y="474" fill="#94a3b8" font-size="8" text-anchor="middle">char + season mapping</text>
+
+  <!-- =================================================================
+       LAYER 6: Monitoring (amber - cloud/infra)
+       ================================================================= -->
+  <!-- Prometheus Metrics -->
+  <rect x="680" y="520" width="200" height="70" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="780" y="542" fill="white" font-size="11" font-weight="600" text-anchor="middle">Prometheus /metrics</text>
+  <text x="780" y="558" fill="#fbbf24" font-size="9" text-anchor="middle">HTTP / LLM / Token / Latency</text>
+  <text x="780" y="574" fill="#94a3b8" font-size="8" text-anchor="middle">Memory rejections, RAM usage</text>
+
+  <!-- =================================================================
+       LAYER 7: macOS System (amber - cloud/infra)
+       ================================================================= -->
+  <!-- macOS launchd -->
+  <rect x="390" y="520" width="230" height="70" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="505" y="542" fill="white" font-size="11" font-weight="600" text-anchor="middle">macOS launchd</text>
+  <text x="505" y="558" fill="#fbbf24" font-size="9" text-anchor="middle">com.localbrain.api.plist</text>
+  <text x="505" y="574" fill="#94a3b8" font-size="8" text-anchor="middle">Auto-start on boot, crash restart</text>
+
+  <!-- =================================================================
+       LAYER 8: CLI Tool (cyan - frontend)
+       ================================================================= -->
+  <!-- CLI Application -->
+  <rect x="30" y="520" width="130" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="95" y="542" fill="white" font-size="11" font-weight="600" text-anchor="middle">local-brain CLI</text>
+  <text x="95" y="558" fill="#22d3ee" font-size="9" text-anchor="middle">uv run local-brain</text>
+  <text x="95" y="574" fill="#94a3b8" font-size="8" text-anchor="middle">/tts /stt /clear /help</text>
+
+  <!-- =================================================================
+       CONNECTIONS: External -> Auth -> Gateway
+       ================================================================= -->
+  <!-- Users -> Gateway (through auth) -->
+  <line x1="160" y1="77" x2="388" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="270" y="95" fill="#94a3b8" font-size="8">HTTPS</text>
+
+  <!-- Hermes -> Gateway (through auth) -->
+  <line x1="160" y1="147" x2="388" y2="125" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="270" y="135" fill="#94a3b8" font-size="8">Bearer</text>
+
+  <!-- Home Assistant -> Gateway (through auth) -->
+  <line x1="160" y1="217" x2="388" y2="140" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="270" y="165" fill="#94a3b8" font-size="8">OpenAI API</text>
+
+  <!-- Other Clients -> Gateway (through auth) -->
+  <line x1="160" y1="287" x2="388" y2="155" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="270" y="210" fill="#94a3b8" font-size="8">API</text>
+
+  <!-- =================================================================
+       CONNECTIONS: Gateway -> Backend Services
+       ================================================================= -->
+  <!-- Gateway -> vLLM -->
+  <line x1="505" y1="200" x2="505" y2="238" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+  <text x="525" y="222" fill="#34d399" font-size="8">chat/</text>
+
+  <!-- Gateway -> STT -->
+  <line x1="505" y1="200" x2="505" y2="328" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+  <text x="525" y="270" fill="#34d399" font-size="8">audio/transc.</text>
+
+  <!-- Gateway -> TTS -->
+  <line x1="505" y1="200" x2="505" y2="418" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+  <text x="525" y="320" fill="#34d399" font-size="8">audio/speech</text>
+
+  <!-- =================================================================
+       CONNECTIONS: Backend Services -> Models
+       ================================================================= -->
+  <!-- vLLM -> Qwen -->
+  <line x1="620" y1="275" x2="678" y2="275" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+  <text x="648" y="269" fill="#a78bfa" font-size="8">loads</text>
+
+  <!-- STT -> Whisper -->
+  <line x1="620" y1="365" x2="678" y2="365" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+  <text x="648" y="359" fill="#a78bfa" font-size="8">loads</text>
+
+  <!-- TTS -> Kokoro -->
+  <line x1="620" y1="455" x2="678" y2="455" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+  <text x="648" y="449" fill="#a78bfa" font-size="8">loads</text>
+
+  <!-- =================================================================
+       CONNECTIONS: CLI -> Gateway
+       ================================================================= -->
+  <line x1="160" y1="555" x2="388" y2="110" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+  <text x="270" y="340" fill="#22d3ee" font-size="8">local-brain CLI</text>
+
+  <!-- =================================================================
+       CONNECTIONS: Gateway -> Monitoring
+       ================================================================= -->
+  <line x1="620" y1="140" x2="678" y2="555" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrowhead)"/>
+  <text x="660" y="350" fill="#fbbf24" font-size="8">/metrics</text>
+
+  <!-- =================================================================
+       CONNECTIONS: macOS -> Services
+       ================================================================= -->
+  <line x1="505" y1="590" x2="505" y2="490" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrowhead)"/>
+  <text x="480" y="540" fill="#fbbf24" font-size="8">launchd</text>
+
+  <!-- =================================================================
+       LEGEND
+       ================================================================= -->
+  <text x="720" y="620" fill="white" font-size="10" font-weight="600">Legend</text>
+
+  <rect x="720" y="632" width="16" height="10" rx="2" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1"/>
+  <text x="742" y="640" fill="#94a3b8" font-size="8">External Client</text>
+
+  <rect x="720" y="648" width="16" height="10" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+  <text x="742" y="656" fill="#94a3b8" font-size="8">Security / Auth</text>
+
+  <rect x="720" y="664" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+  <text x="742" y="672" fill="#94a3b8" font-size="8">Backend Service</text>
+
+  <rect x="720" y="680" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+  <text x="742" y="688" fill="#94a3b8" font-size="8">Model / MLX</text>
+
+  <rect x="720" y="696" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="742" y="704" fill="#94a3b8" font-size="8">Cloud / Infra</text>
+
+  <rect x="720" y="712" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="742" y="720" fill="#94a3b8" font-size="8">Frontend / CLI</text>
+
+  <line x1="720" y1="734" x2="736" y2="734" stroke="#34d399" stroke-width="1.5"/>
+  <text x="742" y="737" fill="#94a3b8" font-size="8">Internal (127.0.0.1)</text>
+
+  <line x1="720" y1="748" x2="736" y2="748" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="742" y="751" fill="#94a3b8" font-size="8">Infra / Config</text>
+</svg>
