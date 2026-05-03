@@ -1,95 +1,46 @@
 import asyncio
 import io
-import os
-import tempfile
 import time
-from typing import Optional
 
 import soundfile as sf
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
-from ..config import settings
-from ..metrics import (
+from local_ai_brain.config import settings
+from local_ai_brain.metrics import (
     audio_processing_latency_seconds,
-    stt_audio_seconds_transcribed_total,
     tts_characters_processed_total,
 )
-from ..schemas import SpeechRequest, TranscriptionResponse
+from local_ai_brain.schemas import SpeechRequest
 
-router = APIRouter()
+app = FastAPI(title="Local AI Brain - TTS Service")
 
+# Initialize TTS model globally
+try:
+    from huggingface_hub import hf_hub_download
+    from kokoro_onnx import Kokoro
 
-@router.post("/audio/transcriptions", response_model=TranscriptionResponse)
-async def create_transcription(
-    request: Request,
-    file: UploadFile = File(...),
-    model: Optional[str] = Form(None),
-    language: Optional[str] = Form(None),
-):
-    model_name = model or settings.WHISPER_MODEL_PATH
-    if model_name != settings.WHISPER_MODEL_PATH:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Unsupported model: {model_name}. "
-                f"This API only supports {settings.WHISPER_MODEL_PATH}"
-            ),
-        )
-    logger.info(f"Received transcription request for model: {model_name}")
-    if language:
-        logger.info(f"Requested language: {language}")
-    stt_model = getattr(request.app.state, "stt_model", None)
-    if stt_model is None:
-        raise HTTPException(status_code=503, detail="STT model is not initialized.")
-
-    start_time = time.time()
-
-    tmp_path = None
-    try:
-        # Stream the upload directly to a temporary file to avoid memory spikes
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp_path = tmp.name
-            while content := await file.read(1024 * 1024):  # 1MB chunks
-                tmp.write(content)
-            tmp.flush()
-
-        # Define a blocking function for whisper
-        def run_whisper():
-            try:
-                info = sf.info(tmp_path)
-                if info.samplerate:
-                    duration_seconds = info.frames / info.samplerate
-                    stt_audio_seconds_transcribed_total.add(duration_seconds)
-            except Exception as e:
-                logger.warning(f"Could not calculate audio duration: {e}")
-
-            return stt_model.transcribe(tmp_path, path_or_hf_repo=model_name, language=language)
-
-        result = await asyncio.to_thread(run_whisper)
-        text = result.get("text", "")
-        return TranscriptionResponse(text=text)
-    except Exception as e:
-        logger.error(f"Error during transcription: {e}")
-        raise HTTPException(status_code=500, detail="Transcription failed")
-    finally:
-        audio_processing_latency_seconds.record(time.time() - start_time)
-
-        def _safe_unlink(path):
-            try:
-                os.unlink(path)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                logger.warning(f"Could not remove temporary audio file {path}: {e}")
-
-        if tmp_path is not None:
-            # Shield the cleanup to ensure it runs even if the request is cancelled
-            asyncio.shield(asyncio.to_thread(_safe_unlink, tmp_path))
+    logger.info("Loading Kokoro ONNX TTS...")
+    onnx_path = hf_hub_download(
+        repo_id=settings.KOKORO_HF_REPO,
+        filename=settings.KOKORO_ONNX_FILE,
+        token=settings.HF_TOKEN,
+    )
+    voices_path = hf_hub_download(
+        repo_id=settings.KOKORO_HF_REPO,
+        filename=settings.KOKORO_VOICES_FILE,
+        token=settings.HF_TOKEN,
+    )
+    tts_model = Kokoro(onnx_path, voices_path)
+except Exception as e:
+    logger.error(f"Failed to initialize TTS model: {e}")
+    if not settings.TESTING:
+        raise RuntimeError("TTS Model initialization failed") from e
+    tts_model = None
 
 
-@router.post("/audio/speech")
+@app.post("/v1/audio/speech")
 async def create_speech(request: Request, body: SpeechRequest):
     if body.response_format and body.response_format != "wav":
         raise HTTPException(
@@ -119,7 +70,6 @@ async def create_speech(request: Request, body: SpeechRequest):
             ),
         )
 
-    tts_model = getattr(request.app.state, "tts_model", None)
     if tts_model is None:
         raise HTTPException(status_code=503, detail="TTS model is not initialized.")
 
@@ -166,3 +116,8 @@ async def create_speech(request: Request, body: SpeechRequest):
         raise HTTPException(status_code=500, detail="TTS generation failed")
     finally:
         audio_processing_latency_seconds.record(time.time() - start_time)
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "tts"}

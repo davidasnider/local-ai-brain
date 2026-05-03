@@ -1223,6 +1223,7 @@ version = "0.1.16"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "kokoro-onnx" },
     { name = "loguru" },
     { name = "mlx-whisper" },
@@ -1249,6 +1250,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.136.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "kokoro-onnx", specifier = ">=0.5.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mlx-whisper", specifier = ">=0.4.3" },
