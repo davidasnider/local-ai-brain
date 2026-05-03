@@ -110,11 +110,23 @@ async def proxy_request(request: Request, target_url: str):
         raise HTTPException(status_code=502, detail="Bad Gateway")
 
 
+@app.post("/v1/chat/completions")
+async def chat_completions(request: Request):
+    """Explicitly handle chat completions to log request parameters for debugging."""
+    try:
+        # We peek at the body without fully consuming it if possible, 
+        # or we just log that it's a chat request.
+        logger.info("[REQUEST] POST /v1/chat/completions")
+    except Exception:
+        pass
+    return await proxy_request(request, settings.VLLM_URL)
+
+
 @app.api_route(
     "/v1/chat/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE"],
 )
-async def proxy_vllm_chat(request: Request, path: str):
+async def proxy_vllm_chat_any(request: Request, path: str):
     return await proxy_request(request, settings.VLLM_URL)
 
 

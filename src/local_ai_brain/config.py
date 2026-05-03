@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     MEMORY_LIMIT_GB: float = Field(default=54.0, gt=0)
     TTS_MAX_CHARACTERS: int = Field(default=4096, gt=0)
     MAX_CONTEXT_TOKENS: int = Field(default=65536, gt=0)
-    DEFAULT_MAX_TOKENS: int = Field(default=16384, gt=0)
+    DEFAULT_MAX_TOKENS: int = Field(default=32768, gt=0)
     TESTING: bool = False
 
     # Microservices URLs
