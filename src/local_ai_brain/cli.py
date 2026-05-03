@@ -345,7 +345,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("serve", help="Start the API servers")
 
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
 
     if args.command == "serve":
         serve()
