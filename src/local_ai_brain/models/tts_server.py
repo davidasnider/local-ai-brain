@@ -38,22 +38,26 @@ app = FastAPI(
 )
 
 # Initialize TTS model globally
+tts_model = None
 try:
-    from huggingface_hub import hf_hub_download
-    from kokoro_onnx import Kokoro
+    if not settings.TESTING:
+        from huggingface_hub import hf_hub_download
+        from kokoro_onnx import Kokoro
 
-    logger.info("Loading Kokoro ONNX TTS...")
-    onnx_path = hf_hub_download(
-        repo_id=settings.KOKORO_HF_REPO,
-        filename=settings.KOKORO_ONNX_FILE,
-        token=settings.HF_TOKEN,
-    )
-    voices_path = hf_hub_download(
-        repo_id=settings.KOKORO_HF_REPO,
-        filename=settings.KOKORO_VOICES_FILE,
-        token=settings.HF_TOKEN,
-    )
-    tts_model = Kokoro(onnx_path, voices_path)
+        logger.info("Loading Kokoro ONNX TTS...")
+        onnx_path = hf_hub_download(
+            repo_id=settings.KOKORO_HF_REPO,
+            filename=settings.KOKORO_ONNX_FILE,
+            token=settings.HF_TOKEN,
+        )
+        voices_path = hf_hub_download(
+            repo_id=settings.KOKORO_HF_REPO,
+            filename=settings.KOKORO_VOICES_FILE,
+            token=settings.HF_TOKEN,
+        )
+        tts_model = Kokoro(onnx_path, voices_path)
+    else:
+        logger.info("TESTING mode: Skipping Kokoro model initialization.")
 except Exception as e:
     logger.error(f"Failed to initialize TTS model: {e}")
     if not settings.TESTING:

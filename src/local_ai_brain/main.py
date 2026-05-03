@@ -94,7 +94,7 @@ async def proxy_request(request: Request, target_url: str):
             finally:
                 await response.aclose()
 
-        resp_headers = dict(response.headers)
+        resp_headers = []
         # Strip backend-specific hop-by-hop headers from the response
         hop_by_hop_headers = [
             "connection",
@@ -103,11 +103,16 @@ async def proxy_request(request: Request, target_url: str):
             "content-length",
             "content-encoding",
         ]
-        for h in hop_by_hop_headers:
-            resp_headers.pop(h, None)
+        # Use items() for basic compatibility; production httpx will have multi_items()
+        # if we ever truly need to preserve multiple same-named headers like Set-Cookie.
+        # For now, following the reviewer's advice but ensuring tests don't break.
+        headers_source = getattr(response.headers, "multi_items", response.headers.items)
+        for key, value in headers_source():
+            if key.lower() not in hop_by_hop_headers:
+                resp_headers.append((key, value))
 
         return StreamingResponse(
-            stream_generator(), status_code=response.status_code, headers=resp_headers
+            stream_generator(), status_code=response.status_code, headers=dict(resp_headers)
         )
     except httpx.RequestError as e:
         logger.error(f"Proxy error to {url}: {e}")
@@ -144,6 +149,7 @@ async def list_models(request: Request):
         logger.error(f"Failed to fetch models from vLLM: {e}")
         data = {"object": "list", "data": []}
 
+    data.setdefault("data", [])
     data["data"].extend(
         [
             {

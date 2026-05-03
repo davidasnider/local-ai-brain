@@ -47,11 +47,15 @@ app = FastAPI(
     dependencies=[Depends(verify_api_key)],
 )
 
+stt_model = None
 try:
-    import mlx_whisper
+    if not settings.TESTING:
+        import mlx_whisper
 
-    stt_model = mlx_whisper
-    logger.info(f"Loaded Whisper STT {settings.WHISPER_MODEL_PATH}...")
+        stt_model = mlx_whisper
+        logger.info(f"Loaded Whisper STT {settings.WHISPER_MODEL_PATH}...")
+    else:
+        logger.info("TESTING mode: Skipping Whisper model initialization.")
 except Exception as e:
     logger.error(f"Failed to initialize STT model: {e}")
     if not settings.TESTING:
