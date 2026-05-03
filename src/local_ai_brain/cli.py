@@ -247,6 +247,12 @@ def serve():
                 settings.QWEN_MODEL_PATH,
                 "--api-key",
                 settings.LOCAL_API_KEY,
+                "--max-tokens",
+                str(settings.DEFAULT_MAX_TOKENS),
+                "--max-request-tokens",
+                str(settings.MAX_CONTEXT_TOKENS),
+                "--reasoning-parser",
+                "qwen3",
             ],
             env=env_vars,
         )
