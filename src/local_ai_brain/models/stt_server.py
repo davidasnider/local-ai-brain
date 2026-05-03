@@ -1,22 +1,38 @@
 import asyncio
 import os
+import secrets
 import tempfile
 import time
 from typing import Optional
 
 import soundfile as sf
-from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, Security, UploadFile
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from local_ai_brain.config import settings
+from local_ai_brain.logging import configure_logging
 from local_ai_brain.metrics import (
     audio_processing_latency_seconds,
     stt_audio_seconds_transcribed_total,
 )
 from local_ai_brain.schemas import TranscriptionResponse
 
-app = FastAPI(title="Local AI Brain - STT Service")
+# Standardize logging
+configure_logging()
+
+
+async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())):
+    if not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    return credentials.credentials
+
+
+app = FastAPI(
+    title="Local AI Brain - STT Service",
+    dependencies=[Depends(verify_api_key)],
+)
 
 try:
     import mlx_whisper

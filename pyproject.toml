@@ -1,6 +1,6 @@
 [project]
 name = "local-ai-brain"
-version = "0.1.16"
+version = "0.1.17"
 description = "Local AI API hosting on Apple Silicon (MLX)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -28,7 +28,7 @@ local-brain = "local_ai_brain.cli:main"
 package = true
 
 [tool.uv.sources]
-vllm-mlx = { git = "https://github.com/waybarrios/vllm-mlx.git", rev = "537dcb86303de34f5cddf09b1cd5fbf1b5ab8636" }
+vllm-mlx = { git = "https://github.com/waybarrios/vllm-mlx.git", rev = "e69435608fa625b0dd4853cc118c968470a1b530" }
 
 [dependency-groups]
 dev = [

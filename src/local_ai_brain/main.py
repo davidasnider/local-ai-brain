@@ -1,8 +1,5 @@
 import contextlib
-import logging
-import os
 import secrets
-import sys
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
@@ -12,94 +9,49 @@ from loguru import logger
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config import settings
+from .logging import configure_logging
 from .middleware import MemoryGuardMiddleware, MetricsMiddleware
 
-
-class InterceptHandler(logging.Handler):
-    def emit(self, record):
-        try:
-            level = logger.level(record.levelname).name
-        except ValueError:
-            level = record.levelno
-
-        # Find caller from where originated the logged message
-        try:
-            frame, depth = sys._getframe(6), 6
-            while frame and frame.f_code.co_filename == logging.__file__:
-                frame = frame.f_back
-                depth += 1
-        except ValueError:
-            # Call stack is too shallow
-            depth = 0
-
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+# Standardize logging using our centralized configuration
+configure_logging()
 
 
-logger.remove()
-
-
-def configure_logging(testing: bool = False):
-    if not testing:
-        log_path = os.path.expanduser(
-            os.getenv("LOCAL_AI_BRAIN_LOG_PATH", "~/Library/Logs/local-ai-brain.log")
-        )
-        log_directory = os.path.dirname(log_path)
-        if log_directory:
-            os.makedirs(log_directory, exist_ok=True)
-        logger.add(
-            log_path,
-            level="INFO",
-            rotation="10 MB",
-            retention="14 days",
-            compression="gz",
-        )
-
-
-configure_logging(settings.TESTING)
-logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
-
-for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
-    logging_logger = logging.getLogger(logger_name)
-    logging_logger.handlers = []
-    logging_logger.propagate = True
-
-security = HTTPBearer()
-
-
-def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)):
+async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())):
     if not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
-        logger.warning("Unauthorized API access attempt.")
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.client = httpx.AsyncClient(timeout=300.0)
+    # Initialize a single httpx client for the lifetime of the app
+    # Use a long timeout for LLM inference (10 minutes)
+    app.state.client = httpx.AsyncClient(timeout=600.0)
     yield
     await app.state.client.aclose()
 
 
-app = FastAPI(lifespan=lifespan, title="Local AI Brain Proxy")
+app = FastAPI(
+    lifespan=lifespan,
+    title="Local AI Brain Gateway",
+    dependencies=[Depends(verify_api_key)],
+)
 
 # Add Middlewares
 app.add_middleware(MemoryGuardMiddleware)
 app.add_middleware(MetricsMiddleware)
 
-VLLM_URL = os.environ.get("VLLM_URL", "http://127.0.0.1:8001")
-STT_URL = os.environ.get("STT_URL", "http://127.0.0.1:8002")
-TTS_URL = os.environ.get("TTS_URL", "http://127.0.0.1:8003")
 
-
-async def proxy_request(request: Request, base_url: str):
+async def proxy_request(request: Request, target_url: str):
+    """Proxy the request to a backend service."""
     path = request.url.path
     query = request.url.query
-    url = f"{base_url.rstrip('/')}{path}"
+    url = f"{target_url.rstrip('/')}{path}"
     if query:
         url = f"{url}?{query}"
 
     headers = dict(request.headers)
-    # Strip hop-by-hop and sensitive headers before proxying
+    # Strip hop-by-hop headers before proxying
     headers_to_strip = [
         "host",
         "connection",
@@ -110,7 +62,6 @@ async def proxy_request(request: Request, base_url: str):
         "trailers",
         "transfer-encoding",
         "upgrade",
-        "authorization",
     ]
     for h in headers_to_strip:
         headers.pop(h, None)
@@ -134,6 +85,7 @@ async def proxy_request(request: Request, base_url: str):
                 await response.aclose()
 
         resp_headers = dict(response.headers)
+        # Strip backend-specific hop-by-hop headers from the response
         hop_by_hop_headers = [
             "connection",
             "keep-alive",
@@ -155,21 +107,27 @@ async def proxy_request(request: Request, base_url: str):
 @app.api_route(
     "/v1/chat/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE"],
-    dependencies=[Depends(verify_api_key)],
 )
 async def proxy_vllm_chat(request: Request, path: str):
-    return await proxy_request(request, VLLM_URL)
+    return await proxy_request(request, settings.VLLM_URL)
 
 
 @app.api_route(
-    "/v1/models",
-    methods=["GET"],
-    dependencies=[Depends(verify_api_key)],
+    "/v1/completions",
+    methods=["GET", "POST"],
 )
+async def proxy_vllm_completions(request: Request):
+    return await proxy_request(request, settings.VLLM_URL)
+
+
+@app.get("/v1/models")
 async def list_models(request: Request):
+    """List available models by merging vLLM models with local ones."""
     try:
         client = request.app.state.client
-        vllm_resp = await client.get(f"{VLLM_URL}/v1/models")
+        # Add internal auth to backend request
+        headers = {"Authorization": f"Bearer {settings.LOCAL_API_KEY}"}
+        vllm_resp = await client.get(f"{settings.VLLM_URL}/v1/models", headers=headers)
         vllm_resp.raise_for_status()
         data = vllm_resp.json()
     except Exception as e:
@@ -181,52 +139,95 @@ async def list_models(request: Request):
             {
                 "id": settings.WHISPER_MODEL_PATH,
                 "object": "model",
-                "created": 0,
+                "created": 1700000000,
                 "owned_by": "local-ai-brain",
+                "type": "stt",
             },
             {
                 "id": settings.KOKORO_MODEL_PATH,
                 "object": "model",
-                "created": 0,
+                "created": 1700000000,
                 "owned_by": "local-ai-brain",
+                "type": "tts",
             },
         ]
     )
     return data
 
 
-@app.api_route(
-    "/v1/models/{model_id:path}",
-    methods=["GET"],
-    dependencies=[Depends(verify_api_key)],
-)
-async def get_model(request: Request, model_id: str):
-    if model_id in (settings.WHISPER_MODEL_PATH, settings.KOKORO_MODEL_PATH):
+@app.get("/v1/models/{model_id:path}")
+async def get_model(model_id: str, request: Request):
+    """Get details for a specific model. Fixes 404s from some clients."""
+    # Normalize model_id (some clients URL-encode it)
+    from urllib.parse import unquote
+
+    model_id = unquote(model_id)
+
+    # Check against our configured models
+    is_qwen = (
+        model_id == settings.QWEN_MODEL_PATH or model_id in settings.QWEN_MODEL_ALIASES
+    )
+    is_stt = model_id == settings.WHISPER_MODEL_PATH
+    is_tts = model_id == settings.KOKORO_MODEL_PATH
+
+    if is_qwen or is_stt or is_tts:
         return {
             "id": model_id,
             "object": "model",
-            "created": 0,
+            "created": 1700000000,
             "owned_by": "local-ai-brain",
+            "type": "llm" if is_qwen else ("stt" if is_stt else "tts"),
         }
-    return await proxy_request(request, VLLM_URL)
+
+    # Fallback: proxy to vLLM
+    return await proxy_request(request, settings.VLLM_URL)
 
 
-@app.api_route("/v1/audio/transcriptions", methods=["POST"], dependencies=[Depends(verify_api_key)])
+# Compatibility endpoints for various LLM clients
+@app.get("/api/v1/models")
+async def ollama_models_compat(request: Request):
+    return await list_models(request)
+
+
+@app.get("/api/tags")
+async def ollama_tags_compat(request: Request):
+    data = await list_models(request)
+    return {"models": data.get("data", [])}
+
+
+@app.get("/version")
+async def version_compat():
+    try:
+        import importlib.metadata
+
+        version = importlib.metadata.version("local-ai-brain")
+    except Exception:
+        version = "0.1.16"  # Fallback
+    return {"version": version}
+
+
+@app.get("/v1/props")
+@app.get("/props")
+async def props_compat():
+    return {"status": "ok", "features": ["chat", "transcription", "speech"]}
+
+
+@app.post("/v1/audio/transcriptions")
 async def proxy_stt(request: Request):
-    return await proxy_request(request, STT_URL)
+    return await proxy_request(request, settings.STT_URL)
 
 
-@app.api_route("/v1/audio/speech", methods=["POST"], dependencies=[Depends(verify_api_key)])
+@app.post("/v1/audio/speech")
 async def proxy_tts(request: Request):
-    return await proxy_request(request, TTS_URL)
+    return await proxy_request(request, settings.TTS_URL)
 
 
-@app.get("/health", tags=["System"], dependencies=[Depends(verify_api_key)])
+@app.get("/health", tags=["System"])
 async def health_check():
     return {"status": "ok", "proxy": "active"}
 
 
-@app.get("/metrics", tags=["System"], dependencies=[Depends(verify_api_key)])
+@app.get("/metrics", tags=["System"])
 async def get_metrics(request: Request):
     # Expose Prometheus metrics from OpenTelemetry custom registry
     from .metrics import OTEL_REGISTRY
@@ -235,9 +236,14 @@ async def get_metrics(request: Request):
     combined_metrics = proxy_metrics
 
     client = request.app.state.client
-    for name, url in [("vLLM", VLLM_URL), ("STT", STT_URL), ("TTS", TTS_URL)]:
+    headers = {"Authorization": f"Bearer {settings.LOCAL_API_KEY}"}
+    for name, url in [
+        ("vLLM", settings.VLLM_URL),
+        ("STT", settings.STT_URL),
+        ("TTS", settings.TTS_URL),
+    ]:
         try:
-            resp = await client.get(f"{url}/metrics", timeout=2.0)
+            resp = await client.get(f"{url}/metrics", headers=headers, timeout=2.0)
             if resp.status_code == 200:
                 combined_metrics += b"\n" + resp.content
         except Exception as e:

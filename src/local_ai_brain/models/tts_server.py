@@ -1,21 +1,37 @@
 import asyncio
 import io
+import secrets
 import time
 
 import soundfile as sf
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from local_ai_brain.config import settings
+from local_ai_brain.logging import configure_logging
 from local_ai_brain.metrics import (
     audio_processing_latency_seconds,
     tts_characters_processed_total,
 )
 from local_ai_brain.schemas import SpeechRequest
 
-app = FastAPI(title="Local AI Brain - TTS Service")
+# Standardize logging
+configure_logging()
+
+
+async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())):
+    if not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    return credentials.credentials
+
+
+app = FastAPI(
+    title="Local AI Brain - TTS Service",
+    dependencies=[Depends(verify_api_key)],
+)
 
 # Initialize TTS model globally
 try:
@@ -84,12 +100,10 @@ async def create_speech(request: Request, body: SpeechRequest):
 
     if body.character:
         logger.info(f"Dynamic routing for character: {body.character}")
-        # Map character to voice profile, e.g., "santa" -> "kokoro_santa_profile.pt"
         active_voice = f"character_{body.character}"
 
     if body.season:
         logger.info(f"Dynamic routing for season: {body.season}")
-        # Map season to voice profile
         active_voice = f"season_{body.season}"
 
     logger.debug(f"Resolved TTS voice profile to: {active_voice}")

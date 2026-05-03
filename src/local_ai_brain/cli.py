@@ -245,6 +245,8 @@ def serve():
                 "8001",
                 "--model",
                 settings.QWEN_MODEL_PATH,
+                "--api-key",
+                settings.LOCAL_API_KEY,
             ],
             env=env_vars,
         )
