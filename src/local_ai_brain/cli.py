@@ -313,10 +313,15 @@ def serve():
                         f"{COLOR_ERROR}A subprocess exited unexpectedly (exit code {p.returncode}). "
                         f"Shutting down...{COLOR_RESET}"
                     )
-                    # Use a custom exception or just return 1
+                    # Terminate and wait for all processes
                     for proc in processes:
                         if proc.poll() is None:
                             proc.terminate()
+                    for proc in processes:
+                        try:
+                            proc.wait(timeout=5)
+                        except Exception:
+                            proc.kill()
                     sys.exit(1)
             time.sleep(1)
 

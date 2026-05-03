@@ -367,7 +367,7 @@ def test_main_serve_subprocess_exit(mock_popen, mock_sleep, capsys):
     with patch.object(sys, "argv", ["local-brain", "serve"]):
         with pytest.raises(SystemExit) as e:
             main()
-        assert e.value.code == 0
+        assert e.value.code == 1
 
     captured = capsys.readouterr()
     assert "A subprocess exited unexpectedly" in captured.out
