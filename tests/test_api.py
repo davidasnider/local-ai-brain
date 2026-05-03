@@ -142,7 +142,7 @@ def test_proxy_stt(mock_send, client):
     async def async_iter():
         yield b'{"text": "hello"}'
 
-    mock_response.aiter_raw = async_iter
+    mock_response.aiter_bytes = async_iter
     mock_send.return_value = mock_response
 
     response = client.post(
@@ -166,7 +166,7 @@ def test_proxy_tts(mock_send, client):
     async def async_iter():
         yield b"audio_data"
 
-    mock_response.aiter_raw = async_iter
+    mock_response.aiter_bytes = async_iter
     mock_send.return_value = mock_response
 
     response = client.post("/v1/audio/speech", headers={"Authorization": "Bearer test-secret-key"})
@@ -187,7 +187,7 @@ def test_proxy_chat(mock_send, client):
     async def async_iter():
         yield b'{"id": "chat-1"}'
 
-    mock_response.aiter_raw = async_iter
+    mock_response.aiter_bytes = async_iter
     mock_send.return_value = mock_response
 
     response = client.post(

@@ -217,10 +217,11 @@ def print_help():
 def serve():
     import subprocess
     import time
+    import shutil
 
     print(f"{COLOR_SYSTEM}Starting Local AI Brain Microservices...{COLOR_RESET}")
 
-    uv_bin = "uv"
+    uv_bin = shutil.which("uv") or "uv"
 
     processes = []
     try:
@@ -229,8 +230,7 @@ def serve():
         from local_ai_brain.config import settings
 
         print(
-            f"{COLOR_SYSTEM}Starting vLLM MLX Server on port 8001 "
-            f"({settings.QWEN_MODEL_PATH})...{COLOR_RESET}"
+            f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}"
         )
         p_vllm = subprocess.Popen(
             [
@@ -310,10 +310,14 @@ def serve():
             for p in processes:
                 if p.poll() is not None:
                     print(
-                        f"{COLOR_ERROR}A subprocess exited unexpectedly. "
+                        f"{COLOR_ERROR}A subprocess exited unexpectedly (exit code {p.returncode}). "
                         f"Shutting down...{COLOR_RESET}"
                     )
-                    raise KeyboardInterrupt
+                    # Use a custom exception or just return 1
+                    for proc in processes:
+                        if proc.poll() is None:
+                            proc.terminate()
+                    sys.exit(1)
             time.sleep(1)
 
     except KeyboardInterrupt:
@@ -323,7 +327,14 @@ def serve():
                 p.terminate()
         for p in processes:
             p.wait()
+        # Normal exit on Ctrl+C
         sys.exit(0)
+    except Exception as e:
+        print(f"{COLOR_ERROR}Fatal error in serve: {e}{COLOR_RESET}")
+        for p in processes:
+            if p.poll() is None:
+                p.terminate()
+        sys.exit(1)
 
 
 def main():

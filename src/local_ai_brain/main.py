@@ -51,7 +51,7 @@ async def proxy_request(request: Request, target_url: str):
         url = f"{url}?{query}"
 
     headers = dict(request.headers)
-    # Strip hop-by-hop headers before proxying
+    # Strip hop-by-hop and client auth headers before proxying
     headers_to_strip = [
         "host",
         "connection",
@@ -59,12 +59,16 @@ async def proxy_request(request: Request, target_url: str):
         "proxy-authenticate",
         "proxy-authorization",
         "te",
-        "trailers",
+        "trailer",
         "transfer-encoding",
         "upgrade",
+        "authorization",
     ]
     for h in headers_to_strip:
         headers.pop(h, None)
+
+    # Inject internal authentication
+    headers["Authorization"] = f"Bearer {settings.LOCAL_API_KEY}"
 
     client = request.app.state.client
     req = client.build_request(
@@ -175,13 +179,20 @@ async def get_model(model_id: str, request: Request):
     is_tts = model_id == settings.KOKORO_MODEL_PATH
 
     if is_qwen or is_stt or is_tts:
-        return {
+        resp = {
             "id": model_id,
             "object": "model",
             "created": 1700000000,
             "owned_by": "local-ai-brain",
             "type": "llm" if is_qwen else ("stt" if is_stt else "tts"),
         }
+        if is_qwen:
+            resp.update({
+                "max_model_len": settings.MAX_CONTEXT_TOKENS,
+                "context_window": settings.MAX_CONTEXT_TOKENS,
+                "max_position_embeddings": settings.MAX_CONTEXT_TOKENS,
+            })
+        return resp
 
     # Fallback: proxy to vLLM
     return await proxy_request(request, settings.VLLM_URL)
