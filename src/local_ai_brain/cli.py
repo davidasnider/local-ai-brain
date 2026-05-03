@@ -214,10 +214,121 @@ def print_help():
     print("  /exit or quit   - Exit the application")
 
 
+def serve():
+    import subprocess
+    import time
+
+    print(f"{COLOR_SYSTEM}Starting Local AI Brain Microservices...{COLOR_RESET}")
+
+    uv_bin = "uv"
+
+    processes = []
+    try:
+        env_vars = dict(os.environ, PYTHONPATH="src")
+
+        print(f"{COLOR_SYSTEM}Starting vLLM MLX Server on port 8001...{COLOR_RESET}")
+        p_vllm = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "python",
+                "-m",
+                "vllm_mlx.server",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8001",
+            ],
+            env=env_vars,
+        )
+        processes.append(p_vllm)
+
+        print(f"{COLOR_SYSTEM}Starting STT Server on port 8002...{COLOR_RESET}")
+        p_stt = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "uvicorn",
+                "local_ai_brain.models.stt_server:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8002",
+            ],
+            env=env_vars,
+        )
+        processes.append(p_stt)
+
+        print(f"{COLOR_SYSTEM}Starting TTS Server on port 8003...{COLOR_RESET}")
+        p_tts = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "uvicorn",
+                "local_ai_brain.models.tts_server:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8003",
+            ],
+            env=env_vars,
+        )
+        processes.append(p_tts)
+
+        print(f"{COLOR_SYSTEM}Starting API Gateway (Proxy) on port 8000...{COLOR_RESET}")
+        proxy_env = dict(
+            env_vars,
+            VLLM_URL="http://127.0.0.1:8001",
+            STT_URL="http://127.0.0.1:8002",
+            TTS_URL="http://127.0.0.1:8003",
+        )
+        p_proxy = subprocess.Popen(
+            [
+                uv_bin,
+                "run",
+                "uvicorn",
+                "local_ai_brain.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+            ],
+            env=proxy_env,
+        )
+        processes.append(p_proxy)
+
+        while True:
+            for p in processes:
+                if p.poll() is not None:
+                    print(
+                        f"{COLOR_ERROR}A subprocess exited unexpectedly. "
+                        f"Shutting down...{COLOR_RESET}"
+                    )
+                    raise KeyboardInterrupt
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print(f"{COLOR_SYSTEM}Shutting down servers...{COLOR_RESET}")
+        for p in processes:
+            if p.poll() is None:
+                p.terminate()
+        for p in processes:
+            p.wait()
+        sys.exit(0)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Local AI Brain CLI")
     parser.add_argument("--help-cmd", action="store_true", help="Print help and exit")
-    args = parser.parse_args()
+
+    subparsers = parser.add_subparsers(dest="command")
+    subparsers.add_parser("serve", help="Start the API servers")
+
+    args, unknown = parser.parse_known_args()
+
+    if args.command == "serve":
+        serve()
+        return
 
     if args.help_cmd:
         print_help()

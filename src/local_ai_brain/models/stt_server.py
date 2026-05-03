@@ -5,8 +5,9 @@ import time
 from typing import Optional
 
 import soundfile as sf
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from loguru import logger
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from local_ai_brain.config import settings
 from local_ai_brain.metrics import (
@@ -100,3 +101,10 @@ async def create_transcription(
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "stt"}
+
+
+@app.get("/metrics")
+async def get_metrics():
+    from local_ai_brain.metrics import OTEL_REGISTRY
+
+    return Response(generate_latest(OTEL_REGISTRY), media_type=CONTENT_TYPE_LATEST)

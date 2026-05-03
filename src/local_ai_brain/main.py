@@ -128,11 +128,51 @@ async def proxy_vllm_chat(request: Request, path: str):
 
 
 @app.api_route(
-    "/v1/models{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE"],
+    "/v1/models",
+    methods=["GET"],
     dependencies=[Depends(verify_api_key)],
 )
-async def proxy_vllm_models(request: Request, path: str):
+async def list_models(request: Request):
+    try:
+        vllm_resp = await client.get(f"{VLLM_URL}/v1/models")
+        vllm_resp.raise_for_status()
+        data = vllm_resp.json()
+    except Exception as e:
+        logger.error(f"Failed to fetch models from vLLM: {e}")
+        data = {"object": "list", "data": []}
+
+    data["data"].extend(
+        [
+            {
+                "id": settings.WHISPER_MODEL_PATH,
+                "object": "model",
+                "created": 0,
+                "owned_by": "local-ai-brain",
+            },
+            {
+                "id": settings.KOKORO_MODEL_PATH,
+                "object": "model",
+                "created": 0,
+                "owned_by": "local-ai-brain",
+            },
+        ]
+    )
+    return data
+
+
+@app.api_route(
+    "/v1/models/{model_id:path}",
+    methods=["GET"],
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_model(request: Request, model_id: str):
+    if model_id in (settings.WHISPER_MODEL_PATH, settings.KOKORO_MODEL_PATH):
+        return {
+            "id": model_id,
+            "object": "model",
+            "created": 0,
+            "owned_by": "local-ai-brain",
+        }
     return await proxy_request(request, VLLM_URL)
 
 
@@ -156,4 +196,15 @@ async def get_metrics():
     # Expose Prometheus metrics from OpenTelemetry custom registry
     from .metrics import OTEL_REGISTRY
 
-    return Response(generate_latest(OTEL_REGISTRY), media_type=CONTENT_TYPE_LATEST)
+    proxy_metrics = generate_latest(OTEL_REGISTRY)
+    combined_metrics = proxy_metrics
+
+    for name, url in [("vLLM", VLLM_URL), ("STT", STT_URL), ("TTS", TTS_URL)]:
+        try:
+            resp = await client.get(f"{url}/metrics", timeout=2.0)
+            if resp.status_code == 200:
+                combined_metrics += b"\n" + resp.content
+        except Exception as e:
+            logger.warning(f"Failed to fetch metrics from {name} at {url}: {e}")
+
+    return Response(combined_metrics, media_type=CONTENT_TYPE_LATEST)

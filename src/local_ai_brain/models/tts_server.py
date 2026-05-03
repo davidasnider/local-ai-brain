@@ -3,9 +3,10 @@ import io
 import time
 
 import soundfile as sf
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from loguru import logger
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from local_ai_brain.config import settings
 from local_ai_brain.metrics import (
@@ -121,3 +122,10 @@ async def create_speech(request: Request, body: SpeechRequest):
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "tts"}
+
+
+@app.get("/metrics")
+async def get_metrics():
+    from local_ai_brain.metrics import OTEL_REGISTRY
+
+    return Response(generate_latest(OTEL_REGISTRY), media_type=CONTENT_TYPE_LATEST)
