@@ -218,7 +218,9 @@ async def version_compat():
 
         version = importlib.metadata.version("local-ai-brain")
     except Exception:
-        version = "0.1.17"  # Fallback
+        from local_ai_brain import __version__
+
+        version = __version__
     return {"version": version}
 
 
@@ -269,10 +271,12 @@ async def get_metrics(request: Request):
                         continue
                     if line.startswith(b"#"):
                         # Handle # HELP and # TYPE lines
-                        parts = line.split(b" ", 2)
+                        parts = line.split(b" ")
                         if len(parts) > 2:
-                            # Prepend prefix to the metric name
-                            line = parts[0] + b" " + prefix + b" ".join(parts[1:])
+                            # Prepend prefix to the metric name (3rd field)
+                            # Format: # HELP metric_name description
+                            # Format: # TYPE metric_name type
+                            line = parts[0] + b" " + parts[1] + b" " + prefix + b" ".join(parts[2:])
                     else:
                         # Actual metric line
                         line = prefix + line
