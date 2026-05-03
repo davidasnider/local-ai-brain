@@ -19,11 +19,11 @@ from local_ai_brain.metrics import (
 from local_ai_brain.schemas import SpeechRequest
 
 # Standardize logging
-configure_logging()
+configure_logging(settings.TESTING)
 
 
-async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())):
-    if not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False))):
+    if credentials is None or not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
 

@@ -13,11 +13,11 @@ from .logging import configure_logging
 from .middleware import MemoryGuardMiddleware, MetricsMiddleware
 
 # Standardize logging using our centralized configuration
-configure_logging()
+configure_logging(settings.TESTING)
 
 
-async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())):
-    if not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
+async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False))):
+    if credentials is None or not secrets.compare_digest(credentials.credentials, settings.LOCAL_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return credentials.credentials
 
@@ -206,7 +206,7 @@ async def version_compat():
 
         version = importlib.metadata.version("local-ai-brain")
     except Exception:
-        version = "0.1.16"  # Fallback
+        version = "0.1.17"  # Fallback
     return {"version": version}
 
 
