@@ -185,8 +185,10 @@ async def get_model(model_id: str, request: Request):
     is_tts = model_id == settings.KOKORO_MODEL_PATH
 
     if is_qwen or is_stt or is_tts:
+        # Normalize model_id to canonical path for the response
+        canonical_id = settings.QWEN_MODEL_PATH if is_qwen else model_id
         resp = {
-            "id": model_id,
+            "id": canonical_id,
             "object": "model",
             "created": 1700000000,
             "owned_by": "local-ai-brain",

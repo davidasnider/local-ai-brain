@@ -360,7 +360,7 @@ def test_main_serve(mock_popen, mock_sleep, capsys):
 @patch("subprocess.Popen")
 def test_main_serve_subprocess_exit(mock_popen, mock_sleep, capsys):
     mock_process = MagicMock()
-    # It will hit the poll() and return 1, which causes KeyboardInterrupt to be raised by our code
+    # It will hit the poll() and return 1, which causes SystemExit(1) to be raised by our code
     mock_process.poll.return_value = 1
     mock_popen.return_value = mock_process
 

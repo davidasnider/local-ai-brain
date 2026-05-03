@@ -105,6 +105,19 @@ def test_get_model_local(client):
     assert data["owned_by"] == "local-ai-brain"
 
 
+def test_get_model_alias_normalization(client):
+    # Test that model aliases are normalized to the canonical path
+    alias = settings.QWEN_MODEL_ALIASES[0]
+    response = client.get(
+        f"/v1/models/{alias}",
+        headers={"Authorization": "Bearer test-api-key"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == settings.QWEN_MODEL_PATH
+    assert data["type"] == "llm"
+
+
 @patch("httpx.AsyncClient.get", new_callable=AsyncMock)
 def test_metrics_aggregation(mock_get, client):
     # Mock responses for vLLM, STT, and TTS

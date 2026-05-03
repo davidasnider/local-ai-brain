@@ -214,6 +214,18 @@ def print_help():
     print("  /exit or quit   - Exit the application")
 
 
+def shutdown_processes(processes):
+    """Gracefully terminate and then kill subprocesses."""
+    for p in processes:
+        if p.poll() is None:
+            p.terminate()
+    for p in processes:
+        try:
+            p.wait(timeout=5)
+        except Exception:
+            p.kill()
+
+
 def serve():
     import shutil
     import subprocess
@@ -311,32 +323,18 @@ def serve():
                         f"{COLOR_ERROR}A subprocess exited unexpectedly "
                         f"(exit code {p.returncode}). Shutting down...{COLOR_RESET}"
                     )
-                    # Terminate and wait for all processes
-                    for proc in processes:
-                        if proc.poll() is None:
-                            proc.terminate()
-                    for proc in processes:
-                        try:
-                            proc.wait(timeout=5)
-                        except Exception:
-                            proc.kill()
+                    shutdown_processes(processes)
                     sys.exit(1)
             time.sleep(1)
 
     except KeyboardInterrupt:
         print(f"{COLOR_SYSTEM}Shutting down servers...{COLOR_RESET}")
-        for p in processes:
-            if p.poll() is None:
-                p.terminate()
-        for p in processes:
-            p.wait()
+        shutdown_processes(processes)
         # Normal exit on Ctrl+C
         sys.exit(0)
     except Exception as e:
         print(f"{COLOR_ERROR}Fatal error in serve: {e}{COLOR_RESET}")
-        for p in processes:
-            if p.poll() is None:
-                p.terminate()
+        shutdown_processes(processes)
         sys.exit(1)
 
 
@@ -347,7 +345,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("serve", help="Start the API servers")
 
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
 
     if args.command == "serve":
         serve()
