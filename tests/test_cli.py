@@ -370,4 +370,4 @@ def test_main_serve_subprocess_exit(mock_popen, mock_sleep, capsys):
         assert e.value.code == 1
 
     captured = capsys.readouterr()
-    assert "A subprocess exited unexpectedly" in captured.out
+    assert "Subprocess exited unexpectedly" in captured.out

@@ -10,7 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config import settings
 from .logging import configure_logging
-from .middleware import MemoryGuardMiddleware, MetricsMiddleware
+from .middleware import MetricsMiddleware
 
 # Standardize logging using our centralized configuration
 configure_logging(settings.TESTING)
@@ -42,7 +42,6 @@ app = FastAPI(
 )
 
 # Add Middlewares
-app.add_middleware(MemoryGuardMiddleware)
 app.add_middleware(MetricsMiddleware)
 
 
@@ -180,7 +179,7 @@ async def get_model(model_id: str, request: Request):
 
     if is_qwen or is_stt or is_tts:
         resp = {
-            "id": model_id,
+            "id": settings.QWEN_MODEL_PATH if is_qwen else model_id,
             "object": "model",
             "created": 1700000000,
             "owned_by": "local-ai-brain",
@@ -262,7 +261,23 @@ async def get_metrics(request: Request):
         try:
             resp = await client.get(f"{url}/metrics", headers=headers, timeout=2.0)
             if resp.status_code == 200:
-                combined_metrics += b"\n" + resp.content
+                # Prefix metrics with service name to avoid collisions
+                prefix = f"{name.lower()}_".encode()
+                prefixed_content = []
+                for line in resp.content.splitlines():
+                    if not line.strip():
+                        continue
+                    if line.startswith(b"#"):
+                        # Handle # HELP and # TYPE lines
+                        parts = line.split(b" ", 2)
+                        if len(parts) > 2:
+                            # Prepend prefix to the metric name
+                            line = parts[0] + b" " + prefix + b" ".join(parts[1:])
+                    else:
+                        # Actual metric line
+                        line = prefix + line
+                    prefixed_content.append(line)
+                combined_metrics += b"\n" + b"\n".join(prefixed_content)
         except Exception as e:
             logger.warning(f"Failed to fetch metrics from {name} at {url}: {e}")
 

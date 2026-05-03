@@ -308,8 +308,8 @@ def serve():
             for p in processes:
                 if p.poll() is not None:
                     print(
-                        f"{COLOR_ERROR}A subprocess exited unexpectedly "
-                        f"(exit code {p.returncode}). Shutting down...{COLOR_RESET}"
+                        f"{COLOR_ERROR}Subprocess exited unexpectedly (exit code {p.returncode}). "
+                        f"Shutting down...{COLOR_RESET}"
                     )
                     # Terminate and wait for all processes
                     for proc in processes:
@@ -329,7 +329,10 @@ def serve():
             if p.poll() is None:
                 p.terminate()
         for p in processes:
-            p.wait()
+            try:
+                p.wait(timeout=5)
+            except Exception:
+                p.kill()
         # Normal exit on Ctrl+C
         sys.exit(0)
     except Exception as e:

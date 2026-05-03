@@ -40,8 +40,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics (via `prometheus_client`). These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies, and memory rejections.
 
 ## 5. Memory Management
-* The FastAPI app must include a memory guard middleware (`MemoryGuardMiddleware`) to track the unified memory footprint using `psutil`.
-* If a request's projected memory usage (current + estimated payload size) threatens to push the unified memory past the `MEMORY_LIMIT_GB` threshold (default: 54GB), the API should safely reject the request with a `429 Too Many Requests` error rather than crashing the system, incrementing the `memory_rejections_total` metric.
+* The system relies on underlying OS paging and process limits. Users should monitor memory via the `/metrics` endpoint.
 
 ## 6. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
