@@ -48,7 +48,6 @@ except Exception as e:
 
 @app.post("/v1/audio/transcriptions", response_model=TranscriptionResponse)
 async def create_transcription(
-    request: Request,
     file: UploadFile = File(...),
     model: Optional[str] = Form(None),
     language: Optional[str] = Form(None),

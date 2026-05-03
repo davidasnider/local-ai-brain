@@ -79,7 +79,9 @@ async def proxy_request(request: Request, target_url: str):
 
         async def stream_generator():
             try:
-                async for chunk in response.aiter_raw():
+                # Use aiter_bytes() to ensure httpx handles decompression if the 
+                # content-encoding header was stripped or modified.
+                async for chunk in response.aiter_bytes():
                     yield chunk
             finally:
                 await response.aclose()
@@ -125,9 +127,11 @@ async def list_models(request: Request):
     """List available models by merging vLLM models with local ones."""
     try:
         client = request.app.state.client
-        # Add internal auth to backend request
+        # Add internal auth to backend request and use a short timeout
         headers = {"Authorization": f"Bearer {settings.LOCAL_API_KEY}"}
-        vllm_resp = await client.get(f"{settings.VLLM_URL}/v1/models", headers=headers)
+        vllm_resp = await client.get(
+            f"{settings.VLLM_URL}/v1/models", headers=headers, timeout=5.0
+        )
         vllm_resp.raise_for_status()
         data = vllm_resp.json()
     except Exception as e:

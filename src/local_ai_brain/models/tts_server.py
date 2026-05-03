@@ -58,7 +58,7 @@ except Exception as e:
 
 
 @app.post("/v1/audio/speech")
-async def create_speech(request: Request, body: SpeechRequest):
+async def create_speech(body: SpeechRequest):
     if body.response_format and body.response_format != "wav":
         raise HTTPException(
             status_code=400,
