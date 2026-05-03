@@ -226,7 +226,12 @@ def serve():
     try:
         env_vars = dict(os.environ, PYTHONPATH="src")
 
-        print(f"{COLOR_SYSTEM}Starting vLLM MLX Server on port 8001...{COLOR_RESET}")
+        from local_ai_brain.config import settings
+
+        print(
+            f"{COLOR_SYSTEM}Starting vLLM MLX Server on port 8001 "
+            f"({settings.QWEN_MODEL_PATH})...{COLOR_RESET}"
+        )
         p_vllm = subprocess.Popen(
             [
                 uv_bin,
@@ -238,6 +243,8 @@ def serve():
                 "127.0.0.1",
                 "--port",
                 "8001",
+                "--model",
+                settings.QWEN_MODEL_PATH,
             ],
             env=env_vars,
         )

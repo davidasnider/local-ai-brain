@@ -2,7 +2,7 @@
 
 A highly responsive, unified local AI API hosted on Apple Silicon (MLX). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding.
 
-It wraps `vllm-mlx` and MLX-optimized audio models in a FastAPI backend, exposing an OpenAI-compatible interface.
+It uses a microservices architecture: a FastAPI API Gateway proxy sits in front of dedicated `vllm-mlx` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
 
 ## Core Capabilities
 
@@ -34,13 +34,19 @@ This script will:
 3. Register and enable a macOS `launchd` service (`com.localbrain.api.plist`) to ensure the API starts on boot and restarts if it crashes.
 
 ### Manual Server Start
-If you prefer to run the server manually:
+If you prefer to run the server manually, use the built-in CLI orchestrator:
 
 ```bash
-./scripts/start_server.sh
+uv run local-brain serve
 ```
 
-The server will be available at `http://localhost:8000`.
+This command starts all four processes:
+- **vLLM MLX** (LLM) on `127.0.0.1:8001`
+- **STT Server** (Whisper) on `127.0.0.1:8002`
+- **TTS Server** (Kokoro) on `127.0.0.1:8003`
+- **API Gateway** (Proxy) on `0.0.0.0:8000`
+
+All external traffic flows through the authenticated API Gateway on port `8000`. Backend services are bound to `127.0.0.1` and are not directly accessible from the network. Press `Ctrl+C` to gracefully shut down all services.
 
 ## Local Development & Testing
 

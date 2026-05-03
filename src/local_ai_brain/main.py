@@ -99,7 +99,21 @@ async def proxy_request(request: Request, base_url: str):
         url = f"{url}?{query}"
 
     headers = dict(request.headers)
-    headers.pop("host", None)
+    # Strip hop-by-hop and sensitive headers before proxying
+    headers_to_strip = [
+        "host",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailers",
+        "transfer-encoding",
+        "upgrade",
+        "authorization",
+    ]
+    for h in headers_to_strip:
+        headers.pop(h, None)
 
     client = request.app.state.client
     req = client.build_request(
