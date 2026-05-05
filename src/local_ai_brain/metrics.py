@@ -149,6 +149,18 @@ else:
     )
 
 
+# Deprecated counter — kept for scraper/dashboard backwards-compatibility.
+# The memory-guard middleware that incremented this counter has been removed;
+# this series will always be zero and will be removed in a future release.
+if _current_mod and hasattr(_current_mod, "memory_rejections_total"):
+    memory_rejections_total = _current_mod.memory_rejections_total
+else:
+    memory_rejections_total = meter.create_counter(
+        "memory_rejections_total",
+        description="[DEPRECATED] Requests rejected by the memory guard. Always zero; retained for dashboard compatibility.",
+    )
+
+
 def update_memory_metrics():
     """Legacy function maintained for compatibility; no-op with OTel observable gauges."""
     pass
