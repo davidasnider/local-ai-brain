@@ -1,12 +1,11 @@
 # Product Requirements Document (PRD): Local AI Brain
 
 ## 1. Project Overview
-A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding. It wraps `vllm-mlx` and MLX-optimized audio models in a FastAPI backend, exposing an OpenAI-compatible interface.
+A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding. It uses a microservices architecture with a FastAPI API Gateway proxy in front of dedicated `vllm-mlx` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
 
 ## 2. Core Requirements & Constraints
 * **Framework:** Python 3.12+ with FastAPI.
 * **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup).
-* **Hardware Limit:** Must cap unified memory usage using a configurable threshold (defaults to **54GB**, set via `MEMORY_LIMIT_GB`).
 * **Audio Constraints:** Text-to-Speech (TTS) input length must be restricted by the configurable `TTS_MAX_CHARACTERS` setting (defaults to 4096) to prevent extended blocking of resources.
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access.
@@ -37,13 +36,9 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Special Feature - Voice Router:** Must accept a custom parameter in the payload (e.g., `character` or `season`) to dynamically swap Kokoro voice profiles on the fly (e.g., Default, Santa, Irish, Jack Skellington).
 
 * **`GET /metrics`**
-  * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics (via `prometheus_client`). These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies, and memory rejections.
+  * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics (via `prometheus_client`). These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies.
 
-## 5. Memory Management
-* The FastAPI app must include a memory guard middleware (`MemoryGuardMiddleware`) to track the unified memory footprint using `psutil`.
-* If a request's projected memory usage (current + estimated payload size) threatens to push the unified memory past the `MEMORY_LIMIT_GB` threshold (default: 54GB), the API should safely reject the request with a `429 Too Many Requests` error rather than crashing the system, incrementing the `memory_rejections_total` metric.
-
-## 6. Development Environment & Tooling
+## 5. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
 * **Linting & Formatting:** `ruff` will be the sole tool for both linting and formatting.
 * **Pre-commit Hooks:** The repository must include a `.pre-commit-config.yaml` to enforce quality checks before any code is committed. The hooks must include:
@@ -52,7 +47,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
 
 
-## 7. Interactive CLI
+## 6. Interactive CLI
 * An interactive CLI tool (`local-brain`) must be provided for directly interacting with and testing the API endpoints.
 * It should be built using only standard Python libraries (e.g., `urllib.request`) to minimize dependencies.
 * Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
