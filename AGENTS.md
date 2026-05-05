@@ -24,7 +24,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * Use `uv sync` to keep the environment updated.
 
 2. **Configuration Management:**
-   * Use `pydantic-settings` to manage the `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, and model paths.
+   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`), and LLM cache settings (`LLM_KV_CACHE_BITS`, `LLM_KV_CACHE_QUANTIZATION`).
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
 3. **OpenAI Compatibility & Security:**

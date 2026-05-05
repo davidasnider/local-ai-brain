@@ -10,8 +10,8 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access.
 * **Observability & Telemetry:**
-  * Granular logging using `loguru` (including file rotation) and system monitoring with `psutil` to track RAM usage per request.
-  * Must expose a Prometheus `/metrics` endpoint (via `prometheus_client`) for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, and process/system memory usage.
+  * Granular logging using `loguru` (including file rotation) and background system monitoring via `psutil` observable gauges for process and system memory usage.
+  * Must expose a Prometheus `/metrics` endpoint instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`) for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, generation latencies, and process/system memory usage.
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
@@ -36,7 +36,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Special Feature - Voice Router:** Must accept a custom parameter in the payload (e.g., `character` or `season`) to dynamically swap Kokoro voice profiles on the fly (e.g., Default, Santa, Irish, Jack Skellington).
 
 * **`GET /metrics`**
-  * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics (via `prometheus_client`). These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies.
+  * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`). These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies, and process/system memory usage.
 
 ## 5. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
