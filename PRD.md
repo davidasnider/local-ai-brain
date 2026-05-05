@@ -10,8 +10,8 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access.
 * **Observability & Telemetry:**
-  * Granular logging using `loguru` (including file rotation) and system monitoring with `psutil` to expose point-in-time process and system memory gauges.
-  * Must expose a Prometheus `/metrics` endpoint instrumented with OpenTelemetry for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, and process/system memory usage.
+  * Granular logging using `loguru` (including file rotation).
+  * Must expose a Prometheus `/metrics` endpoint instrumented with OpenTelemetry for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, and point-in-time process/system memory usage.
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
