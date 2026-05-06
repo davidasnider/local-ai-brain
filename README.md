@@ -9,7 +9,6 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 - **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit/8-bit).
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
-- **Unified Memory Management:** Caps memory usage using a memory guard middleware to ensure system stability. Defaults to **54GB** (configurable via the `MEMORY_LIMIT_GB` environment variable). Large requests are proactively rejected if projected to exceed the limit.
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
 - **Security:** Authenticated via a static `LOCAL_API_KEY` Bearer token.
 
@@ -146,4 +145,4 @@ Use the [Extended OpenAI Conversation](https://github.com/jekalmin/extended_open
 - **API Key:** `<LOCAL_API_KEY>`
 
 ## Monitoring
-Metrics are exposed at `/metrics` in Prometheus format, covering HTTP requests, active LLM requests, token consumption and generation, processing latency, memory rejections, and precise system and process RAM usage.
+Metrics are exposed at `/metrics` in Prometheus format, covering HTTP requests, active LLM requests, token consumption and generation, processing latency, and precise system and process RAM usage.
