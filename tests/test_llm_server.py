@@ -1,46 +1,44 @@
-import os
-import sys
-import unittest
 from unittest.mock import MagicMock, patch
 
-# Ensure src is in path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
+def test_patched_init_logic():
+    """Verify that patched_init correctly handles prefill_step_size defaulting."""
+    # We test the patched_init logic directly.
+    # We need to import it here to avoid issues with our mocks.
+    from local_ai_brain.models.llm_server import apply_patches
 
-class TestLLMServer(unittest.TestCase):
-    def test_patched_init_logic(self):
-        # We test the patched_init function directly to verify its logic
-        from local_ai_brain.models.llm_server import patched_init
+    # Use a dummy class to mock SimpleEngine
+    class DummyEngine:
+        def __init__(self, *args, **kwargs):
+            self.init_args = args
+            self.init_kwargs = kwargs
 
-        original_init = MagicMock()
-        instance = MagicMock()
-
-        with patch("local_ai_brain.models.llm_server.original_init", original_init):
-            # Case 1: No prefill_step_size provided -> should set to 512
-            patched_init(instance)
-            args, kwargs = original_init.call_args
-            self.assertEqual(kwargs["prefill_step_size"], 512)
-
-            # Case 2: 2048 provided (default) -> should override to 512
-            original_init.reset_mock()
-            patched_init(instance, prefill_step_size=2048)
-            args, kwargs = original_init.call_args
-            self.assertEqual(kwargs["prefill_step_size"], 512)
-
-            # Case 3: Custom value provided (e.g. 1024) -> should be preserved
-            original_init.reset_mock()
-            patched_init(instance, prefill_step_size=1024)
-            args, kwargs = original_init.call_args
-            self.assertEqual(kwargs["prefill_step_size"], 1024)
-
-    def test_monkeypatch_presence(self):
-        # Verify that the SimpleEngine.__init__ has indeed been replaced
+    # Mock SimpleEngine in the module where apply_patches imports it
+    with patch("vllm_mlx.engine.simple.SimpleEngine", DummyEngine, create=True):
+        apply_patches()
         from vllm_mlx.engine.simple import SimpleEngine
 
-        from local_ai_brain.models.llm_server import patched_init
+        # Case 1: No prefill_step_size provided -> should set to 512
+        instance = SimpleEngine()
+        assert instance.init_kwargs["prefill_step_size"] == 512
 
-        self.assertEqual(SimpleEngine.__init__, patched_init)
+        # Case 2: 2048 explicitly provided -> should be preserved (addressing PR comment)
+        instance = SimpleEngine(prefill_step_size=2048)
+        assert instance.init_kwargs["prefill_step_size"] == 2048
+
+        # Case 3: Custom value provided (e.g. 1024) -> should be preserved
+        instance = SimpleEngine(prefill_step_size=1024)
+        assert instance.init_kwargs["prefill_step_size"] == 1024
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_monkeypatch_idempotency():
+    """Verify that apply_patches can be called multiple times without issues."""
+    from local_ai_brain.models.llm_server import apply_patches
+
+    # Mock SimpleEngine
+    mock_engine = MagicMock()
+    with patch("vllm_mlx.engine.simple.SimpleEngine", mock_engine, create=True):
+        apply_patches()
+        first_init = mock_engine.__init__
+        apply_patches()
+        assert mock_engine.__init__ == first_init
