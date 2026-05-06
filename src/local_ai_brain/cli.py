@@ -248,7 +248,7 @@ def serve():
                 "run",
                 "python",
                 "-m",
-                "vllm_mlx.server",
+                "local_ai_brain.models.llm_server",
                 "--host",
                 "127.0.0.1",
                 "--port",
