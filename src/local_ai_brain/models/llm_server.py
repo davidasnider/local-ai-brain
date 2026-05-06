@@ -7,6 +7,9 @@ processes during large prefill operations on Apple Silicon.
 
 from loguru import logger
 
+from local_ai_brain.config import settings
+from local_ai_brain.logging import configure_logging
+
 _PATCH_APPLIED = False
 
 
@@ -50,13 +53,14 @@ def apply_patches():
 
 def main():
     """Main entry point for the patched vLLM server."""
+    configure_logging(testing=settings.TESTING)
     apply_patches()
 
     try:
         import vllm_mlx.server
     except ImportError as e:
         logger.error(f"Failed to import vllm-mlx: {e}")
-        return
+        raise SystemExit(1) from e
 
     # Run the original server main function with existing CLI arguments
     vllm_mlx.server.main()
