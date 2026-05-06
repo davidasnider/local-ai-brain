@@ -1,8 +1,9 @@
 """Wrapper for vllm_mlx.server that patches engine settings to prevent GPU timeouts.
 
-This module provides a way to run the vllm_mlx server with a smaller default
-prefill_step_size, which prevents the macOS Metal watchdog from terminating
-processes during large prefill operations on Apple Silicon.
+This module provides a way to run the vllm_mlx server with a very small default
+prefill_step_size (128) and restricted max_num_seqs (1), which prevents the macOS
+Metal watchdog from terminating processes during large or concurrent prefill
+operations on Apple Silicon.
 """
 
 from loguru import logger
@@ -27,27 +28,55 @@ def apply_patches():
         logger.warning("vllm_mlx not found; skipping monkeypatches.")
         return
 
+    import inspect
+
     original_init = SimpleEngine.__init__
+    sig = inspect.signature(original_init)
 
     def patched_init(self, *args, **kwargs):
-        """Patched __init__ for SimpleEngine that overrides prefill_step_size.
+        """Patched __init__ for SimpleEngine that overrides engine parameters.
 
         Args:
             *args: Variable length argument list passed to original __init__.
             **kwargs: Arbitrary keyword arguments passed to original __init__.
         """
-        # If not explicitly provided, default to 512 instead of 2048.
+        # Bind the provided arguments to the original signature to see what's set
+        bound = sig.bind_partial(self, *args, **kwargs)
+
+        # If not explicitly provided, default to 128 instead of 2048.
         # This chunks the prefill work into smaller pieces that fit within
         # the macOS 5-second Metal watchdog timer.
-        if "prefill_step_size" not in kwargs:
-            kwargs["prefill_step_size"] = 512
+        # We use 128 (very conservative) to prevent timeouts on large models.
+        applied = []
+        if "prefill_step_size" in sig.parameters and "prefill_step_size" not in bound.arguments:
+            kwargs["prefill_step_size"] = 128
+            applied.append("prefill_step_size=128")
+
+        # Limit concurrency to prevent multiple large prefills from triggering
+        # the GPU watchdog.
+        if "max_num_seqs" in sig.parameters and "max_num_seqs" not in bound.arguments:
+            kwargs["max_num_seqs"] = 1
+            applied.append("max_num_seqs=1")
+
+        if applied:
+            logger.info(f"Applying engine stability overrides: {', '.join(applied)}")
 
         original_init(self, *args, **kwargs)
 
     # Apply the patch
     SimpleEngine.__init__ = patched_init
     _PATCH_APPLIED = True
-    logger.info("Patched vllm_mlx.engine.simple.SimpleEngine with prefill_step_size=512")
+
+    overrides = []
+    if "prefill_step_size" in sig.parameters:
+        overrides.append("prefill_step_size=128")
+    if "max_num_seqs" in sig.parameters:
+        overrides.append("max_num_seqs=1")
+
+    if overrides:
+        logger.info(f"Patched vllm_mlx.engine.simple.SimpleEngine with {', '.join(overrides)}")
+    else:
+        logger.info("No supported stability overrides found for SimpleEngine signature.")
 
 
 def main():
