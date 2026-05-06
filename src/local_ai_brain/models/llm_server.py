@@ -1,3 +1,10 @@
+"""Wrapper for vllm_mlx.server that patches engine settings to prevent GPU timeouts.
+
+This module monkeypatches the vllm_mlx SimpleEngine to use a smaller default
+prefill_step_size, which prevents the macOS Metal watchdog from terminating
+processes during large prefill operations on Apple Silicon.
+"""
+
 import sys
 
 from loguru import logger
@@ -16,6 +23,12 @@ original_init = SimpleEngine.__init__
 
 
 def patched_init(self, *args, **kwargs):
+    """Patched __init__ for SimpleEngine that overrides prefill_step_size.
+
+    Args:
+        *args: Variable length argument list passed to original __init__.
+        **kwargs: Arbitrary keyword arguments passed to original __init__.
+    """
     # If not explicitly provided, default to 512 instead of 2048.
     # This chunks the prefill work into smaller pieces that fit within
     # the macOS 5-second Metal watchdog timer.
@@ -31,6 +44,7 @@ logger.info("Patched vllm_mlx.engine.simple.SimpleEngine with prefill_step_size=
 
 
 def main():
+    """Main entry point for the patched vLLM server."""
     # Run the original server main function with existing CLI arguments
     vllm_mlx.server.main()
 
