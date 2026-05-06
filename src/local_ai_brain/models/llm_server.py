@@ -7,7 +7,6 @@ processes during large prefill operations on Apple Silicon.
 
 from loguru import logger
 
-from local_ai_brain.config import settings
 from local_ai_brain.logging import configure_logging
 
 _PATCH_APPLIED = False
@@ -53,6 +52,8 @@ def apply_patches():
 
 def main():
     """Main entry point for the patched vLLM server."""
+    from local_ai_brain.config import settings
+
     configure_logging(testing=settings.TESTING)
     apply_patches()
 

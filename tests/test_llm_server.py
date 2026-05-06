@@ -1,6 +1,11 @@
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Set dummy env vars for module-level settings imports in some modules
+os.environ.setdefault("LOCAL_API_KEY", "test-key")
+os.environ.setdefault("TESTING", "1")
 
 
 @pytest.fixture(autouse=True)
