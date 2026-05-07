@@ -43,6 +43,7 @@ def apply_patches():
         # Bind the provided arguments to the original signature to see what's set
         bound = sig.bind_partial(self, *args, **kwargs)
 
+<<<<<<< HEAD
         # If not explicitly provided, default to 128 instead of 2048.
         # This chunks the prefill work into smaller pieces that fit within
         # the macOS 5-second Metal watchdog timer.
@@ -51,6 +52,13 @@ def apply_patches():
         if "prefill_step_size" in sig.parameters and "prefill_step_size" not in bound.arguments:
             kwargs["prefill_step_size"] = 128
             applied.append("prefill_step_size=128")
+=======
+        # If not explicitly provided, default to 512 instead of 2048.
+        # This chunks the prefill work into smaller pieces that fit within
+        # the macOS 5-second Metal watchdog timer.
+        if "prefill_step_size" in sig.parameters and "prefill_step_size" not in bound.arguments:
+            kwargs["prefill_step_size"] = 512
+>>>>>>> 214b0a0 (fix: address PR feedback on semaphore scope and engine patching)
 
         # Limit concurrency to prevent multiple large prefills from triggering
         # the GPU watchdog.
@@ -69,7 +77,11 @@ def apply_patches():
 
     overrides = []
     if "prefill_step_size" in sig.parameters:
+<<<<<<< HEAD
         overrides.append("prefill_step_size=128")
+=======
+        overrides.append("prefill_step_size=512")
+>>>>>>> 214b0a0 (fix: address PR feedback on semaphore scope and engine patching)
     if "max_num_seqs" in sig.parameters:
         overrides.append("max_num_seqs=1")
 
