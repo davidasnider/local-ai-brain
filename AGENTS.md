@@ -53,3 +53,6 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
 9. **Interactive CLI Tool:**
    * Maintain the `local-brain` CLI tool located in `src/local_ai_brain/cli.py`.
    * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
+
+10. **LLM Execution & GPU Timeout Prevention:**
+    * Always run `vllm-mlx` via the custom wrapper located at `src/local_ai_brain/models/llm_server.py`. This wrapper applies essential monkeypatches to reduce the `prefill_step_size`, preventing macOS Metal watchdog timeouts during large model prefill operations on Apple Silicon.

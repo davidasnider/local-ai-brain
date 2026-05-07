@@ -6,7 +6,7 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit/8-bit).
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit/8-bit). Uses a custom wrapper (`llm_server.py`) to prevent macOS Metal watchdog timeouts during large prefill operations.
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
@@ -40,7 +40,7 @@ uv run local-brain serve
 ```
 
 This command starts all four processes:
-- **vLLM MLX** (LLM) on `127.0.0.1:8001`
+- **vLLM MLX** (LLM) on `127.0.0.1:8001` (via `llm_server.py` wrapper to prevent macOS Metal timeouts)
 - **STT Server** (Whisper) on `127.0.0.1:8002`
 - **TTS Server** (Kokoro) on `127.0.0.1:8003`
 - **API Gateway** (Proxy) on `0.0.0.0:8000`
