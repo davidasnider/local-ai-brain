@@ -130,6 +130,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             "content-encoding",
         }
         # Use multi_items() if available to preserve duplicate headers like Set-Cookie
+        # falling back to items() for basic compatibility.
         headers_source = getattr(response.headers, "multi_items", response.headers.items)
         for key, value in headers_source():
             if key.lower() not in hop_by_hop_headers:
