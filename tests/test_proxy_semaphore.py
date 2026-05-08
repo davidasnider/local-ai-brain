@@ -40,21 +40,21 @@ async def test_proxy_request_semaphore_release_on_success(mock_request, mock_app
     mock_app.state.client.send.return_value = mock_response
 
     # Verify semaphore is initially free
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
 
     # Call proxy_request with semaphore
     response = await proxy_request(mock_request, "http://backend", use_semaphore=True)
     assert isinstance(response, StreamingResponse)
 
-    # Semaphore should be acquired (value = 0) because streaming hasn't finished
-    assert mock_app.state.llm_semaphore._value == 0
+    # Semaphore should be acquired because streaming hasn't finished
+    assert mock_app.state.llm_semaphore.locked()
 
     # Consume the stream to trigger release
     async for _ in response.body_iterator:
         pass
 
     # Semaphore should be released
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
     mock_response.aclose.assert_called_once()
 
 
@@ -63,13 +63,13 @@ async def test_proxy_request_semaphore_release_on_send_failure(mock_request, moc
     # Setup mock client to raise error
     mock_app.state.client.send.side_effect = httpx.RequestError("Failed")
 
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
 
     with pytest.raises(Exception):
         await proxy_request(mock_request, "http://backend", use_semaphore=True)
 
     # Semaphore should be released on failure
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
 
 
 @pytest.mark.anyio
@@ -84,14 +84,14 @@ async def test_proxy_request_response_closed_on_header_failure(mock_request, moc
     mock_response.headers.multi_items.side_effect = Exception("Header Failure")
     mock_app.state.client.send.return_value = mock_response
 
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
 
     with pytest.raises(Exception, match="Header Failure"):
         await proxy_request(mock_request, "http://backend", use_semaphore=True)
 
     # Response should be closed and semaphore released
     mock_response.aclose.assert_called_once()
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
 
 
 @pytest.mark.anyio
@@ -99,10 +99,10 @@ async def test_proxy_request_cancellation_hardening(mock_request, mock_app):
     # Setup mock client to simulate cancellation during send
     mock_app.state.client.send.side_effect = asyncio.CancelledError()
 
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
 
     with pytest.raises(asyncio.CancelledError):
         await proxy_request(mock_request, "http://backend", use_semaphore=True)
 
     # Semaphore MUST be released even on CancelledError
-    assert mock_app.state.llm_semaphore._value == 1
+    assert not mock_app.state.llm_semaphore.locked()
