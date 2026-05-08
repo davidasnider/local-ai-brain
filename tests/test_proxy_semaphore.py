@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from local_ai_brain.main import proxy_request
@@ -65,8 +65,9 @@ async def test_proxy_request_semaphore_release_on_send_failure(mock_request, moc
 
     assert not mock_app.state.llm_semaphore.locked()
 
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException) as exc:
         await proxy_request(mock_request, "http://backend", use_semaphore=True)
+    assert exc.value.status_code == 502
 
     # Semaphore should be released on failure
     assert not mock_app.state.llm_semaphore.locked()

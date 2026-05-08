@@ -115,27 +115,29 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
 
         response = await client.send(req, stream=True)
 
-        resp_headers = []
+        # Build StreamingResponse with multiple headers support
+        streaming_resp = StreamingResponse(
+            stream_generator(response, semaphore),
+            status_code=response.status_code,
+        )
+
         # Strip backend-specific hop-by-hop headers from the response
-        hop_by_hop_headers = [
+        hop_by_hop_headers = {
             "connection",
             "keep-alive",
             "transfer-encoding",
             "content-length",
             "content-encoding",
-        ]
-        # Use items() for basic compatibility; production httpx will have multi_items()
-        # if we ever truly need to preserve multiple same-named headers like Set-Cookie.
+        }
+        # Use multi_items() if available to preserve duplicate headers like Set-Cookie
         headers_source = getattr(response.headers, "multi_items", response.headers.items)
         for key, value in headers_source():
             if key.lower() not in hop_by_hop_headers:
-                resp_headers.append((key, value))
+                # Use raw_headers to preserve duplicates (FastAPI/Starlette internal)
+                streaming_resp.raw_headers.append(
+                    (key.lower().encode("latin-1"), value.encode("latin-1"))
+                )
 
-        streaming_resp = StreamingResponse(
-            stream_generator(response, semaphore),
-            status_code=response.status_code,
-            headers=dict(resp_headers),
-        )
         # Clear flags so finally block doesn't cleanup resources now owned by StreamingResponse
         response = None
         semaphore_acquired = False
