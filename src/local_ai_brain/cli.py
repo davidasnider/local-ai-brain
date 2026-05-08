@@ -257,6 +257,8 @@ def serve():
                 settings.QWEN_MODEL_PATH,
                 "--api-key",
                 settings.LOCAL_API_KEY,
+                "--reasoning-parser",
+                "qwen3",
             ],
             env=env_vars,
         )
