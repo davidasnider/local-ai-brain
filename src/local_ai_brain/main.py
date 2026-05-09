@@ -75,16 +75,17 @@ async def proxy_request(request: Request, target_url: str):
     # Inject internal authentication
     headers["Authorization"] = f"Bearer {settings.LOCAL_API_KEY}"
 
-    should_parse_body_for_model_normalization = (
+    should_normalize_model = (
         request.method in {"POST", "PUT"}
         and (path.startswith("/v1/chat/") or path == "/v1/completions")
         and "application/json" in headers.get("content-type", "").lower()
     )
-    if should_parse_body_for_model_normalization:
+    if should_normalize_model:
         body = await request.body()
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
+            logger.debug(f"Skipping model alias normalization due to invalid JSON for path: {path}")
             payload = None
         if isinstance(payload, dict):
             model = payload.get("model")
