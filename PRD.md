@@ -15,7 +15,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
-* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 35B parameter) quantized for MLX (4-bit to respect RAM limits). Must use a patched `vllm-mlx` implementation (via `src/local_ai_brain/models/llm_server.py`) to chunk prefill operations and prevent macOS Metal watchdog timeouts.
+* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 35B parameters) quantized for MLX (4-bit to respect RAM limits). Must use a patched `vllm-mlx` implementation (via `src/local_ai_brain/models/llm_server.py`) to chunk prefill operations and prevent macOS Metal watchdog timeouts.
 * **Speech-to-Text (STT):** Lightning Whisper MLX.
 * **Text-to-Speech (TTS):** Kokoro TTS via MLX (or ONNX).
 
