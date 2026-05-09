@@ -1,4 +1,5 @@
 import os
+from json import loads
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -208,6 +209,59 @@ def test_proxy_chat(mock_send, client):
 
     req = mock_send.call_args[0][0]
     assert "8001" in str(req.url)
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_alias_model_normalization(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={
+            "model": settings.QWEN_MODEL_ALIASES[0],
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    assert response.status_code == 200
+
+    req = mock_send.call_args[0][0]
+    payload = loads(req.content.decode("utf-8"))
+    assert payload["model"] == settings.QWEN_MODEL_PATH
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_completions_alias_model_normalization(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "cmpl-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    response = client.post(
+        "/v1/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={"model": settings.QWEN_MODEL_ALIASES[0], "prompt": "hello"},
+    )
+    assert response.status_code == 200
+
+    req = mock_send.call_args[0][0]
+    payload = loads(req.content.decode("utf-8"))
+    assert payload["model"] == settings.QWEN_MODEL_PATH
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
