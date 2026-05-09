@@ -26,9 +26,13 @@ def mock_vllm_mlx():
 
     # We use a real class for SimpleEngine to properly test attribute assignment
     class SimpleEngine:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, prefill_step_size=None, max_num_seqs=None, *args, **kwargs):
             self.init_args = args
-            self.init_kwargs = kwargs
+            self.init_kwargs = {
+                "prefill_step_size": prefill_step_size,
+                "max_num_seqs": max_num_seqs,
+                **kwargs,
+            }
 
     mock_engine.SimpleEngine = SimpleEngine
 
@@ -45,23 +49,27 @@ def mock_vllm_mlx():
 
 
 def test_patched_init_logic(mock_vllm_mlx):
-    """Verify that patched_init correctly handles prefill_step_size defaulting."""
+    """Verify that patched_init correctly handles default overrides."""
     from local_ai_brain.models.llm_server import apply_patches
 
     mock_engine, _ = mock_vllm_mlx
     apply_patches()
 
-    # Case 1: No prefill_step_size provided -> should set to 512
+    # Case 1: No arguments provided -> should set defaults
     instance = mock_engine.SimpleEngine()
-    assert instance.init_kwargs["prefill_step_size"] == 512
+    assert instance.init_kwargs["prefill_step_size"] == 128
+    assert instance.init_kwargs["max_num_seqs"] == 1
 
-    # Case 2: 2048 explicitly provided -> should be preserved (addressing PR comment)
-    instance = mock_engine.SimpleEngine(prefill_step_size=2048)
+    # Case 2: Values explicitly provided via kwargs -> should be preserved
+    instance = mock_engine.SimpleEngine(prefill_step_size=2048, max_num_seqs=4)
     assert instance.init_kwargs["prefill_step_size"] == 2048
+    assert instance.init_kwargs["max_num_seqs"] == 4
 
-    # Case 3: Custom value provided (e.g. 1024) -> should be preserved
-    instance = mock_engine.SimpleEngine(prefill_step_size=1024)
-    assert instance.init_kwargs["prefill_step_size"] == 1024
+    # Case 3: Values explicitly provided via positional args -> should be preserved
+    # Note: SimpleEngine(2048, 4) passes 2048 as prefill_step_size and 4 as max_num_seqs
+    instance = mock_engine.SimpleEngine(2048, 4)
+    assert instance.init_kwargs["prefill_step_size"] == 2048
+    assert instance.init_kwargs["max_num_seqs"] == 4
 
 
 def test_monkeypatch_idempotency(mock_vllm_mlx):
