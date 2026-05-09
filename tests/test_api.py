@@ -241,6 +241,7 @@ def test_proxy_chat_alias_model_normalization(mock_send, client, qwen_alias):
     assert response.status_code == 200
 
     req = mock_send.call_args[0][0]
+    assert req.content
     payload = loads(req.content.decode("utf-8"))
     assert payload["model"] == settings.QWEN_MODEL_PATH
 
@@ -266,6 +267,7 @@ def test_proxy_completions_alias_model_normalization(mock_send, client, qwen_ali
     assert response.status_code == 200
 
     req = mock_send.call_args[0][0]
+    assert req.content
     payload = loads(req.content.decode("utf-8"))
     assert payload["model"] == settings.QWEN_MODEL_PATH
 

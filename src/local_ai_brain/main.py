@@ -84,8 +84,8 @@ async def proxy_request(request: Request, target_url: str):
         body = await request.body()
         try:
             payload = json.loads(body)
-        except json.JSONDecodeError as e:
-            logger.debug(f"Skipping model alias normalization for {path}: invalid JSON ({e})")
+        except json.JSONDecodeError:
+            logger.debug(f"Skipping model alias normalization for {path}: invalid JSON")
             payload = None
         if isinstance(payload, dict):
             model = payload.get("model")
