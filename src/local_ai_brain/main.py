@@ -75,7 +75,6 @@ async def proxy_request(request: Request, target_url: str):
     # Inject internal authentication
     headers["Authorization"] = f"Bearer {settings.LOCAL_API_KEY}"
 
-    content = request.stream()
     should_normalize_model = (
         request.method in {"POST", "PUT"}
         and (path.startswith("/v1/chat/") or path == "/v1/completions")
@@ -83,17 +82,18 @@ async def proxy_request(request: Request, target_url: str):
     )
     if should_normalize_model:
         body = await request.body()
-        if body:
-            try:
-                payload = json.loads(body)
-            except json.JSONDecodeError:
-                payload = None
-            if isinstance(payload, dict):
-                model = payload.get("model")
-                if isinstance(model, str) and model in settings.QWEN_MODEL_ALIASES:
-                    payload["model"] = settings.QWEN_MODEL_PATH
-                    body = json.dumps(payload).encode("utf-8")
+        try:
+            payload = json.loads(body) if body else None
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            model = payload.get("model")
+            if isinstance(model, str) and model in settings.QWEN_MODEL_ALIASES:
+                payload["model"] = settings.QWEN_MODEL_PATH
+                body = json.dumps(payload).encode("utf-8")
         content = body
+    else:
+        content = request.stream()
 
     client = request.app.state.client
     req = client.build_request(
