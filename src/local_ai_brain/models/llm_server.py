@@ -1,8 +1,9 @@
 """Wrapper for vllm_mlx.server that patches engine settings to prevent GPU timeouts.
 
 This module provides a way to run the vllm_mlx server with a very small default
-prefill_step_size (128) and restricted max_num_seqs (1), which prevents the macOS
-Metal watchdog from terminating processes during large or concurrent prefill
+prefill_step_size (128) and restricted max_num_seqs (1). These overrides are applied
+conditionally based on the installed vllm-mlx version's supported signature, preventing
+the macOS Metal watchdog from terminating processes during large or concurrent prefill
 operations on Apple Silicon.
 """
 
