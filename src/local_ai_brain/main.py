@@ -75,15 +75,15 @@ async def proxy_request(request: Request, target_url: str):
     # Inject internal authentication
     headers["Authorization"] = f"Bearer {settings.LOCAL_API_KEY}"
 
-    should_normalize_model = (
+    should_parse_body_for_model_normalization = (
         request.method in {"POST", "PUT"}
         and (path.startswith("/v1/chat/") or path == "/v1/completions")
         and "application/json" in headers.get("content-type", "").lower()
     )
-    if should_normalize_model:
+    if should_parse_body_for_model_normalization:
         body = await request.body()
         try:
-            payload = json.loads(body) if body else None
+            payload = json.loads(body)
         except json.JSONDecodeError:
             payload = None
         if isinstance(payload, dict):
