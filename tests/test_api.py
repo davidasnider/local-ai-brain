@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 # Set testing environment variables before importing app
 os.environ["TESTING"] = "1"
-os.environ["LOCAL_API_KEY"] = "test-api-key"
+os.environ["LOCAL_API_KEY"] = "test-api-key"  # pragma: allowlist secret
 
 from local_ai_brain.config import settings
 from local_ai_brain.main import app

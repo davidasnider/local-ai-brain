@@ -7,7 +7,7 @@ from starlette.types import Scope
 
 # Set environment variables BEFORE any imports from the app
 os.environ["TESTING"] = "1"
-os.environ["LOCAL_API_KEY"] = "test-api-key"
+os.environ["LOCAL_API_KEY"] = "test-api-key"  # pragma: allowlist secret
 
 from local_ai_brain.middleware import MetricsMiddleware  # noqa: E402
 

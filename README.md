@@ -6,7 +6,7 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit/8-bit). Uses a custom wrapper (`src/local_ai_brain/models/llm_server.py`) to prevent macOS Metal watchdog timeouts during large prefill operations.
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit). Uses a custom wrapper (`src/local_ai_brain/models/llm_server.py`) to prevent macOS Metal watchdog timeouts during large prefill operations.
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
@@ -75,7 +75,7 @@ curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
   -d '{
-    "model": "mlx-community/Qwen3.6-35B-A3B-8bit",
+    "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
     "messages": [{"role": "user", "content": "How do I build a DIY smart mirror?"}],
     "stream": true
   }'
