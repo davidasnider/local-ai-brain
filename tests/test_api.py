@@ -20,6 +20,12 @@ def client():
         yield client
 
 
+@pytest.fixture
+def qwen_alias():
+    assert settings.QWEN_MODEL_ALIASES
+    return settings.QWEN_MODEL_ALIASES[0]
+
+
 def test_health_check(client):
     response = client.get("/health", headers={"Authorization": "Bearer test-api-key"})
     assert response.status_code == 200
@@ -212,7 +218,7 @@ def test_proxy_chat(mock_send, client):
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-def test_proxy_chat_alias_model_normalization(mock_send, client):
+def test_proxy_chat_alias_model_normalization(mock_send, client, qwen_alias):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.headers = {}
@@ -228,7 +234,7 @@ def test_proxy_chat_alias_model_normalization(mock_send, client):
         "/v1/chat/completions",
         headers={"Authorization": "Bearer test-api-key"},
         json={
-            "model": settings.QWEN_MODEL_ALIASES[0],
+            "model": qwen_alias,
             "messages": [{"role": "user", "content": "hi"}],
         },
     )
@@ -240,7 +246,7 @@ def test_proxy_chat_alias_model_normalization(mock_send, client):
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-def test_proxy_completions_alias_model_normalization(mock_send, client):
+def test_proxy_completions_alias_model_normalization(mock_send, client, qwen_alias):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.headers = {}
@@ -255,7 +261,7 @@ def test_proxy_completions_alias_model_normalization(mock_send, client):
     response = client.post(
         "/v1/completions",
         headers={"Authorization": "Bearer test-api-key"},
-        json={"model": settings.QWEN_MODEL_ALIASES[0], "prompt": "hello"},
+        json={"model": qwen_alias, "prompt": "hello"},
     )
     assert response.status_code == 200
 
