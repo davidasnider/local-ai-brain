@@ -6,7 +6,7 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit). Legacy `*-8bit` model IDs are still accepted as aliases and normalized to the canonical 4-bit model path for compatibility. Uses a custom wrapper (`src/local_ai_brain/models/llm_server.py`) to prevent macOS Metal watchdog timeouts during large prefill operations.
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit). Uses a custom wrapper (`src/local_ai_brain/models/llm_server.py`) to prevent macOS Metal watchdog timeouts during large prefill operations.
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
