@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import secrets
 
@@ -31,6 +32,8 @@ async def lifespan(app: FastAPI):
     # Initialize a single httpx client for the lifetime of the app
     # Use a long timeout for LLM inference (10 minutes)
     app.state.client = httpx.AsyncClient(timeout=600.0)
+    # Semaphore to prevent Metal GPU timeouts by limiting concurrent LLM requests
+    app.state.llm_semaphore = asyncio.Semaphore(1)
     yield
     await app.state.client.aclose()
 
@@ -45,8 +48,15 @@ app = FastAPI(
 app.add_middleware(MetricsMiddleware)
 
 
-async def proxy_request(request: Request, target_url: str):
-    """Proxy the request to a backend service."""
+async def proxy_request(request: Request, target_url: str, use_semaphore: bool = False):
+    """Proxy the request to a backend service.
+
+    Args:
+        request: The incoming FastAPI request.
+        target_url: The base URL of the backend service to proxy to.
+        use_semaphore: If True, uses the app-level LLM semaphore to serialize requests.
+            This is used to prevent Metal GPU timeouts on Apple Silicon.
+    """
     path = request.url.path
     query = request.url.query
     url = f"{target_url.rstrip('/')}{path}"
@@ -82,41 +92,71 @@ async def proxy_request(request: Request, target_url: str):
         content=request.stream(),
     )
 
+    async def stream_generator(response: httpx.Response, semaphore: asyncio.Semaphore | None):
+        try:
+            # Use aiter_bytes() to ensure httpx handles decompression if the
+            # content-encoding header was stripped or modified.
+            async for chunk in response.aiter_bytes():
+                yield chunk
+        finally:
+            try:
+                await response.aclose()
+            finally:
+                if semaphore:
+                    semaphore.release()
+
+    semaphore = request.app.state.llm_semaphore if use_semaphore else None
+    response = None
+    semaphore_acquired = False
     try:
+        if semaphore:
+            await semaphore.acquire()
+            semaphore_acquired = True
+
         response = await client.send(req, stream=True)
 
-        async def stream_generator():
-            try:
-                # Use aiter_bytes() to ensure httpx handles decompression if the
-                # content-encoding header was stripped or modified.
-                async for chunk in response.aiter_bytes():
-                    yield chunk
-            finally:
-                await response.aclose()
+        # Build StreamingResponse with multiple headers support
+        streaming_resp = StreamingResponse(
+            stream_generator(response, semaphore),
+            status_code=response.status_code,
+        )
 
-        resp_headers = []
         # Strip backend-specific hop-by-hop headers from the response
-        hop_by_hop_headers = [
+        hop_by_hop_headers = {
             "connection",
             "keep-alive",
             "transfer-encoding",
             "content-length",
             "content-encoding",
-        ]
-        # Use items() for basic compatibility; production httpx will have multi_items()
-        # if we ever truly need to preserve multiple same-named headers like Set-Cookie.
-        # For now, following the reviewer's advice but ensuring tests don't break.
+        }
+        # Use multi_items() if available to preserve duplicate headers like Set-Cookie
+        # falling back to items() for basic compatibility.
         headers_source = getattr(response.headers, "multi_items", response.headers.items)
         for key, value in headers_source():
             if key.lower() not in hop_by_hop_headers:
-                resp_headers.append((key, value))
+                # Use raw_headers to preserve duplicates (FastAPI/Starlette internal)
+                streaming_resp.raw_headers.append(
+                    (key.lower().encode("latin-1"), value.encode("latin-1"))
+                )
 
-        return StreamingResponse(
-            stream_generator(), status_code=response.status_code, headers=dict(resp_headers)
-        )
-    except httpx.RequestError as e:
-        logger.error(f"Proxy error to {url}: {e}")
-        raise HTTPException(status_code=502, detail="Bad Gateway")
+        # Clear flags so finally block doesn't cleanup resources now owned by StreamingResponse
+        response = None
+        semaphore_acquired = False
+        return streaming_resp
+
+    except Exception as e:
+        if isinstance(e, httpx.RequestError):
+            logger.error(f"Proxy error to {url}: {e}")
+            raise HTTPException(status_code=502, detail="Bad Gateway")
+        raise
+    finally:
+        # If we didn't successfully hand off to StreamingResponse, clean up
+        try:
+            if response:
+                await response.aclose()
+        finally:
+            if semaphore_acquired:
+                semaphore.release()
 
 
 @app.api_route(
@@ -124,7 +164,7 @@ async def proxy_request(request: Request, target_url: str):
     methods=["GET", "POST", "PUT", "DELETE"],
 )
 async def proxy_vllm_chat(request: Request, path: str):
-    return await proxy_request(request, settings.VLLM_URL)
+    return await proxy_request(request, settings.VLLM_URL, use_semaphore=True)
 
 
 @app.api_route(
@@ -132,7 +172,7 @@ async def proxy_vllm_chat(request: Request, path: str):
     methods=["GET", "POST"],
 )
 async def proxy_vllm_completions(request: Request):
-    return await proxy_request(request, settings.VLLM_URL)
+    return await proxy_request(request, settings.VLLM_URL, use_semaphore=True)
 
 
 @app.get("/v1/models")
