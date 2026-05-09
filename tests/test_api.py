@@ -1,5 +1,5 @@
+import json
 import os
-from json import loads
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -242,7 +242,7 @@ def test_proxy_chat_alias_model_normalization(mock_send, client, qwen_alias):
 
     req = mock_send.call_args[0][0]
     assert req.content
-    payload = loads(req.content.decode("utf-8"))
+    payload = json.loads(req.content.decode("utf-8"))
     assert payload["model"] == settings.QWEN_MODEL_PATH
 
 
@@ -268,7 +268,7 @@ def test_proxy_completions_alias_model_normalization(mock_send, client, qwen_ali
 
     req = mock_send.call_args[0][0]
     assert req.content
-    payload = loads(req.content.decode("utf-8"))
+    payload = json.loads(req.content.decode("utf-8"))
     assert payload["model"] == settings.QWEN_MODEL_PATH
 
 
