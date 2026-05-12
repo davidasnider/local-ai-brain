@@ -355,6 +355,20 @@ def test_main_serve(mock_popen, mock_sleep, capsys):
     assert mock_process.terminate.call_count == 4
     assert mock_process.wait.call_count == 4
 
+    # Verify vLLM command arguments
+    vllm_call = mock_popen.call_args_list[0]
+    cmd = vllm_call.args[0]
+    assert "--model" in cmd
+    assert "--continuous-batching" in cmd
+    assert "--max-kv-size" in cmd
+    # Check that dynamic flags are present if enabled in settings
+    from local_ai_brain.config import settings
+
+    if settings.LLM_SPECPREFILL_ENABLED:
+        assert "--speculative-draft-model" in cmd
+    if settings.LLM_KV_CACHE_QUANTIZATION:
+        assert "--kv-cache-bits" in cmd
+
 
 @patch("time.sleep")
 @patch("subprocess.Popen")

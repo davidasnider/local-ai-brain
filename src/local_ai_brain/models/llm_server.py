@@ -1,7 +1,7 @@
 """Wrapper for vllm_mlx.server with optimized configuration for local execution.
 
 This module provides a way to run the vllm_mlx server with appropriate logging
-and environment configuration for the Local AI Brain system.
+configuration for the Local AI Brain system.
 """
 
 from loguru import logger
