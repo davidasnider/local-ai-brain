@@ -261,6 +261,10 @@ def serve():
             "--continuous-batching",
             "--max-kv-size",
             str(settings.LLM_MAX_KV_SIZE),
+            "--prefill-step-size",
+            str(settings.LLM_PREFILL_STEP_SIZE),
+            "--max-num-seqs",
+            str(settings.LLM_MAX_NUM_SEQS),
         ]
 
         if settings.LLM_SPECPREFILL_ENABLED:

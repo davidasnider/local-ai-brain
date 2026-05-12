@@ -44,6 +44,14 @@ class Settings(BaseSettings):
         description="Draft model for speculative prefill",
     )
     LLM_MAX_KV_SIZE: int = Field(default=8192, ge=0, description="Maximum KV cache size")
+    LLM_PREFILL_STEP_SIZE: int = Field(
+        default=128,
+        description="Prefill step size (prevents Metal GPU timeouts)",
+    )
+    LLM_MAX_NUM_SEQS: int = Field(
+        default=1,
+        description="Max concurrent sequences (prevents Metal GPU timeouts)",
+    )
 
     # Legacy model ID aliases (accepted in addition to QWEN_MODEL_PATH)
     QWEN_MODEL_ALIASES: list[str] = Field(default=["mlx-community/Qwen3.6-35B-A3B-8bit"])
