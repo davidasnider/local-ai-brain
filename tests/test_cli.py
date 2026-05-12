@@ -339,7 +339,8 @@ def test_tts_http_error_non_json(mock_urlopen, capsys):
 
 @patch("time.sleep")
 @patch("subprocess.Popen")
-def test_main_serve(mock_popen, mock_sleep, capsys):
+def test_main_serve(mock_popen, mock_sleep, capsys, monkeypatch):
+    monkeypatch.setenv("LOCAL_API_KEY", "test-key")
     mock_sleep.side_effect = KeyboardInterrupt()
 
     mock_process = MagicMock()
