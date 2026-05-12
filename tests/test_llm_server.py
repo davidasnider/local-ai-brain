@@ -21,8 +21,14 @@ def test_main_failure_exits_nonzero():
 
 def test_main_runs_server():
     """Verify that main() correctly invokes vllm_mlx.server.main()."""
-    from local_ai_brain.models.llm_server import main
+    from unittest.mock import MagicMock
 
-    with patch("vllm_mlx.server.main") as mock_server_main:
+    mock_vllm = MagicMock()
+    mock_server = MagicMock()
+    mock_vllm.server = mock_server
+
+    with patch.dict("sys.modules", {"vllm_mlx": mock_vllm, "vllm_mlx.server": mock_server}):
+        from local_ai_brain.models.llm_server import main
+
         main()
-        mock_server_main.assert_called_once()
+        mock_server.main.assert_called_once()
