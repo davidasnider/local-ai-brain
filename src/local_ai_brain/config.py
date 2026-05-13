@@ -30,8 +30,30 @@ class Settings(BaseSettings):
     KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
 
     # LLM engine settings
-    LLM_KV_CACHE_QUANTIZATION: bool = True
-    LLM_KV_CACHE_BITS: int = Field(default=4, ge=4, le=8)
+    LLM_KV_CACHE_QUANTIZATION: bool = Field(
+        default=True, description="Enable KV cache quantization for memory efficiency"
+    )
+    LLM_KV_CACHE_BITS: int = Field(
+        default=4, ge=4, le=8, description="Number of bits for KV cache quantization"
+    )
+    LLM_SPECPREFILL_ENABLED: bool = Field(
+        default=True, description="Enable speculative prefill for faster generation"
+    )
+    LLM_SPECPREFILL_DRAFT_MODEL: str = Field(
+        default="mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+        description="Draft model for speculative prefill",
+    )
+    LLM_MAX_KV_SIZE: int = Field(default=8192, ge=0, description="Maximum KV cache size")
+    LLM_PREFILL_STEP_SIZE: int = Field(
+        default=128,
+        gt=0,
+        description="Prefill step size (prevents Metal GPU timeouts)",
+    )
+    LLM_MAX_NUM_SEQS: int = Field(
+        default=1,
+        gt=0,
+        description="Max concurrent sequences (prevents Metal GPU timeouts)",
+    )
 
     # Legacy model ID aliases (accepted in addition to QWEN_MODEL_PATH)
     QWEN_MODEL_ALIASES: list[str] = Field(default=["mlx-community/Qwen3.6-35B-A3B-8bit"])
