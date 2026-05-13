@@ -5,6 +5,8 @@ configuration.
 """
 
 import importlib
+import os
+import sys
 
 from loguru import logger
 
@@ -16,6 +18,11 @@ def main():
     from local_ai_brain.config import settings
 
     configure_logging(testing=settings.TESTING)
+
+    # Inject API key from environment if present and not already in args
+    # to avoid leaking it in process listings.
+    if "VLLM_API_KEY" in os.environ and "--api-key" not in sys.argv:
+        sys.argv.extend(["--api-key", os.environ["VLLM_API_KEY"]])
 
     try:
         vllm_server = importlib.import_module("vllm_mlx.server")

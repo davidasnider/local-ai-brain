@@ -237,9 +237,9 @@ def serve():
 
     processes = []
     try:
-        env_vars = dict(os.environ, PYTHONPATH="src")
-
         from local_ai_brain.config import settings
+
+        env_vars = dict(os.environ, PYTHONPATH="src", VLLM_API_KEY=settings.LOCAL_API_KEY)
 
         print(f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}")
         vllm_cmd = [
@@ -254,8 +254,6 @@ def serve():
             "8001",
             "--model",
             settings.QWEN_MODEL_PATH,
-            "--api-key",
-            settings.LOCAL_API_KEY,
             "--reasoning-parser",
             "qwen3",
             "--continuous-batching",
