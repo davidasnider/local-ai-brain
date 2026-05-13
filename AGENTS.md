@@ -55,5 +55,5 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
 
 10. **LLM Execution & GPU Timeout Prevention:**
-    * Run the LLM backend via the custom wrapper at `src/local_ai_brain/models/llm_server.py` (which configures proper system logging). Prefill chunking and concurrency are controlled by Pydantic settings (`LLM_PREFILL_STEP_SIZE` defaults to 128, `LLM_MAX_NUM_SEQS` defaults to 1 in `config.py`), which the CLI (`src/local_ai_brain/cli.py`) forwards to the backend as CLI flags to reduce macOS Metal watchdog timeout risk during large model prefill operations on Apple Silicon.
+    * Always run `vllm-mlx` ensuring stability overrides (e.g., `--prefill-step-size` and `--max-num-seqs`) are passed via CLI arguments (as configured in `src/local_ai_brain/cli.py`) using defaults from `src/local_ai_brain/config.py` to prevent macOS Metal watchdog timeouts during large model prefill operations on Apple Silicon.
     * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the MLX backend.
