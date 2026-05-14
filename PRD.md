@@ -15,7 +15,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
-* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 35B parameter) quantized for MLX (4-bit to respect RAM limits). The system defaults prefill chunking to `prefill_step_size=128` and limits default concurrency to `max_num_seqs=1` via application settings (`config.py`) and CLI flags, while also serializing requests at the API gateway level (via semaphore) to reduce macOS Metal watchdog timeout risk during large prefill operations.
+* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 35B parameter) quantized for MLX (4-bit to respect RAM limits). Must use stability overrides (such as chunked prefill operations via CLI arguments passed by the `local-brain serve` CLI orchestrator) and gateway-level request serialization to prevent macOS Metal watchdog timeouts.
 * **Speech-to-Text (STT):** Lightning Whisper MLX.
 * **Text-to-Speech (TTS):** Kokoro TTS via MLX (or ONNX).
 
