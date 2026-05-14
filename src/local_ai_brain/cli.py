@@ -242,26 +242,38 @@ def serve():
         from local_ai_brain.config import settings
 
         print(f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}")
-        p_vllm = subprocess.Popen(
-            [
-                uv_bin,
-                "run",
-                "python",
-                "-m",
-                "local_ai_brain.models.llm_server",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "8001",
-                "--model",
-                settings.QWEN_MODEL_PATH,
-                "--api-key",
-                settings.LOCAL_API_KEY,
-                "--reasoning-parser",
-                "qwen3",
-            ],
-            env=env_vars,
-        )
+        vllm_cmd = [
+            uv_bin,
+            "run",
+            "python",
+            "-m",
+            "local_ai_brain.models.llm_server",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8001",
+            "--model",
+            settings.QWEN_MODEL_PATH,
+            "--api-key",
+            settings.LOCAL_API_KEY,
+            "--reasoning-parser",
+            "qwen3",
+            "--continuous-batching",
+            "--max-kv-size",
+            str(settings.LLM_MAX_KV_SIZE),
+            "--prefill-step-size",
+            str(settings.LLM_PREFILL_STEP_SIZE),
+            "--max-num-seqs",
+            str(settings.LLM_MAX_NUM_SEQS),
+        ]
+
+        if settings.LLM_SPECPREFILL_ENABLED:
+            vllm_cmd.extend(["--speculative-draft-model", settings.LLM_SPECPREFILL_DRAFT_MODEL])
+
+        if settings.LLM_KV_CACHE_QUANTIZATION:
+            vllm_cmd.extend(["--kv-cache-bits", str(settings.LLM_KV_CACHE_BITS)])
+
+        p_vllm = subprocess.Popen(vllm_cmd, env=env_vars)
         processes.append(p_vllm)
 
         print(f"{COLOR_SYSTEM}Starting STT Server on port 8002...{COLOR_RESET}")
