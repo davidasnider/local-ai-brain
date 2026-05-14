@@ -24,7 +24,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * Use `uv sync` to keep the environment updated.
 
 2. **Configuration Management:**
-   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`), and LLM cache settings (`LLM_KV_CACHE_BITS`, `LLM_KV_CACHE_QUANTIZATION`).
+   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`), and LLM cache and prefill settings (`LLM_KV_CACHE_BITS`, `LLM_KV_CACHE_QUANTIZATION`, `LLM_MAX_KV_SIZE`, `LLM_SPECPREFILL_ENABLED`, `LLM_SPECPREFILL_DRAFT_MODEL`).
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
 3. **OpenAI Compatibility & Security:**
@@ -55,5 +55,5 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
 
 10. **LLM Execution & GPU Timeout Prevention:**
-    * Always run `vllm-mlx` ensuring stability overrides (e.g., `--prefill-step-size` and `--max-num-seqs`) are passed via CLI arguments (as configured in `src/local_ai_brain/cli.py`) using defaults from `src/local_ai_brain/config.py` to prevent macOS Metal watchdog timeouts during large model prefill operations on Apple Silicon.
+    * Always run `vllm-mlx` ensuring stability overrides (e.g., `--prefill-step-size`, `--max-num-seqs`), speculative prefill (`--speculative-draft-model`), and KV cache settings (`--kv-cache-bits`, `--max-kv-size`) are passed via CLI arguments (as configured in `src/local_ai_brain/cli.py`) using defaults from `src/local_ai_brain/config.py` to prevent macOS Metal watchdog timeouts during large model prefill operations on Apple Silicon.
     * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the MLX backend.
