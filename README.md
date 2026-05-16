@@ -139,6 +139,11 @@ export OPENAI_API_BASE="http://localhost:8000/v1"
 export OPENAI_API_KEY="<your-secret-local-api-key>"
 ```
 
+### Model Alias Normalization & Ollama Compatibility
+For backwards compatibility with clients that hardcode legacy model identifiers, the API Gateway inspects JSON payloads on `/v1/chat/completions` and `/v1/completions`. When `model` exactly matches an entry in `QWEN_MODEL_ALIASES`, it rewrites that value to `QWEN_MODEL_PATH` before proxying to the vLLM backend.
+
+Additionally, Local AI Brain exposes Ollama compatibility endpoints (`/api/v1/models` and `/api/tags`) to allow tools that expect an Ollama-compatible backend to list and verify available models seamlessly.
+
 ### Home Assistant
 Use the [Extended OpenAI Conversation](https://github.com/jekalmin/extended_openai_conversation) integration and point it to:
 - **URL:** `http://<your-mac-ip>:8000/v1`
