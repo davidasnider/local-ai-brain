@@ -24,7 +24,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 
 * **`POST /v1/chat/completions`**
   * Fully OpenAI-compatible schema.
-  * Automatically normalizes legacy or alias model identifiers (e.g., rewriting `*-8bit` requests to the canonical 4-bit model) to ensure backward compatibility with clients that hardcode model paths.
+  * Automatically normalizes legacy model aliases by rewriting request `model` values from `QWEN_MODEL_ALIASES` to `QWEN_MODEL_PATH`, ensuring backward compatibility for clients with hardcoded model IDs.
   * Handles multi-turn chat, tool calling, and vision inputs.
   * Primary interface for coding tools (Hermes, Gemini CLI) and Home Assistant (via Extended OpenAI integration).
 
