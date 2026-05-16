@@ -24,8 +24,12 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 
 * **`POST /v1/chat/completions`**
   * Fully OpenAI-compatible schema.
+  * Automatically normalizes legacy or alias model identifiers (e.g., rewriting `*-8bit` requests to the canonical 4-bit model) to ensure backward compatibility with clients that hardcode model paths.
   * Handles multi-turn chat, tool calling, and vision inputs.
   * Primary interface for coding tools (Hermes, Gemini CLI) and Home Assistant (via Extended OpenAI integration).
+
+* **Ollama Compatibility Endpoints (`/api/v1/models`, `/api/tags`)**
+  * Provides mock responses matching the Ollama API specification to allow seamless integration with tools that expect an Ollama-compatible backend.
 
 * **`POST /v1/audio/transcriptions`**
   * OpenAI-compatible schema for STT.

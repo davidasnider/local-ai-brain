@@ -24,13 +24,15 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * Use `uv sync` to keep the environment updated.
 
 2. **Configuration Management:**
-   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`), and LLM cache and prefill settings (`LLM_KV_CACHE_BITS`, `LLM_KV_CACHE_QUANTIZATION`, `LLM_MAX_KV_SIZE`, `LLM_SPECPREFILL_ENABLED`, `LLM_SPECPREFILL_DRAFT_MODEL`).
+   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `QWEN_MODEL_ALIASES`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`), and LLM cache and prefill settings (`LLM_KV_CACHE_BITS`, `LLM_KV_CACHE_QUANTIZATION`, `LLM_MAX_KV_SIZE`, `LLM_SPECPREFILL_ENABLED`, `LLM_SPECPREFILL_DRAFT_MODEL`).
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
 3. **OpenAI Compatibility & Security:**
    * Ensure `/v1/chat/completions` and audio endpoints perfectly match the OpenAI Pydantic schemas. 
    * Implement a global `Depends` in FastAPI that checks for a valid `Bearer` token matching the `LOCAL_API_KEY`. 
    * All routes — including `/health` and `/metrics` — must require a valid Bearer token. There are no unauthenticated endpoints.
+   * Model requests matching `QWEN_MODEL_ALIASES` must be normalized to `QWEN_MODEL_PATH` before proxying to maintain backwards compatibility.
+   * Provide Ollama compatibility endpoints (`/api/v1/models` and `/api/tags`) for tools expecting an Ollama backend.
 
 4. **Logging (Crucial):**
    * Ensure model quantization configurations (e.g., 4-bit) are set explicitly during MLX model initialization.
@@ -49,6 +51,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
 8. **Code Style:**
    * Write clean, asynchronous (`async def`) Python code. 
    * Use dependency injection for model loading to ensure models load on startup and stay hot in memory, rather than reloading on each request.
+   * Use the `{model_id:path}` syntax for FastAPI route parameters when accepting model identifiers to properly handle HuggingFace/MLX model names with forward slashes.
 
 9. **Interactive CLI Tool:**
    * Maintain the `local-brain` CLI tool located in `src/local_ai_brain/cli.py`.
