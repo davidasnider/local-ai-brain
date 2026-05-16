@@ -29,7 +29,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * Primary interface for coding tools (Hermes, Gemini CLI) and Home Assistant (via Extended OpenAI integration).
 
 * **Ollama Compatibility Endpoints (`/api/v1/models`, `/api/tags`)**
-  * Provides mock responses matching the Ollama API specification to allow seamless integration with tools that expect an Ollama-compatible backend.
+  * Provides a minimal compatibility shim for model discovery/listing so tools expecting an Ollama-like backend can enumerate available models, but these responses are not required to fully match the Ollama API specification.
 
 * **`POST /v1/audio/transcriptions`**
   * OpenAI-compatible schema for STT.
