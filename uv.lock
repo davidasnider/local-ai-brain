@@ -1262,7 +1262,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.14.0" },
     { name = "soundfile", specifier = ">=0.13.1" },
     { name = "uvicorn", specifier = ">=0.46.0" },
-    { name = "vllm-mlx", git = "https://github.com/waybarrios/vllm-mlx.git?rev=f3dabc8e307007d59b6e60b5c3c427da05f0d919" },
+    { name = "vllm-mlx", git = "https://github.com/waybarrios/vllm-mlx.git?rev=d4674701d6e0c1fd6244f4896fd291b9fa275d6a" },
 ]
 
 [package.metadata.requires-dev]
@@ -3567,7 +3567,7 @@ wheels = [
 [[package]]
 name = "vllm-mlx"
 version = "0.3.0"
-source = { git = "https://github.com/waybarrios/vllm-mlx.git?rev=f3dabc8e307007d59b6e60b5c3c427da05f0d919#f3dabc8e307007d59b6e60b5c3c427da05f0d919" }
+source = { git = "https://github.com/waybarrios/vllm-mlx.git?rev=d4674701d6e0c1fd6244f4896fd291b9fa275d6a#d4674701d6e0c1fd6244f4896fd291b9fa275d6a" }
 dependencies = [
     { name = "fastapi" },
     { name = "gradio" },
