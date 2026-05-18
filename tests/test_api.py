@@ -279,3 +279,81 @@ def test_proxy_bad_gateway(mock_send, client):
     response = client.post("/v1/chat/completions", headers={"Authorization": "Bearer test-api-key"})
     assert response.status_code == 502
     assert response.json() == {"detail": "Bad Gateway"}
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_default_max_tokens(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = httpx.Headers({"Content-Type": "application/json"})
+
+    async def mock_aiter_bytes():
+        yield b'{"id":"chatcmpl-123"}'
+
+    mock_response.aiter_bytes = mock_aiter_bytes
+
+    async def mock_aclose():
+        pass
+
+    mock_response.aclose = mock_aclose
+    mock_send.return_value = mock_response
+
+    payload = {
+        "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
+        "messages": [{"role": "user", "content": "Hello"}],
+        # max_tokens not provided
+    }
+
+    response = client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": f"Bearer {settings.LOCAL_API_KEY}"},
+    )
+    assert response.status_code == 200
+
+    # Extract the request passed to httpx.AsyncClient.send
+    args, kwargs = mock_send.call_args
+    req = args[0]
+    import json
+
+    req_body = json.loads(req.content.decode("utf-8"))
+    assert req_body.get("max_tokens") == settings.DEFAULT_MAX_TOKENS
+
+    # Extract the request passed to httpx.AsyncClient.send
+    args, kwargs = mock_send.call_args
+    req = args[0]
+    # The payload content is byte encoded
+    import json
+
+    req_body = json.loads(req.content.decode("utf-8"))
+    assert req_body.get("max_tokens") == settings.DEFAULT_MAX_TOKENS
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_max_tokens_truncation(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = httpx.Headers({"Content-Type": "application/json"})
+
+    async def mock_aiter_bytes():
+        yield b'{"id":"chatcmpl-123"}'
+
+    mock_response.aiter_bytes = mock_aiter_bytes
+
+    async def mock_aclose():
+        pass
+
+    mock_response.aclose = mock_aclose
+    mock_send.return_value = mock_response
+
+    payload = {
+        "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": 1000000,  # Larger than MAX_CONTEXT_TOKENS
+    }
+    response = client.post(
+        "/v1/chat/completions",
+        json=payload,
+        headers={"Authorization": f"Bearer {settings.LOCAL_API_KEY}"},
+    )
+    assert response.status_code == 200
