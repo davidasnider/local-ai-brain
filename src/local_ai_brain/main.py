@@ -106,11 +106,11 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             max_tokens = payload.get("max_tokens")
             if max_tokens is None:
                 payload["max_tokens"] = settings.DEFAULT_MAX_TOKENS
-                logger.info(f"Defaulting max_tokens to {settings.DEFAULT_MAX_TOKENS}")
+                logger.debug(f"Defaulting max_tokens to {settings.DEFAULT_MAX_TOKENS}")
             elif isinstance(max_tokens, int):
                 if max_tokens > settings.MAX_CONTEXT_TOKENS:
-                    logger.info(
-                        f"Truncating requested max_tokens ({max_tokens}) "
+                    logger.debug(
+                        f"Clamping requested max_tokens ({max_tokens}) "
                         f"to MAX_CONTEXT_TOKENS ({settings.MAX_CONTEXT_TOKENS})"
                     )
                     payload["max_tokens"] = settings.MAX_CONTEXT_TOKENS

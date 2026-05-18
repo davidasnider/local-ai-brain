@@ -310,7 +310,7 @@ def test_proxy_chat_default_max_tokens(mock_send, client):
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-def test_proxy_chat_max_tokens_truncation(mock_send, client):
+def test_proxy_chat_max_tokens_clamping(mock_send, client):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.headers = {}
@@ -336,5 +336,36 @@ def test_proxy_chat_max_tokens_truncation(mock_send, client):
     req = mock_send.call_args[0][0]
     assert req.content
     payload = json.loads(req.content.decode("utf-8"))
-    # Should be clamped/truncated to MAX_CONTEXT_TOKENS (65536)
+    # Should be clamped to MAX_CONTEXT_TOKENS (65536)
+    assert payload["max_tokens"] == settings.MAX_CONTEXT_TOKENS
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_completions_max_tokens_clamping(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "cmpl-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    # Send a completions request with max_tokens set extremely high (e.g. 999999)
+    response = client.post(
+        "/v1/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={
+            "prompt": "hello",
+            "max_tokens": 999999,
+        },
+    )
+    assert response.status_code == 200
+
+    req = mock_send.call_args[0][0]
+    assert req.content
+    payload = json.loads(req.content.decode("utf-8"))
+    # Should be clamped to MAX_CONTEXT_TOKENS (65536)
     assert payload["max_tokens"] == settings.MAX_CONTEXT_TOKENS
