@@ -90,6 +90,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
         and (path.startswith("/v1/chat/") or path == "/v1/completions")
         and "application/json" in headers.get("content-type", "").lower()
     )
+
     if should_normalize_model:
         body = await request.body()
         try:
@@ -101,8 +102,23 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             model = payload.get("model")
             if isinstance(model, str) and model in settings.QWEN_MODEL_ALIASES:
                 payload["model"] = settings.QWEN_MODEL_PATH
-                body = json.dumps(payload).encode("utf-8")
+
+            # Default output token limit and max_tokens clamping handling
+            max_tokens = payload.get("max_tokens")
+            if max_tokens is None:
+                payload["max_tokens"] = settings.DEFAULT_MAX_TOKENS
+                logger.debug(f"Defaulting max_tokens to {settings.DEFAULT_MAX_TOKENS}")
+            elif isinstance(max_tokens, int):
+                if max_tokens > settings.MAX_CONTEXT_TOKENS:
+                    logger.debug(
+                        f"Clamping requested max_tokens ({max_tokens}) "
+                        f"to MAX_CONTEXT_TOKENS ({settings.MAX_CONTEXT_TOKENS})"
+                    )
+                    payload["max_tokens"] = settings.MAX_CONTEXT_TOKENS
+
+            body = json.dumps(payload).encode("utf-8")
         content = body
+
     else:
         content = request.stream()
 
