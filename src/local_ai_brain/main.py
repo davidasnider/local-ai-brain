@@ -101,7 +101,21 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             model = payload.get("model")
             if isinstance(model, str) and model in settings.QWEN_MODEL_ALIASES:
                 payload["model"] = settings.QWEN_MODEL_PATH
-                body = json.dumps(payload).encode("utf-8")
+
+            # Dynamic token truncation and default output token limit handling
+            max_tokens = payload.get("max_tokens")
+            if max_tokens is None:
+                payload["max_tokens"] = settings.DEFAULT_MAX_TOKENS
+                logger.info(f"Defaulting max_tokens to {settings.DEFAULT_MAX_TOKENS}")
+            elif isinstance(max_tokens, int):
+                if max_tokens > settings.MAX_CONTEXT_TOKENS:
+                    logger.info(
+                        f"Truncating requested max_tokens ({max_tokens}) "
+                        f"to MAX_CONTEXT_TOKENS ({settings.MAX_CONTEXT_TOKENS})"
+                    )
+                    payload["max_tokens"] = settings.MAX_CONTEXT_TOKENS
+
+            body = json.dumps(payload).encode("utf-8")
         content = body
     else:
         content = request.stream()
