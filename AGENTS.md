@@ -59,4 +59,5 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
 
 10. **LLM Execution & GPU Timeout Prevention:**
     * Always run `vllm-mlx` ensuring stability overrides (e.g., `--prefill-step-size`, `--max-num-seqs`), speculative prefill (`--speculative-draft-model`), and KV cache settings (`--kv-cache-bits`, `--max-kv-size`) are passed via CLI arguments (as configured in `src/local_ai_brain/cli.py`) using defaults from `src/local_ai_brain/config.py` to prevent macOS Metal watchdog timeouts during large model prefill operations on Apple Silicon.
+    * There is also a standalone wrapper script available in `scripts/start_llm.sh` to start the raw `mlx_lm.server` with specific stability overrides directly, primarily for testing purposes.
     * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the MLX backend.

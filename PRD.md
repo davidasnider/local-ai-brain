@@ -55,3 +55,6 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 * An interactive CLI tool (`local-brain`) must be provided for directly interacting with and testing the API endpoints.
 * It should be built using only standard Python libraries (e.g., `urllib.request`) to minimize dependencies.
 * Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
+
+## 7. Testing Scripts
+* Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the standalone MLX LM server with predefined stability overrides directly without needing the full microservices stack.

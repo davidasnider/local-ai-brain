@@ -47,6 +47,15 @@ This command starts all four processes:
 
 All external traffic flows through the authenticated API Gateway on port `8000`. Backend services are bound to `127.0.0.1` and are not directly accessible from the network. Press `Ctrl+C` to gracefully shut down all services.
 
+### Standalone MLX LM Server
+You can also run the underlying `mlx_lm.server` directly (without the API Gateway or audio services) for testing purposes using the provided shell script:
+
+```bash
+./scripts/start_llm.sh
+```
+
+This starts the MLX LM server on `0.0.0.0:8000` with the 4-bit Qwen model and custom stability overrides (e.g., `--prefill-step-size 1024` and prompt caching) enabled.
+
 ## Local Development & Testing
 
 1. **Setup Environment:**
