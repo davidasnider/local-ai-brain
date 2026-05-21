@@ -33,6 +33,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * All routes — including `/health` and `/metrics` — must require a valid Bearer token. There are no unauthenticated endpoints.
    * Model requests matching `QWEN_MODEL_ALIASES` must be normalized to `QWEN_MODEL_PATH` before proxying to maintain backwards compatibility.
    * Provide Ollama compatibility endpoints (`/api/v1/models` and `/api/tags`) for tools expecting an Ollama backend.
+   * Ensure the API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 65536) to prevent extremely large values from causing backend generation failures. If `max_tokens` is not provided, default to `DEFAULT_MAX_TOKENS` (16384).
 
 4. **Logging (Crucial):**
    * Ensure model quantization configurations (e.g., 4-bit) are set explicitly during MLX model initialization.
