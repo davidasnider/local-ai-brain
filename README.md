@@ -54,7 +54,7 @@ You can also run the underlying `mlx_lm.server` directly (without the API Gatewa
 ./scripts/start_llm.sh
 ```
 
-This starts the MLX LM server on `0.0.0.0:8000` with the 4-bit Qwen model and custom stability overrides (e.g., `--prefill-step-size 1024` and prompt caching) enabled.
+This starts the MLX LM server on `127.0.0.1:8000` with the 4-bit Qwen model and custom stability overrides (e.g., `--prefill-step-size 1024` and prompt caching) enabled.
 
 ## Local Development & Testing
 
