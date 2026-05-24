@@ -21,7 +21,7 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
 
     # Model settings
     hf_repo = config.get("hf_model_repo_id", "unsloth/Qwen3.6-35B-A3B-MTP-GGUF")
-    model_file = config.get("model", "*UD-Q4_K_M*")
+    model_file = config.get("model", "UD-Q4_K_M")
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:

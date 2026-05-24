@@ -1,6 +1,6 @@
 # Local AI Brain
 
-A highly responsive, unified local AI API hosted on Apple Silicon (MLX). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding.
+A highly responsive, unified local AI API hosted on Apple Silicon. This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding.
 
 It uses a microservices architecture: a FastAPI API Gateway proxy sits in front of dedicated `llama-cpp-python` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
 

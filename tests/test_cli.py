@@ -341,6 +341,7 @@ def test_tts_http_error_non_json(mock_urlopen, capsys):
 @patch("subprocess.Popen")
 def test_main_serve(mock_popen, mock_sleep, capsys, monkeypatch):
     monkeypatch.setenv("LOCAL_API_KEY", "test-key")
+    monkeypatch.setenv("TESTING", "1")
     mock_sleep.side_effect = KeyboardInterrupt()
 
     mock_process = MagicMock()
@@ -368,8 +369,10 @@ def test_main_serve(mock_popen, mock_sleep, capsys, monkeypatch):
 
 @patch("time.sleep")
 @patch("subprocess.Popen")
-def test_main_serve_subprocess_restart(mock_popen, mock_sleep, capsys):
+def test_main_serve_subprocess_restart(mock_popen, mock_sleep, capsys, monkeypatch):
     """Verify that a crashing subprocess is restarted."""
+    monkeypatch.setenv("LOCAL_API_KEY", "test-key")
+    monkeypatch.setenv("TESTING", "1")
     mock_process = MagicMock()
     # Provide enough poll() values for 4 processes over multiple iterations.
     # One process returns 1 (crash) once, others return None (running).

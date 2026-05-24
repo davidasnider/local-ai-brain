@@ -78,7 +78,7 @@ def test_main_no_config(mock_exec, mock_log):
             mock_exec.assert_called_once()
             cmd = mock_exec.call_args[0][1]
             assert "-hf" in cmd
-            assert "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:*UD-Q4_K_M*" in cmd
+            assert "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M" in cmd
             assert "--ctx-size" in cmd
             assert "98304" in cmd
 

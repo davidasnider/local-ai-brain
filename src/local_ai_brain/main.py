@@ -199,7 +199,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                 completion_tokens = usage.get("completion_tokens", 0)
 
                 # Input TPS (Prefill)
-                if first_token_time and prompt_tokens > 0:
+                if first_token_time is not None and prompt_tokens > 0:
                     prefill_duration = first_token_time - request_start
                     if prefill_duration > 0.001:
                         input_tps = prompt_tokens / prefill_duration
@@ -210,7 +210,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                     input_tps_str = "N/A"
 
                 # Output TPS (Generation)
-                if first_token_time and completion_tokens > 1:
+                if first_token_time is not None and completion_tokens > 1:
                     generation_duration = request_end - first_token_time
                     if generation_duration > 0.01:
                         output_tps = completion_tokens / generation_duration
