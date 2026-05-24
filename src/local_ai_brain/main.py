@@ -241,12 +241,12 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
     semaphore = request.app.state.llm_semaphore if use_semaphore else None
     response = None
     semaphore_acquired = False
-    request_start = time.perf_counter()
     try:
         if semaphore:
             await semaphore.acquire()
             semaphore_acquired = True
 
+        request_start = time.perf_counter()
         response = await client.send(req, stream=True)
 
         # Build StreamingResponse with multiple headers support

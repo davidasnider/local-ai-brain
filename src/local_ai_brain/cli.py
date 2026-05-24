@@ -244,11 +244,19 @@ def serve():
     logger.info("Starting Local AI Brain Microservices...")
 
     uv_bin = shutil.which("uv") or "uv"
-    env_vars = dict(os.environ, PYTHONPATH="src", VLLM_API_KEY=settings.LOCAL_API_KEY)
+    env_vars = dict(
+        os.environ,
+        PYTHONPATH="src",
+        VLLM_API_KEY=settings.LOCAL_API_KEY,
+        LOCAL_API_KEY=settings.LOCAL_API_KEY,
+        OPENAI_API_KEY=settings.LOCAL_API_KEY,
+    )
 
     # Crash log configuration
-    crash_log_path = os.path.expanduser(
-        os.getenv("LOCAL_AI_BRAIN_CRASH_LOG", "~/Library/Logs/local-ai-brain-crash.log")
+    crash_log_path = os.path.abspath(
+        os.path.expanduser(
+            os.getenv("LOCAL_AI_BRAIN_CRASH_LOG", "~/Library/Logs/local-ai-brain-crash.log")
+        )
     )
     os.makedirs(os.path.dirname(crash_log_path), exist_ok=True)
 
