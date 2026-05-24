@@ -84,6 +84,7 @@ def main():
                     config = loaded
         except Exception as e:
             logger.error(f"Failed to parse {config_path}: {e}")
+            sys.exit(1)
 
     # 2. Build CLI arguments for llama-server
     # Handle Network & Security (prioritizing CLI args passed to this wrapper)

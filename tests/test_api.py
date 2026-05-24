@@ -443,7 +443,7 @@ def test_normalize_model_metadata():
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-@patch("time.perf_counter")
+@patch("local_ai_brain.main.time.perf_counter")
 def test_stream_generator_usage_extraction_sse(mock_perf, mock_send, client):
     # Setup mocks for timing
     # We need enough values for all calls to perf_counter
@@ -502,7 +502,7 @@ def test_stream_generator_usage_extraction_sse(mock_perf, mock_send, client):
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-@patch("time.perf_counter")
+@patch("local_ai_brain.main.time.perf_counter")
 def test_stream_generator_usage_extraction_raw_json(mock_perf, mock_send, client):
     # Setup mocks for timing
     # 1. Body read (potential)
@@ -551,7 +551,7 @@ def test_stream_generator_usage_extraction_raw_json(mock_perf, mock_send, client
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-@patch("time.perf_counter")
+@patch("local_ai_brain.main.time.perf_counter")
 def test_stream_generator_no_usage(mock_perf, mock_send, client):
     mock_perf.side_effect = [100.0, 100.1, 100.5, 100.5, 100.5, 100.5]
 
@@ -582,7 +582,7 @@ def test_stream_generator_no_usage(mock_perf, mock_send, client):
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
-@patch("time.perf_counter")
+@patch("local_ai_brain.main.time.perf_counter")
 def test_stream_generator_fast_tps(mock_perf, mock_send, client):
     # Test "FAST" and "N/A" cases
     # 1. Body read (potential)
@@ -619,3 +619,106 @@ def test_stream_generator_fast_tps(mock_perf, mock_send, client):
         assert "FAST" == call_args[4]
         assert 10 == call_args[5]
         assert "FAST" == call_args[6]
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_invalid_json_payload(mock_send, client):
+    # Tests line 66 in main.py
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b"ok"
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    # Send invalid JSON with application/json header
+    response = client.post(
+        "/v1/chat/completions",
+        content="invalid-json",
+        headers={
+            "Authorization": f"Bearer {settings.LOCAL_API_KEY}",
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 200
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_stream_content(mock_send, client):
+    # Tests line 114 in main.py (non-should_normalize_model path)
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b"ok"
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    # Use a path that doesn't trigger should_normalize_model (e.g. not /v1/chat or /v1/completions)
+    response = client.post(
+        "/v1/audio/transcriptions",
+        content=b"some-audio-data",
+        headers={"Authorization": f"Bearer {settings.LOCAL_API_KEY}", "Content-Type": "audio/wav"},
+    )
+    assert response.status_code == 200
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_metrics_failure_logging(mock_get, client):
+    # Tests lines 482-483 in main.py
+    def side_effect(url, **kwargs):
+        if "metrics" in url:
+            if "8001" in url:  # vLLM
+                raise httpx.ConnectError("Connection failed")
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.content = b"metric 1.0"
+            return mock_resp
+        return MagicMock()
+
+    mock_get.side_effect = side_effect
+
+    with patch("local_ai_brain.main.logger.warning") as mock_warn:
+        response = client.get(
+            "/metrics", headers={"Authorization": f"Bearer {settings.LOCAL_API_KEY}"}
+        )
+        assert response.status_code == 200
+        mock_warn.assert_called()
+        assert "Failed to fetch metrics from vLLM" in mock_warn.call_args[0][0]
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_request_stream_options_edge_cases(mock_send, client):
+    # Tests lines 89-91 in main.py
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b"ok"
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    # Case: stream_options is not a dict
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+            "stream_options": None,
+        },
+        headers={"Authorization": f"Bearer {settings.LOCAL_API_KEY}"},
+    )
+    assert response.status_code == 200
+    sent_payload = json.loads(mock_send.call_args[0][0].content.decode("utf-8"))
+    assert sent_payload["stream_options"] == {"include_usage": True}

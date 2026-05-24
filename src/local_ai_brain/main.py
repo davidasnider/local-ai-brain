@@ -112,7 +112,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                 stream_opts = payload.get("stream_options")
                 if isinstance(stream_opts, dict):
                     stream_opts["include_usage"] = True
-                elif "stream_options" not in payload:
+                else:
                     payload["stream_options"] = {"include_usage": True}
 
             # Default output token limit and max_tokens clamping handling
@@ -153,7 +153,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
         usage = None
         try:
             async for chunk in response.aiter_bytes():
-                if not first_token_time:
+                if first_token_time is None:
                     first_token_time = time.perf_counter()
 
                 # Try a quick check for usage in this chunk
