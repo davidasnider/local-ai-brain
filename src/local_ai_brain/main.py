@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import json
 import secrets
+import time
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
@@ -91,6 +92,8 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
         and "application/json" in headers.get("content-type", "").lower()
     )
 
+    model_name = "STT/TTS" if not should_normalize_model else "LLM"
+
     if should_normalize_model:
         body = await request.body()
         try:
@@ -99,9 +102,18 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             logger.debug("Skipping model alias normalization: invalid JSON payload")
             payload = None
         if isinstance(payload, dict):
-            model = payload.get("model")
-            if isinstance(model, str) and model in settings.QWEN_MODEL_ALIASES:
+            model_name = payload.get("model", "LLM")
+            if isinstance(model_name, str) and model_name in settings.QWEN_MODEL_ALIASES:
                 payload["model"] = settings.QWEN_MODEL_PATH
+                model_name = settings.QWEN_MODEL_PATH
+
+            # Always request usage for streaming requests if possible
+            if payload.get("stream") is True:
+                stream_opts = payload.get("stream_options")
+                if isinstance(stream_opts, dict):
+                    stream_opts["include_usage"] = True
+                else:
+                    payload["stream_options"] = {"include_usage": True}
 
             # Default output token limit and max_tokens clamping handling
             max_tokens = payload.get("max_tokens")
@@ -130,18 +142,101 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
         content=content,
     )
 
-    async def stream_generator(response: httpx.Response, semaphore: asyncio.Semaphore | None):
+    async def stream_generator(
+        response: httpx.Response,
+        semaphore: asyncio.Semaphore | None,
+        request_start: float,
+        model_name: str,
+        is_llm: bool = False,
+    ):
+        first_token_time = None
+        usage = None
         try:
-            # Use aiter_bytes() to ensure httpx handles decompression if the
-            # content-encoding header was stripped or modified.
             async for chunk in response.aiter_bytes():
+                if first_token_time is None:
+                    first_token_time = time.perf_counter()
+
+                # Try a quick check for usage in this chunk
+                if b'"usage"' in chunk:
+                    try:
+                        decoded = chunk.decode("utf-8", errors="ignore")
+                        # Case 1: Standard SSE format
+                        for line in decoded.split("\n"):
+                            if line.startswith("data: "):
+                                try:
+                                    payload = json.loads(line[6:])
+                                    if "usage" in payload:
+                                        usage = payload["usage"]
+                                except Exception:
+                                    pass
+
+                        # Case 2: Raw JSON (non-streaming)
+                        if not usage:
+                            try:
+                                payload = json.loads(decoded)
+                                if "usage" in payload:
+                                    usage = payload["usage"]
+                            except json.JSONDecodeError:
+                                pass
+                    except Exception:
+                        pass
+
                 yield chunk
         finally:
+            request_end = time.perf_counter()
             try:
                 await response.aclose()
             finally:
                 if semaphore:
                     semaphore.release()
+
+            # Log LLM usage if we found it or just the total time
+            total_time = request_end - request_start
+            log_prefix = "[LLM]" if is_llm else "[Proxy]"
+
+            if usage:
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+
+                # Input TPS (Prefill)
+                if first_token_time is not None and prompt_tokens > 0:
+                    prefill_duration = first_token_time - request_start
+                    if prefill_duration > 0.001:
+                        input_tps = prompt_tokens / prefill_duration
+                        input_tps_str = f"{input_tps:.2f} t/s"
+                    else:
+                        input_tps_str = "FAST"
+                else:
+                    input_tps_str = "N/A"
+
+                # Output TPS (Generation)
+                if first_token_time is not None and completion_tokens > 1:
+                    generation_duration = request_end - first_token_time
+                    if generation_duration > 0.01:
+                        output_tps = completion_tokens / generation_duration
+                        output_tps_str = f"{output_tps:.2f} t/s"
+                    else:
+                        output_tps_str = "FAST"
+                else:
+                    output_tps_str = "N/A"
+
+                logger.info(
+                    "{} {} completed: {} in ({}) | {} out ({}) | {:.2f}s total",
+                    log_prefix,
+                    model_name,
+                    prompt_tokens,
+                    input_tps_str,
+                    completion_tokens,
+                    output_tps_str,
+                    total_time,
+                )
+            else:
+                logger.info(
+                    "{} {} completed in {:.2f}s (No usage found)",
+                    log_prefix,
+                    model_name,
+                    total_time,
+                )
 
     semaphore = request.app.state.llm_semaphore if use_semaphore else None
     response = None
@@ -151,11 +246,12 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             await semaphore.acquire()
             semaphore_acquired = True
 
+        request_start = time.perf_counter()
         response = await client.send(req, stream=True)
 
         # Build StreamingResponse with multiple headers support
         streaming_resp = StreamingResponse(
-            stream_generator(response, semaphore),
+            stream_generator(response, semaphore, request_start, model_name, is_llm=use_semaphore),
             status_code=response.status_code,
         )
 
@@ -213,9 +309,40 @@ async def proxy_vllm_completions(request: Request):
     return await proxy_request(request, settings.VLLM_URL, use_semaphore=True)
 
 
-@app.get("/v1/models")
-async def list_models(request: Request):
-    """List available models by merging vLLM models with local ones."""
+def normalize_model_metadata(model_obj: dict):
+    """Normalize llama-server metadata into standard OpenAI-compatible fields.
+
+    Promotes internal llama.cpp 'n_ctx' to standard fields like 'max_model_len'
+    and 'context_window' at the top level, and removes 'n_ctx_train' to prevent
+    agents from assuming a larger context window than configured.
+    """
+    if "meta" in model_obj:
+        meta = model_obj["meta"]
+        # Use the configured context window (n_ctx) as the source of truth
+        n_ctx = meta.get("n_ctx")
+        if n_ctx:
+            # Promote to top-level fields commonly used by AI clients/proxies
+            model_obj["max_model_len"] = n_ctx
+            model_obj["context_window"] = n_ctx
+            model_obj["max_position_embeddings"] = n_ctx
+
+        # Remove the training context length to prevent confusion
+        meta.pop("n_ctx_train", None)
+
+    # Inject project-defined aliases for the primary LLM model
+    if model_obj.get("id") == settings.QWEN_MODEL_PATH:
+        existing_aliases = model_obj.get("aliases", [])
+        for alias in settings.QWEN_MODEL_ALIASES:
+            if alias not in existing_aliases:
+                existing_aliases.append(alias)
+        model_obj["aliases"] = existing_aliases
+
+    return model_obj
+
+
+async def _fetch_models_data(request: Request):
+    """Internal helper to fetch all models and detect if the backend is unreachable."""
+    backend_failed = False
     try:
         client = request.app.state.client
         # Add internal auth to backend request and use a short timeout
@@ -224,10 +351,15 @@ async def list_models(request: Request):
         vllm_resp.raise_for_status()
         data = vllm_resp.json()
     except Exception as e:
-        logger.error(f"Failed to fetch models from vLLM: {e}")
+        logger.error(f"Failed to fetch models from LLM backend: {e}")
         data = {"object": "list", "data": []}
+        backend_failed = True
 
     data.setdefault("data", [])
+
+    # Normalize metadata for all LLM models returned by the backend
+    data["data"] = [normalize_model_metadata(m) for m in data["data"]]
+
     data["data"].extend(
         [
             {
@@ -246,44 +378,55 @@ async def list_models(request: Request):
             },
         ]
     )
+    return data, backend_failed
+
+
+@app.get("/v1/models")
+async def list_models(request: Request):
+    """List available models by merging backend LLM models with local audio models."""
+    data, _ = await _fetch_models_data(request)
     return data
 
 
 @app.get("/v1/models/{model_id:path}")
 async def get_model(model_id: str, request: Request):
-    """Get details for a specific model. Fixes 404s from some clients."""
+    """Get details for a specific model."""
     # Normalize model_id (some clients URL-encode it)
     from urllib.parse import unquote
 
     model_id = unquote(model_id)
 
-    # Check against our configured models
-    is_qwen = model_id == settings.QWEN_MODEL_PATH or model_id in settings.QWEN_MODEL_ALIASES
-    is_stt = model_id == settings.WHISPER_MODEL_PATH
-    is_tts = model_id == settings.KOKORO_MODEL_PATH
-
-    if is_qwen or is_stt or is_tts:
-        # Normalize model_id to canonical path for the response
-        canonical_id = settings.QWEN_MODEL_PATH if is_qwen else model_id
-        resp = {
-            "id": canonical_id,
+    # Check against our local audio models first
+    if model_id == settings.WHISPER_MODEL_PATH:
+        return {
+            "id": model_id,
             "object": "model",
             "created": 1700000000,
             "owned_by": "local-ai-brain",
-            "type": "llm" if is_qwen else ("stt" if is_stt else "tts"),
+            "type": "stt",
         }
-        if is_qwen:
-            resp.update(
-                {
-                    "max_model_len": settings.MAX_CONTEXT_TOKENS,
-                    "context_window": settings.MAX_CONTEXT_TOKENS,
-                    "max_position_embeddings": settings.MAX_CONTEXT_TOKENS,
-                }
-            )
-        return resp
+    elif model_id == settings.KOKORO_MODEL_PATH:
+        return {
+            "id": model_id,
+            "object": "model",
+            "created": 1700000000,
+            "owned_by": "local-ai-brain",
+            "type": "tts",
+        }
 
-    # Fallback: proxy to vLLM
-    return await proxy_request(request, settings.VLLM_URL)
+    # For everything else (including LLMs), we resolve it by querying the combined list
+    # Because llama-server doesn't seem to support GET /v1/models/{id} natively.
+    models_data, backend_failed = await _fetch_models_data(request)
+    for model in models_data.get("data", []):
+        if model.get("id") == model_id or model_id in model.get("aliases", []):
+            return model
+
+    if backend_failed:
+        raise HTTPException(
+            status_code=502, detail="LLM backend unreachable. Check if llama-server is running."
+        )
+
+    raise HTTPException(status_code=404, detail="Model not found")
 
 
 # Compatibility endpoints for various LLM clients

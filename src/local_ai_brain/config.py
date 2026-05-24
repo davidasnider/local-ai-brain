@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # Core settings
     LOCAL_API_KEY: str
     TTS_MAX_CHARACTERS: int = Field(default=4096, gt=0)
-    MAX_CONTEXT_TOKENS: int = Field(default=65536, gt=0)
+    MAX_CONTEXT_TOKENS: int = Field(default=98304, gt=0)
     DEFAULT_MAX_TOKENS: int = Field(default=16384, gt=0)
     TESTING: bool = False
 
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = Field(default=None, validation_alias="HF_TOKEN")
 
     # Model paths
-    QWEN_MODEL_PATH: str = "mlx-community/Qwen3.6-35B-A3B-4bit"
+    QWEN_MODEL_PATH: str = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M"
     WHISPER_MODEL_PATH: str = "mlx-community/whisper-large-v3-mlx"
     KOKORO_MODEL_PATH: str = "kokoro-onnx"
     KOKORO_HF_REPO: str = "fastrtc/kokoro-onnx"

@@ -1,12 +1,12 @@
 # Local AI Brain
 
-A highly responsive, unified local AI API hosted on Apple Silicon (MLX). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding.
+A highly responsive, unified local AI API hosted on Apple Silicon. This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding.
 
-It uses a microservices architecture: a FastAPI API Gateway proxy sits in front of dedicated `vllm-mlx` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
+It uses a microservices architecture: a FastAPI API Gateway proxy sits in front of dedicated `llama-cpp-python` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized for MLX (4-bit). The API is backed by the canonical 4-bit model variant. The `local-brain serve` orchestrator starts the vLLM backend with `--reasoning-parser qwen3` to parse and expose Qwen 3 reasoning output in structured form. It supports a large **64K context window** (`MAX_CONTEXT_TOKENS` = 65536) and defaults to **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). It utilizes KV cache quantization and speculative prefill (using a draft model) for faster generation and memory efficiency. To prevent macOS Metal watchdog timeouts during large prefill operations, the `local-brain serve` CLI command passes stability overrides directly to `vllm-mlx` (configured in `config.py`), and concurrent requests are serialized at the API Gateway level.
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized (GGUF). The API is backed by the `llama-cpp-python` server. It supports a large **96K context window** (`MAX_CONTEXT_TOKENS` = 98304). It utilizes Flash Attention, KV cache quantization (Q8_0), and optimized batch sizes for maximum performance on Apple Silicon. To ensure stability and prevent timeouts, the `local-brain serve` CLI command manages the server lifecycle, and concurrent requests are serialized at the API Gateway level. Configuration can be overridden via `llm_config.yaml`.
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
@@ -40,21 +40,32 @@ uv run local-brain serve
 ```
 
 This command starts all four processes:
-- **vLLM MLX** (LLM) on `127.0.0.1:8001` (via `llm_server.py` wrapper to prevent macOS Metal timeouts)
+- **LLM Server** on `127.0.0.1:8001` (via `llm_server.py` wrapper to prevent macOS Metal timeouts)
 - **STT Server** (Whisper) on `127.0.0.1:8002`
 - **TTS Server** (Kokoro) on `127.0.0.1:8003`
 - **API Gateway** (Proxy) on `0.0.0.0:8000`
 
-All external traffic flows through the authenticated API Gateway on port `8000`. Backend services are bound to `127.0.0.1` and are not directly accessible from the network. Press `Ctrl+C` to gracefully shut down all services.
+All external traffic flows through the authenticated API Gateway on port `8000`. Backend services are bound to `127.0.0.1` and are not directly accessible from the network.
 
-### Standalone MLX LM Server
-You can also run the underlying `mlx_lm.server` directly (without the API Gateway or audio services) for testing purposes using the provided shell script:
+### Reliability and Logging
+
+The system is designed for high availability on macOS:
+- **Auto-Restart:** The `local-brain serve` orchestrator monitors all backend services. If any process crashes, it is automatically restarted after a 5-second delay.
+- **Crash Logging:** Subprocess errors (stderr) are captured in a dedicated crash log file: `~/Library/Logs/local-ai-brain-crash.log`.
+- **System Logging:** Operational logs are stored in `~/Library/Logs/local-ai-brain.log`.
+- **Process Management:** In production, the system is managed by `launchd` via `com.localbrain.api.plist`, providing system-level persistence and auto-start on boot.
+
+Press `Ctrl+C` to gracefully shut down all services.
+
+
+### Standalone LLM Server
+You can also run the underlying `llama-cpp-python` server directly (without the API Gateway or audio services) for testing purposes using the provided shell script:
 
 ```bash
 ./scripts/start_llm.sh
 ```
 
-This starts the MLX LM server on `127.0.0.1:8000` with the 4-bit Qwen model and custom stability overrides (e.g., `--prefill-step-size 1024` and prompt caching) enabled.
+This starts the optimized LLM server on `127.0.0.1:8000` using the parameters defined in `llm_server.py` (which can be overridden by editing `llm_config.yaml`).
 
 ## Local Development & Testing
 
@@ -84,7 +95,7 @@ curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
   -d '{
-    "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
+    "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M",
     "messages": [{"role": "user", "content": "How do I build a DIY smart mirror?"}],
     "stream": true
   }'
@@ -149,9 +160,10 @@ export OPENAI_API_KEY="<your-secret-local-api-key>"
 ```
 
 ### Model Alias Normalization & Ollama Compatibility
-For backwards compatibility with clients that hardcode legacy model identifiers, the API Gateway inspects JSON payloads on `/v1/chat/completions` and `/v1/completions`. When `model` exactly matches an entry in `QWEN_MODEL_ALIASES`, it rewrites that value to `QWEN_MODEL_PATH` before proxying to the vLLM backend.
+For backwards compatibility with clients that hardcode legacy model identifiers, the API Gateway inspects JSON payloads on `/v1/chat/completions` and `/v1/completions`. When `model` exactly matches an entry in `QWEN_MODEL_ALIASES`, it rewrites that value to `QWEN_MODEL_PATH` before proxying to the backend.
 
 Additionally, Local AI Brain exposes Ollama compatibility endpoints (`/api/v1/models` and `/api/tags`) to allow tools that expect an Ollama-compatible backend to list and verify available models seamlessly.
+
 
 ### Home Assistant
 Use the [Extended OpenAI Conversation](https://github.com/jekalmin/extended_openai_conversation) integration and point it to:
