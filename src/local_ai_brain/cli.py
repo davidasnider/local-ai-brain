@@ -7,6 +7,10 @@ import urllib.request
 import uuid
 from typing import Dict, List
 
+from loguru import logger
+
+from local_ai_brain.logging import configure_logging
+
 # ANSI escape codes for colors
 COLOR_RESET = "\033[0m"
 COLOR_USER = "\033[94m"  # Blue
@@ -216,13 +220,15 @@ def print_help():
 
 def shutdown_processes(processes):
     """Gracefully terminate and then kill subprocesses."""
-    for p in processes:
+    for name, p in processes.items():
         if p.poll() is None:
+            logger.info(f"Shutting down {name}...")
             p.terminate()
-    for p in processes:
+    for name, p in processes.items():
         try:
             p.wait(timeout=5)
         except Exception:
+            logger.warning(f"Killing {name} (timed out during terminate)...")
             p.kill()
 
 
@@ -231,52 +237,49 @@ def serve():
     import subprocess
     import time
 
-    print(f"{COLOR_SYSTEM}Starting Local AI Brain Microservices...{COLOR_RESET}")
+    from local_ai_brain.config import settings
+
+    # Configure logging for both file and console
+    configure_logging(testing=settings.TESTING)
+    logger.info("Starting Local AI Brain Microservices...")
 
     uv_bin = shutil.which("uv") or "uv"
+    env_vars = dict(os.environ, PYTHONPATH="src", VLLM_API_KEY=settings.LOCAL_API_KEY)
 
-    processes = []
-    try:
-        from local_ai_brain.config import settings
+    # Crash log configuration
+    crash_log_path = os.path.expanduser(
+        os.getenv("LOCAL_AI_BRAIN_CRASH_LOG", "~/Library/Logs/local-ai-brain-crash.log")
+    )
+    os.makedirs(os.path.dirname(crash_log_path), exist_ok=True)
 
-        env_vars = dict(os.environ, PYTHONPATH="src", VLLM_API_KEY=settings.LOCAL_API_KEY)
+    def start_subprocess(name, cmd, env):
+        logger.info(f"Starting {name}...")
+        # Open in append mode to preserve history
+        log_file = open(crash_log_path, "a")
+        log_file.write(f"\n--- Starting {name} at {time.ctime()} ---\n")
+        log_file.flush()
+        proc = subprocess.Popen(cmd, env=env, stderr=log_file, stdout=subprocess.DEVNULL)
+        log_file.close()
+        return proc
 
-        print(f"{COLOR_SYSTEM}Starting vLLM engine on port 8001...{COLOR_RESET}")
-        vllm_cmd = [
-            uv_bin,
-            "run",
-            "python",
-            "-m",
-            "local_ai_brain.models.llm_server",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8001",
-            "--model",
-            settings.QWEN_MODEL_PATH,
-            "--reasoning-parser",
-            "qwen3",
-            "--continuous-batching",
-            "--max-kv-size",
-            str(settings.LLM_MAX_KV_SIZE),
-            "--prefill-step-size",
-            str(settings.LLM_PREFILL_STEP_SIZE),
-            "--max-num-seqs",
-            str(settings.LLM_MAX_NUM_SEQS),
-        ]
-
-        if settings.LLM_SPECPREFILL_ENABLED:
-            vllm_cmd.extend(["--speculative-draft-model", settings.LLM_SPECPREFILL_DRAFT_MODEL])
-
-        if settings.LLM_KV_CACHE_QUANTIZATION:
-            vllm_cmd.extend(["--kv-cache-bits", str(settings.LLM_KV_CACHE_BITS)])
-
-        p_vllm = subprocess.Popen(vllm_cmd, env=env_vars)
-        processes.append(p_vllm)
-
-        print(f"{COLOR_SYSTEM}Starting STT Server on port 8002...{COLOR_RESET}")
-        p_stt = subprocess.Popen(
-            [
+    # Dictionary to track processes and their restart configurations
+    service_configs = {
+        "LLM Server": {
+            "cmd": [
+                uv_bin,
+                "run",
+                "python",
+                "-m",
+                "local_ai_brain.models.llm_server",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8001",
+            ],
+            "env": env_vars,
+        },
+        "STT Server": {
+            "cmd": [
                 uv_bin,
                 "run",
                 "uvicorn",
@@ -286,13 +289,10 @@ def serve():
                 "--port",
                 "8002",
             ],
-            env=env_vars,
-        )
-        processes.append(p_stt)
-
-        print(f"{COLOR_SYSTEM}Starting TTS Server on port 8003...{COLOR_RESET}")
-        p_tts = subprocess.Popen(
-            [
+            "env": env_vars,
+        },
+        "TTS Server": {
+            "cmd": [
                 uv_bin,
                 "run",
                 "uvicorn",
@@ -302,19 +302,10 @@ def serve():
                 "--port",
                 "8003",
             ],
-            env=env_vars,
-        )
-        processes.append(p_tts)
-
-        print(f"{COLOR_SYSTEM}Starting API Gateway (Proxy) on port 8000...{COLOR_RESET}")
-        proxy_env = dict(
-            env_vars,
-            VLLM_URL="http://127.0.0.1:8001",
-            STT_URL="http://127.0.0.1:8002",
-            TTS_URL="http://127.0.0.1:8003",
-        )
-        p_proxy = subprocess.Popen(
-            [
+            "env": env_vars,
+        },
+        "API Gateway": {
+            "cmd": [
                 uv_bin,
                 "run",
                 "uvicorn",
@@ -324,28 +315,41 @@ def serve():
                 "--port",
                 "8000",
             ],
-            env=proxy_env,
-        )
-        processes.append(p_proxy)
+            "env": dict(
+                env_vars,
+                VLLM_URL="http://127.0.0.1:8001",
+                STT_URL="http://127.0.0.1:8002",
+                TTS_URL="http://127.0.0.1:8003",
+            ),
+        },
+    }
 
+    processes = {}
+    for name, cfg in service_configs.items():
+        processes[name] = start_subprocess(name, cfg["cmd"], cfg["env"])
+
+    try:
         while True:
-            for p in processes:
-                if p.poll() is not None:
-                    print(
-                        f"{COLOR_ERROR}A subprocess exited unexpectedly "
-                        f"(exit code {p.returncode}). Shutting down...{COLOR_RESET}"
+            for name, p in list(processes.items()):
+                exit_code = p.poll()
+                if exit_code is not None:
+                    logger.error(
+                        f"{name} exited unexpectedly (exit code {exit_code}). "
+                        f"Check {crash_log_path} for details. Restarting in 5s..."
                     )
-                    shutdown_processes(processes)
-                    sys.exit(1)
+                    # Small delay before restart to prevent tight loops
+                    time.sleep(5)
+                    processes[name] = start_subprocess(
+                        name, service_configs[name]["cmd"], service_configs[name]["env"]
+                    )
             time.sleep(1)
 
     except KeyboardInterrupt:
-        print(f"{COLOR_SYSTEM}Shutting down servers...{COLOR_RESET}")
+        logger.info("Shutting down servers (KeyboardInterrupt)...")
         shutdown_processes(processes)
-        # Normal exit on Ctrl+C
         sys.exit(0)
     except Exception as e:
-        print(f"{COLOR_ERROR}Fatal error in serve: {e}{COLOR_RESET}")
+        logger.exception(f"Fatal error in serve: {e}")
         shutdown_processes(processes)
         sys.exit(1)
 

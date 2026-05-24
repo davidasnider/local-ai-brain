@@ -17,8 +17,9 @@ dependencies = [
     "pydantic-settings>=2.14.0",
     "soundfile>=0.13.1",
     "uvicorn>=0.46.0",
-    "vllm-mlx",
+    "llama-cpp-python[server]",
     "httpx>=0.28.1",
+    "python-multipart>=0.0.29",
 ]
 
 [project.scripts]
@@ -28,7 +29,6 @@ local-brain = "local_ai_brain.cli:main"
 package = true
 
 [tool.uv.sources]
-vllm-mlx = { git = "https://github.com/waybarrios/vllm-mlx.git", rev = "d4674701d6e0c1fd6244f4896fd291b9fa275d6a" } # pragma: allowlist secret
 
 [dependency-groups]
 dev = [

@@ -356,71 +356,34 @@ def test_main_serve(mock_popen, mock_sleep, capsys, monkeypatch):
     assert mock_process.terminate.call_count == 4
     assert mock_process.wait.call_count == 4
 
-    # Verify vLLM command arguments
-    vllm_call = mock_popen.call_args_list[0]
-    cmd = vllm_call.args[0]
-    assert "--model" in cmd
-    assert "--continuous-batching" in cmd
-    assert "--max-kv-size" in cmd
-    assert "--prefill-step-size" in cmd
-    assert "--max-num-seqs" in cmd
-
-    # Check that dynamic flags are present if enabled in settings
-    from local_ai_brain.config import settings
-
-    if settings.LLM_SPECPREFILL_ENABLED:
-        assert "--speculative-draft-model" in cmd
-    else:
-        assert "--speculative-draft-model" not in cmd
-
-    if settings.LLM_KV_CACHE_QUANTIZATION:
-        assert "--kv-cache-bits" in cmd
-    else:
-        assert "--kv-cache-bits" not in cmd
+    # Verify LLM Server command uses our internal wrapper
+    llm_call = mock_popen.call_args_list[0]
+    cmd = llm_call.args[0]
+    assert "local_ai_brain.models.llm_server" in cmd
+    assert "--host" in cmd
+    assert "127.0.0.1" in cmd
+    assert "--port" in cmd
+    assert "8001" in cmd
 
 
 @patch("time.sleep")
 @patch("subprocess.Popen")
-def test_main_serve_disabled_features(mock_popen, mock_sleep, capsys, monkeypatch):
-    """Verify that conditional flags are omitted when features are disabled."""
-    monkeypatch.setenv("LOCAL_API_KEY", "test-key")
-    monkeypatch.setenv("LLM_SPECPREFILL_ENABLED", "0")
-    monkeypatch.setenv("LLM_KV_CACHE_QUANTIZATION", "0")
-    mock_sleep.side_effect = KeyboardInterrupt()
-
+def test_main_serve_subprocess_restart(mock_popen, mock_sleep, capsys):
+    """Verify that a crashing subprocess is restarted."""
     mock_process = MagicMock()
-    mock_process.poll.return_value = None
-    mock_popen.return_value = mock_process
-
-    # We must reload settings or mock them because pydantic-settings are cached
-    # For simplicity in this test, we rely on the fact that Settings reads env vars on init
-    from local_ai_brain.config import Settings
-
-    new_settings = Settings()
-    with patch("local_ai_brain.config.settings", new_settings):
-        with patch.object(sys, "argv", ["local-brain", "serve"]):
-            with pytest.raises(SystemExit):
-                main()
-
-    vllm_call = mock_popen.call_args_list[0]
-    cmd = vllm_call.args[0]
-    assert "--speculative-draft-model" not in cmd
-    assert "--kv-cache-bits" not in cmd
-    assert "--prefill-step-size" in cmd  # Should still be there as it's not conditional
-
-
-@patch("time.sleep")
-@patch("subprocess.Popen")
-def test_main_serve_subprocess_exit(mock_popen, mock_sleep, capsys):
-    mock_process = MagicMock()
-    # It will hit the poll() and return 1, which causes SystemExit(1) to be raised by our code
-    mock_process.poll.return_value = 1
+    # Provide enough poll() values for 4 processes over multiple iterations.
+    # One process returns 1 (crash) once, others return None (running).
+    mock_process.poll.side_effect = [1, None, None, None, None, None, None, None]
+    # First sleep is the 5s restart delay, second sleep triggers shutdown
+    mock_sleep.side_effect = [None, KeyboardInterrupt()]
     mock_popen.return_value = mock_process
 
     with patch.object(sys, "argv", ["local-brain", "serve"]):
-        with pytest.raises(SystemExit) as e:
+        with pytest.raises(SystemExit):
             main()
-        assert e.value.code == 1
 
+    # Should have started 4 initial + 1 restart = 5
+    assert mock_popen.call_count == 5
     captured = capsys.readouterr()
-    assert "A subprocess exited unexpectedly" in captured.out
+    assert "exited unexpectedly" in captured.out
+    assert "Restarting in 5s" in captured.out

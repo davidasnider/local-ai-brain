@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = Field(default=None, validation_alias="HF_TOKEN")
 
     # Model paths
-    QWEN_MODEL_PATH: str = "mlx-community/Qwen3.6-35B-A3B-4bit"
+    QWEN_MODEL_PATH: str = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M"
     WHISPER_MODEL_PATH: str = "mlx-community/whisper-large-v3-mlx"
     KOKORO_MODEL_PATH: str = "kokoro-onnx"
     KOKORO_HF_REPO: str = "fastrtc/kokoro-onnx"
