@@ -373,13 +373,26 @@ def test_main_serve_subprocess_restart(mock_popen, mock_sleep, capsys, monkeypat
     """Verify that a crashing subprocess is restarted."""
     monkeypatch.setenv("LOCAL_API_KEY", "test-key")
     monkeypatch.setenv("TESTING", "1")
-    mock_process = MagicMock()
-    # Provide enough poll() values for 4 processes over multiple iterations.
-    # One process returns 1 (crash) once, others return None (running).
-    mock_process.poll.side_effect = [1, None, None, None, None, None, None, None]
+
+    # Create distinct mock processes for each service
+    p1 = MagicMock(name="p1")
+    p2 = MagicMock(name="p2")
+    p3 = MagicMock(name="p3")
+    p4 = MagicMock(name="p4")
+    p1_restart = MagicMock(name="p1_restart")
+
+    # p1 will crash (return 1 on poll), others stay running (return None)
+    p1.poll.return_value = 1
+    p2.poll.return_value = None
+    p3.poll.return_value = None
+    p4.poll.return_value = None
+    p1_restart.poll.return_value = None
+
+    # subprocess.Popen will return p1, p2, p3, p4 in order, then p1_restart
+    mock_popen.side_effect = [p1, p2, p3, p4, p1_restart]
+
     # First sleep is the 5s restart delay, second sleep triggers shutdown
     mock_sleep.side_effect = [None, KeyboardInterrupt()]
-    mock_popen.return_value = mock_process
 
     with patch.object(sys, "argv", ["local-brain", "serve"]):
         with pytest.raises(SystemExit):

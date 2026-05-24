@@ -340,9 +340,9 @@ def normalize_model_metadata(model_obj: dict):
     return model_obj
 
 
-@app.get("/v1/models")
-async def list_models(request: Request):
-    """List available models by merging backend LLM models with local audio models."""
+async def _fetch_models_data(request: Request):
+    """Internal helper to fetch all models and detect if the backend is unreachable."""
+    backend_failed = False
     try:
         client = request.app.state.client
         # Add internal auth to backend request and use a short timeout
@@ -353,6 +353,7 @@ async def list_models(request: Request):
     except Exception as e:
         logger.error(f"Failed to fetch models from LLM backend: {e}")
         data = {"object": "list", "data": []}
+        backend_failed = True
 
     data.setdefault("data", [])
 
@@ -377,6 +378,13 @@ async def list_models(request: Request):
             },
         ]
     )
+    return data, backend_failed
+
+
+@app.get("/v1/models")
+async def list_models(request: Request):
+    """List available models by merging backend LLM models with local audio models."""
+    data, _ = await _fetch_models_data(request)
     return data
 
 
@@ -408,10 +416,15 @@ async def get_model(model_id: str, request: Request):
 
     # For everything else (including LLMs), we resolve it by querying the combined list
     # Because llama-server doesn't seem to support GET /v1/models/{id} natively.
-    models_data = await list_models(request)
+    models_data, backend_failed = await _fetch_models_data(request)
     for model in models_data.get("data", []):
         if model.get("id") == model_id or model_id in model.get("aliases", []):
             return model
+
+    if backend_failed:
+        raise HTTPException(
+            status_code=502, detail="LLM backend unreachable. Check if llama-server is running."
+        )
 
     raise HTTPException(status_code=404, detail="Model not found")
 

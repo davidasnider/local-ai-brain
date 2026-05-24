@@ -45,7 +45,7 @@ This command starts all four processes:
 - **TTS Server** (Kokoro) on `127.0.0.1:8003`
 - **API Gateway** (Proxy) on `0.0.0.0:8000`
 
-All external traffic flows through the authenticated API Gateway on port `8000`. Backend services are bound to `127.0.0.1` and are not directly accessible from the network. 
+All external traffic flows through the authenticated API Gateway on port `8000`. Backend services are bound to `127.0.0.1` and are not directly accessible from the network.
 
 ### Reliability and Logging
 

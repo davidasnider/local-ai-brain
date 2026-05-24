@@ -9,7 +9,7 @@ os.environ.setdefault("TESTING", "1")
 
 
 @patch("local_ai_brain.models.llm_server.configure_logging")
-@patch("os.environ", {"LOCAL_API_KEY": "test-api-key"})  # pragma: allowlist secret
+@patch.dict("os.environ", {"LOCAL_API_KEY": "test-api-key"})  # pragma: allowlist secret
 @patch("os.execvp")
 def test_main_success(mock_exec, mock_log):
     """Verify that main() builds the correct command and calls execvp."""
@@ -44,7 +44,7 @@ models:
 
 
 @patch("local_ai_brain.models.llm_server.configure_logging")
-@patch("os.environ", {"LOCAL_API_KEY": "test-api-key"})  # pragma: allowlist secret
+@patch.dict("os.environ", {"LOCAL_API_KEY": "test-api-key"})  # pragma: allowlist secret
 @patch("os.execvp")
 def test_main_config_alt_format(mock_exec, mock_log):
     """Verify that main() handles alternative YAML formats (direct dict)."""
