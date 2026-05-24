@@ -255,12 +255,10 @@ def serve():
     def start_subprocess(name, cmd, env):
         logger.info(f"Starting {name}...")
         # Open in append mode to preserve history
-        log_file = open(crash_log_path, "a")
-        log_file.write(f"\n--- Starting {name} at {time.ctime()} ---\n")
-        log_file.flush()
-        proc = subprocess.Popen(cmd, env=env, stderr=log_file, stdout=subprocess.DEVNULL)
-        log_file.close()
-        return proc
+        with open(crash_log_path, "a") as log_file:
+            log_file.write(f"\n--- Starting {name} at {time.ctime()} ---\n")
+            log_file.flush()
+            return subprocess.Popen(cmd, env=env, stderr=log_file, stdout=subprocess.DEVNULL)
 
     # Dictionary to track processes and their restart configurations
     service_configs = {

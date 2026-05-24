@@ -88,7 +88,7 @@ def main():
     # 2. Build CLI arguments for llama-server
     # Handle Network & Security (prioritizing CLI args passed to this wrapper)
     # We look for --host and --port in sys.argv first
-    host = "0.0.0.0"
+    host = "127.0.0.1"
     port = "8000"
 
     for i, arg in enumerate(sys.argv):
@@ -100,7 +100,20 @@ def main():
     cmd = build_command(config, host, port)
 
     # 3. Launch the binary
-    logger.info(f"Launching engine: {' '.join(cmd)}")
+    # Sanitize command for logging (redact API key)
+    log_cmd = []
+    skip_next = False
+    for i, arg in enumerate(cmd):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--api-key":
+            log_cmd.extend([arg, "********"])
+            skip_next = True
+        else:
+            log_cmd.append(arg)
+
+    logger.info(f"Launching engine: {' '.join(log_cmd)}")
     try:
         # We use execvp to replace the current process with llama-server
         # so that signals and process management work correctly.

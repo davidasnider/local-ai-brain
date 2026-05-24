@@ -490,14 +490,15 @@ def test_stream_generator_usage_extraction_sse(mock_perf, mock_send, client):
         # completion_tokens=20 => 20.00 t/s
         mock_logger.assert_called()
         call_args = mock_logger.call_args[0]
-        assert "[LLM] {} completed: {} in ({}) | {} out ({}) | {:.2f}s total" == call_args[0]
-        assert "test-model" == call_args[1]
-        assert 10 == call_args[2]
-        assert "20.00 t/s" == call_args[3]
-        assert 20 == call_args[4]
-        assert "20.00 t/s" == call_args[5]
+        assert "{} {} completed: {} in ({}) | {} out ({}) | {:.2f}s total" == call_args[0]
+        assert "[LLM]" == call_args[1]
+        assert "test-model" == call_args[2]
+        assert 10 == call_args[3]
+        assert "20.00 t/s" == call_args[4]
+        assert 20 == call_args[5]
+        assert "20.00 t/s" == call_args[6]
         # total = 101.5 - 100.0 = 1.5s
-        assert 1.50 == pytest.approx(call_args[6], abs=0.01)
+        assert 1.50 == pytest.approx(call_args[7], abs=0.01)
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
@@ -539,13 +540,14 @@ def test_stream_generator_usage_extraction_raw_json(mock_perf, mock_send, client
         # prompt_tokens=5 => 50.00 t/s
         # request_end=100.5 => generation=0.4s
         # completion_tokens=10 => 25.00 t/s
-        assert "[LLM] {} completed: {} in ({}) | {} out ({}) | {:.2f}s total" == call_args[0]
-        assert "test-model" == call_args[1]
-        assert 5 == call_args[2]
-        assert "50.00 t/s" == call_args[3]
-        assert 10 == call_args[4]
-        assert "25.00 t/s" == call_args[5]
-        assert 0.50 == pytest.approx(call_args[6], abs=0.01)
+        assert "{} {} completed: {} in ({}) | {} out ({}) | {:.2f}s total" == call_args[0]
+        assert "[LLM]" == call_args[1]
+        assert "test-model" == call_args[2]
+        assert 5 == call_args[3]
+        assert "50.00 t/s" == call_args[4]
+        assert 10 == call_args[5]
+        assert "25.00 t/s" == call_args[6]
+        assert 0.50 == pytest.approx(call_args[7], abs=0.01)
 
 
 @patch("httpx.AsyncClient.send", new_callable=AsyncMock)
@@ -612,7 +614,8 @@ def test_stream_generator_fast_tps(mock_perf, mock_send, client):
 
         mock_logger.assert_called()
         call_args = mock_logger.call_args[0]
-        assert "[LLM] {} completed: {} in ({}) | {} out ({}) | {:.2f}s total" == call_args[0]
-        assert "FAST" == call_args[3]
-        assert 10 == call_args[4]
-        assert "FAST" == call_args[5]
+        assert "{} {} completed: {} in ({}) | {} out ({}) | {:.2f}s total" == call_args[0]
+        assert "[LLM]" == call_args[1]
+        assert "FAST" == call_args[4]
+        assert 10 == call_args[5]
+        assert "FAST" == call_args[6]

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # Core settings
     LOCAL_API_KEY: str
     TTS_MAX_CHARACTERS: int = Field(default=4096, gt=0)
-    MAX_CONTEXT_TOKENS: int = Field(default=65536, gt=0)
+    MAX_CONTEXT_TOKENS: int = Field(default=98304, gt=0)
     DEFAULT_MAX_TOKENS: int = Field(default=16384, gt=0)
     TESTING: bool = False
 

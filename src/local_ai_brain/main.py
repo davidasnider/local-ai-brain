@@ -109,10 +109,11 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
 
             # Always request usage for streaming requests if possible
             if payload.get("stream") is True:
-                if "stream_options" not in payload:
+                stream_opts = payload.get("stream_options")
+                if isinstance(stream_opts, dict):
+                    stream_opts["include_usage"] = True
+                elif "stream_options" not in payload:
                     payload["stream_options"] = {"include_usage": True}
-                else:
-                    payload["stream_options"]["include_usage"] = True
 
             # Default output token limit and max_tokens clamping handling
             max_tokens = payload.get("max_tokens")
@@ -146,6 +147,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
         semaphore: asyncio.Semaphore | None,
         request_start: float,
         model_name: str,
+        is_llm: bool = False,
     ):
         first_token_time = None
         usage = None
@@ -190,6 +192,8 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
 
             # Log LLM usage if we found it or just the total time
             total_time = request_end - request_start
+            log_prefix = "[LLM]" if is_llm else "[Proxy]"
+
             if usage:
                 prompt_tokens = usage.get("prompt_tokens", 0)
                 completion_tokens = usage.get("completion_tokens", 0)
@@ -217,7 +221,8 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                     output_tps_str = "N/A"
 
                 logger.info(
-                    "[LLM] {} completed: {} in ({}) | {} out ({}) | {:.2f}s total",
+                    "{} {} completed: {} in ({}) | {} out ({}) | {:.2f}s total",
+                    log_prefix,
                     model_name,
                     prompt_tokens,
                     input_tps_str,
@@ -227,7 +232,10 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                 )
             else:
                 logger.info(
-                    "[LLM] {} completed in {:.2f}s (No usage found)", model_name, total_time
+                    "{} {} completed in {:.2f}s (No usage found)",
+                    log_prefix,
+                    model_name,
+                    total_time,
                 )
 
     semaphore = request.app.state.llm_semaphore if use_semaphore else None
@@ -243,7 +251,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
 
         # Build StreamingResponse with multiple headers support
         streaming_resp = StreamingResponse(
-            stream_generator(response, semaphore, request_start, model_name),
+            stream_generator(response, semaphore, request_start, model_name, is_llm=use_semaphore),
             status_code=response.status_code,
         )
 
@@ -320,6 +328,15 @@ def normalize_model_metadata(model_obj: dict):
 
         # Remove the training context length to prevent confusion
         meta.pop("n_ctx_train", None)
+
+    # Inject project-defined aliases for the primary LLM model
+    if model_obj.get("id") == settings.QWEN_MODEL_PATH:
+        existing_aliases = model_obj.get("aliases", [])
+        for alias in settings.QWEN_MODEL_ALIASES:
+            if alias not in existing_aliases:
+                existing_aliases.append(alias)
+        model_obj["aliases"] = existing_aliases
+
     return model_obj
 
 

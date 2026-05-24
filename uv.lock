@@ -774,6 +774,7 @@ dependencies = [
     { name = "psutil" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
+    { name = "pyyaml" },
     { name = "soundfile" },
     { name = "uvicorn" },
 ]
@@ -802,6 +803,7 @@ requires-dist = [
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pydantic-settings", specifier = ">=2.14.0" },
     { name = "python-multipart", specifier = ">=0.0.29" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "soundfile", specifier = ">=0.13.1" },
     { name = "uvicorn", specifier = ">=0.46.0" },
 ]
