@@ -57,4 +57,4 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 * Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
 
 ## 7. Testing Scripts
-* Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the standalone `llama-cpp-python` server directly with predefined stability overrides without needing the full microservices stack.
+* Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the `llama-server` wrapper module standalone with predefined stability settings from `llm_config.yaml` without needing the full microservices stack.
