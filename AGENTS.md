@@ -60,5 +60,5 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 
 10. **LLM Execution & GPU Timeout Prevention:**
     * Always run `llama-cpp-python` via the `llama-server` binary wrapper (`src/local_ai_brain/models/llm_server.py`) ensuring stability overrides for Apple Silicon (e.g., `-ngl`, `--ctx-size`, `--flash-attn`, `--batch-size`, `--ubatch-size`, `-np`, `--spec-draft-n-max`, `--spec-draft-p-min`, `--cache-type-k`, `--cache-type-v`) are parsed from `llm_config.yaml` to prevent macOS Metal watchdog timeouts during large model operations.
-    * There is also a standalone utility script available in `scripts/start_llm.sh` to start the `llama-server` wrapper module independently, primarily for testing purposes. It relies on the same defaults and `llm_config.yaml` as the production service.
+    * There is also a standalone wrapper script available in `scripts/start_llm.sh` to start the raw `llama-cpp-python` server with specific stability overrides directly, primarily for testing purposes.
     * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the backend.

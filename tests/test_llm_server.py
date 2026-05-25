@@ -86,13 +86,14 @@ def test_main_no_config(mock_exec, mock_log):
 @patch("local_ai_brain.models.llm_server.configure_logging")
 @patch.dict("os.environ", {"LOCAL_API_KEY": "test-api-key"})  # pragma: allowlist secret
 @patch("os.execvp")
-def test_main_stability_overrides(mock_exec, mock_log):
-    """Verify that main() parses slots and speculative decoding parameters from YAML."""
+def test_main_config_speculative_params(mock_exec, mock_log):
+    """Verify that main() parses speculative parameters from config."""
     from local_ai_brain.models.llm_server import main
 
     yaml_content = """
-n_parallel: 4
-spec_draft_n_max: 5
+model: "direct-model.gguf"
+n_parallel: 2
+spec_draft_n_max: 3
 spec_draft_p_min: 0.8
 """
     with patch("builtins.open", mock_open(read_data=yaml_content)):
@@ -102,9 +103,9 @@ spec_draft_p_min: 0.8
                 mock_exec.assert_called_once()
                 cmd = mock_exec.call_args[0][1]
                 assert "-np" in cmd
-                assert "4" in cmd
+                assert "2" in cmd
                 assert "--spec-draft-n-max" in cmd
-                assert "5" in cmd
+                assert "3" in cmd
                 assert "--spec-draft-p-min" in cmd
                 assert "0.8" in cmd
 
