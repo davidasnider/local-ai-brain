@@ -40,10 +40,10 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     cmd.extend(["--batch-size", str(config.get("n_batch", 2048))])
     cmd.extend(["--ubatch-size", str(config.get("n_ubatch", 2048))])
 
-    # Slots and Speculative Decoding from original script
-    cmd.extend(["-np", "1"])
-    cmd.extend(["--spec-draft-n-max", "2"])
-    cmd.extend(["--spec-draft-p-min", "0.75"])
+    # Slots and Speculative Decoding (sourced from config or defaults)
+    cmd.extend(["-np", str(config.get("n_parallel", 1))])
+    cmd.extend(["--spec-draft-n-max", str(config.get("spec_draft_n_max", 2))])
+    cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min", 0.75))])
 
     # Cache quantization (mapping 8 -> q8_0 for llama-server)
     type_k = config.get("type_k")

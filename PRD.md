@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD): Local AI Brain
 
 ## 1. Project Overview
-A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding. It uses a microservices architecture with a FastAPI API Gateway proxy in front of dedicated `vllm-mlx` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
+A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). This service acts as the central "brain" for home automation (specifically Home Assistant), document processing, and a backend for local agentic coding. It uses a microservices architecture with a FastAPI API Gateway proxy in front of dedicated `llama-cpp-python` (LLM), Whisper (STT), and Kokoro (TTS) backend services, exposing a unified OpenAI-compatible interface.
 
 ## 2. Core Requirements & Constraints
 * **Framework:** Python 3.12+ with FastAPI.
@@ -15,7 +15,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
-* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 35B parameter) quantized for MLX (4-bit to respect RAM limits). The `local-brain serve` orchestrator starts the vLLM backend with `--reasoning-parser qwen3` to parse and expose thinking outputs in structured form. It supports a **64K context window** (`MAX_CONTEXT_TOKENS` = 65536) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 65536) to prevent extremely large values from causing backend generation failures, improving compatibility with upstream tools like Hermes. KV cache quantization and speculative prefill are enabled for improved performance and memory efficiency. Must use stability overrides (such as chunked prefill operations via CLI arguments passed by the `local-brain serve` CLI orchestrator) and gateway-level request serialization to prevent macOS Metal watchdog timeouts.
+* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 35B parameter) quantized (GGUF to respect RAM limits). The `local-brain serve` orchestrator starts the llama-cpp-python backend (via `llama-server`) configured via `llm_config.yaml`. It supports a **96K context window** (`MAX_CONTEXT_TOKENS` = 98304) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 98304) to prevent extremely large values from causing backend generation failures, improving compatibility with upstream tools like Hermes. KV cache quantization and optimized batch sizes (e.g., `-ngl`, `--ctx-size`, `--flash-attn`, `--batch-size`, `--ubatch-size`, `--cache-type-k q8_0`) are enabled for improved performance and memory efficiency on Apple Silicon. Must use stability overrides and gateway-level request serialization to prevent macOS Metal watchdog timeouts.
 * **Speech-to-Text (STT):** Lightning Whisper MLX.
 * **Text-to-Speech (TTS):** Kokoro TTS via MLX (or ONNX).
 
@@ -57,4 +57,4 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 * Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
 
 ## 7. Testing Scripts
-* Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the standalone MLX LM server with predefined stability overrides directly without needing the full microservices stack.
+* Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the `llama-server` wrapper module standalone with predefined stability settings from `llm_config.yaml` without needing the full microservices stack.

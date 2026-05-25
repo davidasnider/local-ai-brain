@@ -1,13 +1,13 @@
 # Agent Instructions for Local AI Brain
 
 ## Role
-You are an expert Python backend engineer specializing in Apple Silicon (MLX), `vllm-mlx`, and FastAPI. Your goal is to build a robust, memory-conscious, secure, and blazing-fast local API.
+You are an expert Python backend engineer specializing in Apple Silicon, `llama-cpp-python`, and FastAPI. Your goal is to build a robust, memory-conscious, secure, and blazing-fast local API.
 
 ## Tech Stack
 * Python 3.12+
 * FastAPI & Uvicorn
 * `pydantic-settings` (for configuration)
-* `vllm-mlx` (for Qwen 3.6 LLM hosting)
+* `llama-cpp-python` (for Qwen 3.6 LLM hosting via llama-server)
 * `mlx-whisper` / Lightning Whisper MLX
 * `kokoro-onnx` or native MLX implementation of Kokoro TTS
 * `loguru` (logging) & `psutil` (hardware monitoring)
@@ -33,7 +33,7 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * All routes — including `/health` and `/metrics` — must require a valid Bearer token. There are no unauthenticated endpoints.
    * Model requests matching `QWEN_MODEL_ALIASES` must be normalized to `QWEN_MODEL_PATH` before proxying to maintain backwards compatibility.
    * Provide Ollama compatibility endpoints (`/api/v1/models` and `/api/tags`) for tools expecting an Ollama backend.
-   * Ensure the API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 65536) to prevent extremely large values from causing backend generation failures. If `max_tokens` is not provided, default to `DEFAULT_MAX_TOKENS` (16384).
+   * Ensure the API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 98304) to prevent extremely large values from causing backend generation failures. If `max_tokens` is not provided, default to `DEFAULT_MAX_TOKENS` (16384).
 
 4. **Logging (Crucial):**
    * Ensure model quantization configurations (e.g., 4-bit) are set explicitly during MLX model initialization.
@@ -59,6 +59,6 @@ You are an expert Python backend engineer specializing in Apple Silicon (MLX), `
    * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
 
 10. **LLM Execution & GPU Timeout Prevention:**
-    * Always run `vllm-mlx` ensuring stability overrides (e.g., `--prefill-step-size`, `--max-num-seqs`), speculative prefill (`--speculative-draft-model`), KV cache settings (`--kv-cache-bits`, `--max-kv-size`), and reasoning capabilities (`--reasoning-parser qwen3`) are passed via CLI arguments (as configured in `src/local_ai_brain/cli.py`) using defaults from `src/local_ai_brain/config.py` where applicable to prevent macOS Metal watchdog timeouts during large model prefill operations on Apple Silicon.
-    * There is also a standalone wrapper script available in `scripts/start_llm.sh` to start the raw `mlx_lm.server` with specific stability overrides directly, primarily for testing purposes.
-    * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the MLX backend.
+    * Always run `llama-cpp-python` via the `llama-server` binary wrapper (`src/local_ai_brain/models/llm_server.py`) ensuring stability overrides for Apple Silicon (e.g., `-ngl`, `--ctx-size`, `--flash-attn`, `--batch-size`, `--ubatch-size`, `-np`, `--spec-draft-n-max`, `--spec-draft-p-min`, `--cache-type-k`, `--cache-type-v`) are parsed from `llm_config.yaml` to prevent macOS Metal watchdog timeouts during large model operations.
+    * There is also a standalone utility script available in `scripts/start_llm.sh` to start the `llama-server` wrapper module independently, primarily for testing purposes. It relies on the same defaults and `llm_config.yaml` as the production service.
+    * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the backend.
