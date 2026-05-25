@@ -8,7 +8,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; PATH="$HOME/.cargo/bin:$PATH" exec uv run local-brain serve</string>
+        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; if ! command -v uv &gt;/dev/null 2&gt;&amp;1; then export PATH="$HOME/.cargo/bin:$PATH"; fi &amp;&amp; exec uv run local-brain serve</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -17,7 +17,7 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>LOCAL_API_KEY</key>
         <string>__REPLACE_WITH_LOCAL_API_KEY__</string>
     </dict>
