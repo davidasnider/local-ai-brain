@@ -1,6 +1,6 @@
 [project]
 name = "local-ai-brain"
-version = "0.1.18"
+version = "0.1.20"
 description = "Local AI API hosting on Apple Silicon"
 readme = "README.md"
 requires-python = ">=3.12"
