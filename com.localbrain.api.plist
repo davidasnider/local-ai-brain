@@ -8,7 +8,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>~/.local/share/local-ai-brain-prod/scripts/start_server.sh</string>
+        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" &amp;&amp; uv run local-brain serve</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
