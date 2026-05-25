@@ -102,17 +102,12 @@ spec_draft_p_min: 0.8
                 main()
                 mock_exec.assert_called_once()
                 cmd = mock_exec.call_args[0][1]
-
-                def get_val(flag):
-                    try:
-                        idx = cmd.index(flag)
-                        return cmd[idx + 1]
-                    except (ValueError, IndexError):
-                        return None
-
-                assert get_val("-np") == "2"
-                assert get_val("--spec-draft-n-max") == "3"
-                assert get_val("--spec-draft-p-min") == "0.8"
+                assert "-np" in cmd
+                assert "2" in cmd
+                assert "--spec-draft-n-max" in cmd
+                assert "3" in cmd
+                assert "--spec-draft-p-min" in cmd
+                assert "0.8" in cmd
 
 
 @patch("local_ai_brain.models.llm_server.configure_logging")

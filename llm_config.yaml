@@ -27,19 +27,6 @@ n_batch: 2048
 # The physical batch size used by llama.cpp.
 n_ubatch: 2048
 
-# --- Slots & Speculative Decoding ---
-
-# The number of parallel slots (sequences) to process.
-n_parallel: 1
-
-# Maximum number of tokens to draft per step for speculative decoding.
-spec_draft_n_max: 2
-
-# Minimum probability for tokens to be drafted in speculative decoding.
-spec_draft_p_min: 0.75
-
-# --- Cache Quantization ---
-
 # Type of the key cache quantization (q8_0, f16, etc.)
 type_k: "q8_0"
 
