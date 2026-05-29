@@ -24,7 +24,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
    * Use `uv sync` to keep the environment updated.
 
 2. **Configuration Management:**
-   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `QWEN_MODEL_ALIASES`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`), and LLM cache and prefill settings (`LLM_KV_CACHE_BITS`, `LLM_KV_CACHE_QUANTIZATION`, `LLM_MAX_KV_SIZE`, `LLM_SPECPREFILL_ENABLED`, `LLM_SPECPREFILL_DRAFT_MODEL`).
+   * Use `pydantic-settings` to manage all configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `QWEN_MODEL_ALIASES`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`).
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
 3. **OpenAI Compatibility & Security:**
@@ -36,7 +36,6 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
    * Ensure the API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 98304) to prevent extremely large values from causing backend generation failures. If `max_tokens` is not provided, default to `DEFAULT_MAX_TOKENS` (16384).
 
 4. **Logging (Crucial):**
-   * Ensure model quantization configurations (e.g., 4-bit) are set explicitly during MLX model initialization.
    * Standard library logging should be intercepted and routed to `loguru`, with rotating log files configured.
    * Models must remain loaded 24/7.
 
