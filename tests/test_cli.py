@@ -1,11 +1,21 @@
 import json
+import subprocess
 import sys
 import urllib.error
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from local_ai_brain.cli import chat, get_api_key, get_base_url, main, stt, tts
+from local_ai_brain.cli import (
+    chat,
+    get_active_client_pids,
+    get_api_key,
+    get_base_url,
+    main,
+    stt,
+    trace,
+    tts,
+)
 
 
 # ANSI code tests
@@ -403,3 +413,95 @@ def test_main_serve_subprocess_restart(mock_popen, mock_sleep, capsys, monkeypat
     captured = capsys.readouterr()
     assert "exited unexpectedly" in captured.out
     assert "Restarting in 5s" in captured.out
+
+
+@patch("subprocess.check_output")
+def test_get_active_client_pids(mock_check_output):
+    mock_check_output.return_value = (
+        b"COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\n"
+        b"Python    12345 user   3u  IPv4 0xdeadbeef      0t0  "
+        b"TCP 127.0.0.1:54321->127.0.0.1:8000 (ESTABLISHED)\n"
+    )
+    pids = get_active_client_pids([8000])
+    assert pids == {54321: 12345}
+
+
+@patch("subprocess.check_output")
+def test_get_active_client_pids_empty(mock_check_output):
+    mock_check_output.return_value = b""
+    pids = get_active_client_pids([8000])
+    assert pids == {}
+
+
+@patch("subprocess.check_output")
+def test_get_active_client_pids_error(mock_check_output):
+    mock_check_output.side_effect = subprocess.CalledProcessError(1, "lsof")
+    pids = get_active_client_pids([8000])
+    assert pids == {}
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("psutil.Process")
+@patch("select.select")
+def test_trace_basic(mock_select, mock_psutil, mock_pids, mock_file, mock_exists, capsys):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 12345}
+
+    proc = MagicMock()
+    proc.cmdline.return_value = ["python", "app.py"]
+    mock_psutil.return_value = proc
+
+    # Mock log file content
+    handle = mock_file()
+    handle.readline.side_effect = [
+        "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
+        'Incoming chat from 127.0.0.1:54321 - "Hello test"\n',
+        "",  # End of loop iteration
+    ]
+
+    # Trigger KeyboardInterrupt after first iteration
+    mock_select.side_effect = KeyboardInterrupt()
+
+    with pytest.raises(SystemExit):
+        trace()
+
+    captured = capsys.readouterr()
+    assert "[PID 12345]" in captured.out
+    assert "python app.py" in captured.out
+    assert "Says:" in captured.out
+    assert "Hello test" in captured.out
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("builtins.input")
+@patch("psutil.Process")
+def test_trace_kill(
+    mock_psutil, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+
+    # Mock select to return stdin available once
+    mock_stdin = MagicMock()
+    mock_stdin.readline.return_value = "k\n"
+
+    # Use patch to replace sys.stdin
+    with patch("sys.stdin", mock_stdin):
+        # First iteration: no line in file, select returns something
+        # Second iteration: KeyboardInterrupt
+        mock_file().readline.return_value = ""
+        mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
+
+        mock_input.return_value = "9999"
+
+        with pytest.raises(SystemExit):
+            trace()
+
+        mock_psutil.assert_called_with(9999)
+        mock_psutil().kill.assert_called_once()
+        captured = capsys.readouterr()
+        assert "Successfully killed PID 9999" in captured.out

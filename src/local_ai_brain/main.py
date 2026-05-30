@@ -128,6 +128,25 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                     )
                     payload["max_tokens"] = settings.MAX_CONTEXT_TOKENS
 
+            # Log who is talking
+            client_host = request.client.host if request.client else "unknown"
+            client_port = request.client.port if request.client else 0
+            messages = payload.get("messages", [])
+            prompt_preview = ""
+            if messages and isinstance(messages, list):
+                last_msg = messages[-1].get("content", "")
+                if isinstance(last_msg, str):
+                    prompt_preview = last_msg[:100].replace("\n", " ") + (
+                        "..." if len(last_msg) > 100 else ""
+                    )
+            elif "prompt" in payload and isinstance(payload["prompt"], str):
+                prompt_preview = payload["prompt"][:100].replace("\n", " ") + (
+                    "..." if len(payload["prompt"]) > 100 else ""
+                )
+
+            if prompt_preview:
+                logger.info(f'Incoming chat from {client_host}:{client_port} - "{prompt_preview}"')
+
             body = json.dumps(payload).encode("utf-8")
         content = body
 
