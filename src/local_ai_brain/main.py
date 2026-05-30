@@ -134,11 +134,13 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             messages = payload.get("messages", [])
             prompt_preview = ""
             if messages and isinstance(messages, list):
-                last_msg = messages[-1].get("content", "")
-                if isinstance(last_msg, str):
-                    prompt_preview = last_msg[:100].replace("\n", " ") + (
-                        "..." if len(last_msg) > 100 else ""
-                    )
+                last_msg_obj = messages[-1]
+                if isinstance(last_msg_obj, dict):
+                    last_msg = last_msg_obj.get("content", "")
+                    if isinstance(last_msg, str):
+                        prompt_preview = last_msg[:100].replace("\n", " ") + (
+                            "..." if len(last_msg) > 100 else ""
+                        )
             elif "prompt" in payload and isinstance(payload["prompt"], str):
                 prompt_preview = payload["prompt"][:100].replace("\n", " ") + (
                     "..." if len(payload["prompt"]) > 100 else ""
