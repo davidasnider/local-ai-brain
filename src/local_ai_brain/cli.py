@@ -250,8 +250,9 @@ def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
         ports = [8000, 8001, 8002, 8003]
     client_pid_map = {}
     try:
-        # lsof -iTCP:8000 -sTCP:ESTABLISHED -n -P
-        cmd = ["lsof", "-iTCP", "-sTCP:ESTABLISHED", "-n", "-P"]
+        # lsof -iTCP:8000,8001,... -sTCP:ESTABLISHED -n -P
+        port_spec = ",".join(map(str, ports))
+        cmd = ["lsof", f"-iTCP:{port_spec}", "-sTCP:ESTABLISHED", "-n", "-P"]
         output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
         for line in output.splitlines():
             parts = line.split()
@@ -263,9 +264,7 @@ def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
                     if "->" in name:
                         src, dst = name.split("->")
                         src_port = int(src.split(":")[-1])
-                        dst_port = int(dst.split(":")[-1])
-                        if dst_port in ports:
-                            client_pid_map[src_port] = pid
+                        client_pid_map[src_port] = pid
                 except (ValueError, IndexError):
                     continue
     except (subprocess.CalledProcessError, FileNotFoundError):

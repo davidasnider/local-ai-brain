@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     MAX_CONTEXT_TOKENS: int = Field(default=98304, gt=0)
     DEFAULT_MAX_TOKENS: int = Field(default=16384, gt=0)
     TESTING: bool = False
+    LOG_PROMPTS: bool = False
 
     # Microservices URLs
     VLLM_URL: str = "http://127.0.0.1:8001"

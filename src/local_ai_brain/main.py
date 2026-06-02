@@ -147,7 +147,14 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                 )
 
             if prompt_preview:
-                logger.info(f'Incoming chat from {client_host}:{client_port} - "{prompt_preview}"')
+                if settings.LOG_PROMPTS:
+                    logger.info(
+                        f'Incoming chat from {client_host}:{client_port} - "{prompt_preview}"'
+                    )
+                else:
+                    logger.info(
+                        f"Incoming chat from {client_host}:{client_port} - [PROMPT REDACTED]"
+                    )
 
             body = json.dumps(payload).encode("utf-8")
         content = body

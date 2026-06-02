@@ -27,8 +27,8 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     if ":" in settings.QWEN_MODEL_PATH:
         default_repo, default_file = settings.QWEN_MODEL_PATH.split(":", 1)
 
-    hf_repo = config.get("hf_model_repo_id", default_repo)
-    model_file = config.get("model", default_file)
+    hf_repo = str(config.get("hf_model_repo_id") or default_repo)
+    model_file = str(config.get("model") or default_file)
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:
@@ -40,20 +40,31 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
         cmd.extend(["--alias", model_file])
 
     # Performance tunables
-    cmd.extend(["-ngl", str(config.get("n_gpu_layers", 99))])
-    cmd.extend(["--ctx-size", str(config.get("n_ctx", 98304))])
+    cmd.extend(
+        ["-ngl", str(config.get("n_gpu_layers") if config.get("n_gpu_layers") is not None else 99)]
+    )
+    cmd.extend(
+        ["--ctx-size", str(config.get("n_ctx") if config.get("n_ctx") is not None else 98304)]
+    )
 
     if config.get("flash_attn", True):
         cmd.extend(["-fa", "on"])
 
-    cmd.extend(["--batch-size", str(config.get("n_batch", 2048))])
-    cmd.extend(["--ubatch-size", str(config.get("n_ubatch", 2048))])
+    cmd.extend(
+        ["--batch-size", str(config.get("n_batch") if config.get("n_batch") is not None else 2048)]
+    )
+    cmd.extend(
+        [
+            "--ubatch-size",
+            str(config.get("n_ubatch") if config.get("n_ubatch") is not None else 2048),
+        ]
+    )
 
     # Slots and Speculative Decoding (sourced from config or defaults)
-    cmd.extend(["-np", str(config.get("n_parallel", 1))])
-    cmd.extend(["--spec-type", config.get("spec_type", "draft-mtp")])
-    cmd.extend(["--spec-draft-n-max", str(config.get("spec_draft_n_max", 2))])
-    cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min", 0.75))])
+    cmd.extend(["-np", str(config.get("n_parallel") or 1)])
+    cmd.extend(["--spec-type", str(config.get("spec_type") or "draft-mtp")])
+    cmd.extend(["--spec-draft-n-max", str(config.get("spec_draft_n_max") or 2)])
+    cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min") or 0.75)])
 
     # Cache quantization (mapping 8 -> q8_0 for llama-server)
     type_k = config.get("type_k")
