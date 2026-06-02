@@ -17,31 +17,41 @@ from local_ai_brain.logging import configure_logging
 
 def build_command(config: dict, host: str, port: str) -> list[str]:
     """Build the CLI arguments for llama-server."""
+    from local_ai_brain.config import settings
+
     cmd = ["llama-server"]
 
     # Model settings
-    hf_repo = config.get("hf_model_repo_id", "unsloth/Qwen3.6-35B-A3B-MTP-GGUF")
-    model_file = config.get("model", "UD-Q4_K_M")
+    default_repo = ""
+    default_file = settings.QWEN_MODEL_PATH
+    if ":" in settings.QWEN_MODEL_PATH:
+        default_repo, default_file = settings.QWEN_MODEL_PATH.split(":", 1)
+
+    hf_repo = config.get("hf_model_repo_id", default_repo)
+    model_file = config.get("model", default_file)
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:
-        # Original script used -hf repo:file format
-        cmd.extend(["-hf", f"{hf_repo}:{model_file}"])
+        model_id = f"{hf_repo}:{model_file}"
+        cmd.extend(["-hf", model_id])
+        cmd.extend(["--alias", model_id])
     else:
         cmd.extend(["--model", model_file])
+        cmd.extend(["--alias", model_file])
 
     # Performance tunables
     cmd.extend(["-ngl", str(config.get("n_gpu_layers", 99))])
     cmd.extend(["--ctx-size", str(config.get("n_ctx", 98304))])
 
     if config.get("flash_attn", True):
-        cmd.extend(["--flash-attn", "on"])
+        cmd.extend(["-fa", "on"])
 
     cmd.extend(["--batch-size", str(config.get("n_batch", 2048))])
     cmd.extend(["--ubatch-size", str(config.get("n_ubatch", 2048))])
 
     # Slots and Speculative Decoding (sourced from config or defaults)
     cmd.extend(["-np", str(config.get("n_parallel", 1))])
+    cmd.extend(["--spec-type", config.get("spec_type", "draft-mtp")])
     cmd.extend(["--spec-draft-n-max", str(config.get("spec_draft_n_max", 2))])
     cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min", 0.75))])
 
@@ -78,7 +88,15 @@ def main():
         try:
             with open(config_path, "r") as f:
                 loaded = yaml.safe_load(f)
-                if loaded and "models" in loaded and len(loaded["models"]) > 0:
+                if loaded and "active_model" in loaded and "models" in loaded:
+                    active = loaded["active_model"]
+                    for m in loaded["models"]:
+                        if m.get("name") == active:
+                            config = m
+                            break
+                    if not config and len(loaded["models"]) > 0:
+                        config = loaded["models"][0]
+                elif loaded and "models" in loaded and len(loaded["models"]) > 0:
                     config = loaded["models"][0]
                 elif loaded:
                     config = loaded

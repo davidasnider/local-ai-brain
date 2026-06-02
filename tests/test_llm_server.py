@@ -78,7 +78,7 @@ def test_main_no_config(mock_exec, mock_log):
             mock_exec.assert_called_once()
             cmd = mock_exec.call_args[0][1]
             assert "-hf" in cmd
-            assert "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M" in cmd
+            assert "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL" in cmd
             assert "--ctx-size" in cmd
             assert "98304" in cmd
 
@@ -93,6 +93,7 @@ def test_main_config_speculative_params(mock_exec, mock_log):
     yaml_content = """
 model: "direct-model.gguf"
 n_parallel: 2
+spec_type: "draft-mtp"
 spec_draft_n_max: 3
 spec_draft_p_min: 0.8
 """
@@ -111,6 +112,7 @@ spec_draft_p_min: 0.8
                         return None
 
                 assert get_val("-np") == "2"
+                assert get_val("--spec-type") == "draft-mtp"
                 assert get_val("--spec-draft-n-max") == "3"
                 assert get_val("--spec-draft-p-min") == "0.8"
 

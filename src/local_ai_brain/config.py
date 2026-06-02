@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = Field(default=None, validation_alias="HF_TOKEN")
 
     # Model paths
-    QWEN_MODEL_PATH: str = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M"
+    QWEN_MODEL_PATH: str = "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL"
     WHISPER_MODEL_PATH: str = "mlx-community/whisper-large-v3-mlx"
     KOKORO_MODEL_PATH: str = "kokoro-onnx"
     KOKORO_HF_REPO: str = "fastrtc/kokoro-onnx"
@@ -52,7 +52,28 @@ class Settings(BaseSettings):
         return normalized
 
     @model_validator(mode="after")
-    def _validate_max_tokens(self) -> "Settings":
+    def _validate_and_load_config(self) -> "Settings":
+        try:
+            from pathlib import Path
+
+            import yaml
+
+            config_path = Path("llm_config.yaml")
+            if config_path.exists():
+                with open(config_path, "r") as f:
+                    loaded = yaml.safe_load(f)
+                    if loaded and "active_model" in loaded and "models" in loaded:
+                        active = loaded["active_model"]
+                        for m in loaded["models"]:
+                            if m.get("name") == active:
+                                repo = m.get("hf_model_repo_id", "")
+                                model_file = m.get("model", "")
+                                if repo and model_file:
+                                    self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
+                                break
+        except Exception as e:
+            logger.warning(f"Failed to load active model from llm_config.yaml: {e}")
+
         if self.DEFAULT_MAX_TOKENS > self.MAX_CONTEXT_TOKENS:
             raise ValueError(
                 f"DEFAULT_MAX_TOKENS ({self.DEFAULT_MAX_TOKENS}) cannot exceed "

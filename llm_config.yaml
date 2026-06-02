@@ -1,45 +1,35 @@
 # LLM Server Configuration
-# Optimized defaults for Qwen 3.6 35B on Apple Silicon.
+# Define multiple model configurations and select the active one.
 
-# --- Core Model Settings ---
+active_model: "qwen-27b-4bit"
 
-# The Hugging Face repo ID to automatically download the model from.
-hf_model_repo_id: "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+models:
+  - name: "qwen-35b-4bit"
+    hf_model_repo_id: "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+    model: "UD-Q4_K_M"
+    n_gpu_layers: 99
+    n_ctx: 98304
+    flash_attn: true
+    n_batch: 2048
+    n_ubatch: 2048
+    type_k: "q8_0"
+    type_v: "q8_0"
+    n_parallel: 1
+    spec_type: "draft-mtp"
+    spec_draft_n_max: 2
+    spec_draft_p_min: 0.75
 
-# The file pattern or specific filename in the repository.
-# Matches the working value from the original start_llm.sh script.
-model: "UD-Q4_K_M"
-
-# The number of layers to put on the GPU. Set -1 to move all to GPU.
-n_gpu_layers: 99
-
-# The context size (window) for the model.
-n_ctx: 98304
-
-# Whether to use flash attention for performance.
-flash_attn: true
-
-# --- Performance & Batching ---
-
-# The batch size to use per eval.
-n_batch: 2048
-
-# The physical batch size used by llama.cpp.
-n_ubatch: 2048
-
-# Type of the key cache quantization (q8_0, f16, etc.)
-type_k: "q8_0"
-
-# Type of the value cache quantization (q8_0, f16, etc.)
-type_v: "q8_0"
-
-# --- Speculative Decoding & Parallelism ---
-
-# The number of parallel slots to use.
-n_parallel: 1
-
-# Maximum number of tokens to draft per step.
-spec_draft_n_max: 2
-
-# Minimum probability to accept a drafted token.
-spec_draft_p_min: 0.75
+  - name: "qwen-27b-4bit"
+    hf_model_repo_id: "unsloth/Qwen3.6-27B-MTP-GGUF"
+    model: "UD-Q4_K_XL"
+    n_ctx: 98304
+    n_gpu_layers: 99
+    flash_attn: true
+    n_batch: 2048
+    n_ubatch: 2048
+    type_k: "q8_0"
+    type_v: "q8_0"
+    n_parallel: 1
+    spec_type: "draft-mtp"
+    spec_draft_n_max: 2
+    spec_draft_p_min: 0.75
