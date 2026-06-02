@@ -58,19 +58,20 @@ class Settings(BaseSettings):
 
             import yaml
 
-            config_path = Path("llm_config.yaml")
-            if config_path.exists():
-                with open(config_path, "r") as f:
-                    loaded = yaml.safe_load(f)
-                    if loaded and "active_model" in loaded and "models" in loaded:
-                        active = loaded["active_model"]
-                        for m in loaded["models"]:
-                            if m.get("name") == active:
-                                repo = m.get("hf_model_repo_id", "")
-                                model_file = m.get("model", "")
-                                if repo and model_file:
-                                    self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
-                                break
+            if "QWEN_MODEL_PATH" not in self.model_fields_set:
+                config_path = Path("llm_config.yaml")
+                if config_path.exists():
+                    with open(config_path, "r") as f:
+                        loaded = yaml.safe_load(f)
+                        if loaded and "active_model" in loaded and "models" in loaded:
+                            active = loaded["active_model"]
+                            for m in loaded["models"]:
+                                if m.get("name") == active:
+                                    repo = m.get("hf_model_repo_id", "")
+                                    model_file = m.get("model", "")
+                                    if repo and model_file:
+                                        self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
+                                    break
         except Exception as e:
             logger.warning(f"Failed to load active model from llm_config.yaml: {e}")
 

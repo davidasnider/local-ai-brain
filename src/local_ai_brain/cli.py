@@ -9,7 +9,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import psutil
 from loguru import logger
@@ -237,15 +237,17 @@ def shutdown_processes(processes):
             p.kill()
 
 
-def get_active_client_pids(ports=[8000, 8001, 8002, 8003]):
+def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
     """Returns a dict mapping client port to PID for local established connections.
 
     Args:
-        ports (list): List of destination ports to filter by.
+        ports (list): List of destination ports to filter by. Defaults to [8000, 8001, 8002, 8003].
 
     Returns:
         dict: Mapping of source port (int) to PID (int).
     """
+    if ports is None:
+        ports = [8000, 8001, 8002, 8003]
     client_pid_map = {}
     try:
         # lsof -iTCP:8000 -sTCP:ESTABLISHED -n -P
@@ -295,7 +297,7 @@ def trace():
         with open(log_path, "r") as f:
             # Seek to end
             f.seek(0, 2)
-            pattern = re.compile(r"Incoming chat from [^:]+:(\d+) - \"(.*)\"")
+            pattern = re.compile(r"Incoming chat from (?:.+):(\d+) - \"(.*)\"")
 
             while True:
                 line = f.readline()
