@@ -296,7 +296,9 @@ def trace():
         with open(log_path, "r") as f:
             # Seek to end
             f.seek(0, 2)
-            pattern = re.compile(r"Incoming chat from (?:.+):(\d+) - \"(.*)\"")
+            pattern = re.compile(
+                r"Incoming chat from (?:.+):(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])"
+            )
 
             while True:
                 line = f.readline()
@@ -304,7 +306,7 @@ def trace():
                     match = pattern.search(line)
                     if match:
                         port = int(match.group(1))
-                        msg = match.group(2)
+                        msg = match.group(2) or "[PROMPT REDACTED]"
 
                         client_pids = get_active_client_pids()
                         pid = client_pids.get(port)
