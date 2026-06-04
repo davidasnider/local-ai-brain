@@ -6,10 +6,10 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized (GGUF). The API is backed by the `llama-cpp-python` server. It supports a large **96K context window** (`MAX_CONTEXT_TOKENS` = 98304). It utilizes Flash Attention, KV cache quantization (Q8_0), and optimized batch sizes for maximum performance on Apple Silicon. To ensure stability and prevent timeouts, the `local-brain serve` CLI command manages the server lifecycle, and concurrent requests are serialized at the API Gateway level. Configuration can be overridden via `llm_config.yaml`.
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 27B quantized (GGUF). The API is backed by the `llama-cpp-python` server. It supports a large **96K context window** (`MAX_CONTEXT_TOKENS` = 98304). It utilizes Flash Attention, KV cache quantization (Q8_0), and optimized batch sizes for maximum performance on Apple Silicon. To ensure stability and prevent timeouts, the `local-brain serve` CLI command manages the server lifecycle, and concurrent requests are serialized at the API Gateway level. Configuration can be overridden via `llm_config.yaml` using multiple model presets and an `active_model` selector.
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
-- **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
+- **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint. Set `LOG_PROMPTS=true` in your environment to log full chat prompts.
 - **Security:** Authenticated via a static `LOCAL_API_KEY` Bearer token.
 
 ## Prerequisites
@@ -95,7 +95,7 @@ curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
   -d '{
-    "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M",
+    "model": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
     "messages": [{"role": "user", "content": "How do I build a DIY smart mirror?"}],
     "stream": true
   }'
@@ -148,6 +148,12 @@ Available commands inside the CLI:
 - `/stt <filepath>` - Transcribe an audio file using Speech-to-Text.
 - `/exit` or `quit` - Exit the CLI.
 - Standard text input will be treated as a chat message to the LLM.
+
+Additionally, you can trace incoming connections and prompts in real time:
+```bash
+uv run local-brain trace
+```
+This command tails the chat logs, maps requests to the local processes (PIDs) that sent them, and allows you to interactively kill misbehaving client processes.
 
 ## Integration Notes
 

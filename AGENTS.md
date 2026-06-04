@@ -7,7 +7,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 * Python 3.12+
 * FastAPI & Uvicorn
 * `pydantic-settings` (for configuration)
-* `llama-cpp-python` (for Qwen 3.6 LLM hosting via llama-server)
+* `llama-cpp-python` (for Qwen 3.6 27B LLM hosting via llama-server)
 * `mlx-whisper` / Lightning Whisper MLX
 * `kokoro-onnx` or native MLX implementation of Kokoro TTS
 * `loguru` (logging) & `psutil` (hardware monitoring)

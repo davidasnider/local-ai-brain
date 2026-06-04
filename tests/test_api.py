@@ -328,7 +328,7 @@ def test_proxy_chat_default_max_tokens(mock_send, client):
     mock_send.return_value = mock_response
 
     payload = {
-        "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
+        "model": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
         "messages": [{"role": "user", "content": "Hello"}],
         # max_tokens not provided
     }
@@ -363,7 +363,7 @@ def test_proxy_chat_max_tokens_clamping(mock_send, client):
     mock_send.return_value = mock_response
 
     payload = {
-        "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
+        "model": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
         "messages": [{"role": "user", "content": "Hello"}],
         "max_tokens": 1000000,  # Larger than MAX_CONTEXT_TOKENS
     }
@@ -398,7 +398,7 @@ def test_proxy_completions_max_tokens_clamping(mock_send, client):
     mock_send.return_value = mock_response
 
     payload = {
-        "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
+        "model": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
         "prompt": "Hello",
         "max_tokens": 1000000,  # Larger than MAX_CONTEXT_TOKENS
     }
@@ -722,3 +722,65 @@ def test_proxy_request_stream_options_edge_cases(mock_send, client):
     assert response.status_code == 200
     sent_payload = json.loads(mock_send.call_args[0][0].content.decode("utf-8"))
     assert sent_payload["stream_options"] == {"include_usage": True}
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_logging(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    with patch("local_ai_brain.main.logger") as mock_logger:
+        with patch("local_ai_brain.main.settings.LOG_PROMPTS", True):
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer test-api-key"},
+                json={
+                    "model": "test-model",
+                    "messages": [{"role": "user", "content": "Tell me a story about a brain."}],
+                },
+            )
+        assert response.status_code == 200
+
+        # Check that logger.info was called with the chat preview
+        log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+        assert any("Incoming chat from" in msg for msg in log_messages)
+        assert any("Tell me a story about a brain." in msg for msg in log_messages)
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_logging_redacted(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    with patch("local_ai_brain.main.logger") as mock_logger:
+        # LOG_PROMPTS is False by default
+        response = client.post(
+            "/v1/chat/completions",
+            headers={"Authorization": "Bearer test-api-key"},
+            json={
+                "model": "test-model",
+                "messages": [{"role": "user", "content": "Sensitive information"}],
+            },
+        )
+        assert response.status_code == 200
+
+        log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+        assert any("Incoming chat from" in msg for msg in log_messages)
+        assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
+        assert not any("Sensitive information" in msg for msg in log_messages)
