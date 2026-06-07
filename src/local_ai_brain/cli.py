@@ -3,6 +3,7 @@ import json
 import os
 import re
 import select
+import signal
 import subprocess
 import sys
 import time
@@ -11,7 +12,6 @@ import urllib.request
 import uuid
 from typing import Dict, List, Optional
 
-import psutil
 from loguru import logger
 
 from local_ai_brain.logging import configure_logging
@@ -313,13 +313,18 @@ def trace():
 
                         if pid:
                             try:
-                                proc = psutil.Process(pid)
-                                cmdline = " ".join(proc.cmdline())
+                                cmdline = (
+                                    subprocess.check_output(
+                                        ["ps", "-p", str(pid), "-o", "command="]
+                                    )
+                                    .decode()
+                                    .strip()
+                                )
                                 print(
                                     f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
                                     f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
                                 )
-                            except psutil.NoSuchProcess:
+                            except subprocess.CalledProcessError:
                                 print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
                         else:
                             print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
@@ -339,7 +344,7 @@ def trace():
                                     f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}"
                                 )
                                 pid_int = int(pid_to_kill)
-                                psutil.Process(pid_int).kill()
+                                os.kill(pid_int, signal.SIGKILL)
                                 print(
                                     f"{COLOR_ASSISTANT}Successfully killed PID "
                                     f"{pid_int}{COLOR_RESET}\n"

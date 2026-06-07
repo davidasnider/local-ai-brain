@@ -27,8 +27,10 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     if ":" in settings.QWEN_MODEL_PATH:
         default_repo, default_file = settings.QWEN_MODEL_PATH.split(":", 1)
 
-    hf_repo = str(config.get("hf_model_repo_id") or default_repo)
-    model_file = str(config.get("model") or default_file)
+    hf_repo_val = config.get("hf_model_repo_id")
+    hf_repo = str(hf_repo_val if hf_repo_val is not None else default_repo)
+    model_file_val = config.get("model")
+    model_file = str(model_file_val if model_file_val is not None else default_file)
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:

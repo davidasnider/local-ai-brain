@@ -1,4 +1,5 @@
 import json
+import signal
 import subprocess
 import sys
 import urllib.error
@@ -443,15 +444,13 @@ def test_get_active_client_pids_error(mock_check_output):
 @patch("os.path.exists")
 @patch("builtins.open", new_callable=mock_open)
 @patch("local_ai_brain.cli.get_active_client_pids")
-@patch("psutil.Process")
+@patch("subprocess.check_output")
 @patch("select.select")
-def test_trace_basic(mock_select, mock_psutil, mock_pids, mock_file, mock_exists, capsys):
+def test_trace_basic(mock_select, mock_check_output, mock_pids, mock_file, mock_exists, capsys):
     mock_exists.return_value = True
     mock_pids.return_value = {54321: 12345}
 
-    proc = MagicMock()
-    proc.cmdline.return_value = ["python", "app.py"]
-    mock_psutil.return_value = proc
+    mock_check_output.return_value = b"python app.py\n"
 
     # Mock log file content
     handle = mock_file()
@@ -479,10 +478,8 @@ def test_trace_basic(mock_select, mock_psutil, mock_pids, mock_file, mock_exists
 @patch("local_ai_brain.cli.get_active_client_pids")
 @patch("select.select")
 @patch("builtins.input")
-@patch("psutil.Process")
-def test_trace_kill(
-    mock_psutil, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
-):
+@patch("os.kill")
+def test_trace_kill(mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys):
     mock_exists.return_value = True
 
     # Mock select to return stdin available once
@@ -501,7 +498,6 @@ def test_trace_kill(
         with pytest.raises(SystemExit):
             trace()
 
-        mock_psutil.assert_called_with(9999)
-        mock_psutil().kill.assert_called_once()
+        mock_kill.assert_called_with(9999, signal.SIGKILL)
         captured = capsys.readouterr()
         assert "Successfully killed PID 9999" in captured.out
