@@ -66,13 +66,26 @@ class Settings(BaseSettings):
                         loaded = yaml.safe_load(f)
                         if loaded and "active_model" in loaded and "models" in loaded:
                             active = loaded["active_model"]
+                            matched = None
                             for m in loaded["models"]:
                                 if m.get("name") == active:
-                                    repo = m.get("hf_model_repo_id", "")
-                                    model_file = m.get("model", "")
-                                    if repo and model_file:
-                                        self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
+                                    matched = m
                                     break
+                            # Fall back to first model if active_model not found
+                            if matched is None and len(loaded["models"]) > 0:
+                                matched = loaded["models"][0]
+                            if matched:
+                                repo = matched.get("hf_model_repo_id", "")
+                                model_file = matched.get("model", "")
+                                if repo and model_file:
+                                    self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
+                        elif loaded and "models" in loaded and len(loaded["models"]) > 0:
+                            # No active_model key — use first model
+                            first = loaded["models"][0]
+                            repo = first.get("hf_model_repo_id", "")
+                            model_file = first.get("model", "")
+                            if repo and model_file:
+                                self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
         except Exception as e:
             logger.warning(f"Failed to load active model from llm_config.yaml: {e}")
 
