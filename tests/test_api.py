@@ -769,18 +769,19 @@ def test_proxy_chat_logging_redacted(mock_send, client):
     mock_send.return_value = mock_response
 
     with patch("local_ai_brain.main.logger") as mock_logger:
-        # LOG_PROMPTS is False by default
-        response = client.post(
-            "/v1/chat/completions",
-            headers={"Authorization": "Bearer test-api-key"},
-            json={
-                "model": "test-model",
-                "messages": [{"role": "user", "content": "Sensitive information"}],
-            },
-        )
-        assert response.status_code == 200
+        # LOG_PROMPTS is False by default; override env in case it leaks
+        with patch.object(settings, "LOG_PROMPTS", False):
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer test-api-key"},
+                json={
+                    "model": "test-model",
+                    "messages": [{"role": "user", "content": "Sensitive information"}],
+                },
+            )
+            assert response.status_code == 200
 
-        log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
-        assert any("Incoming chat from" in msg for msg in log_messages)
-        assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
-        assert not any("Sensitive information" in msg for msg in log_messages)
+            log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+            assert any("Incoming chat from" in msg for msg in log_messages)
+            assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
+            assert not any("Sensitive information" in msg for msg in log_messages)
