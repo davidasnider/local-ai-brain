@@ -64,7 +64,11 @@ class Settings(BaseSettings):
                 if config_path.exists():
                     with open(config_path, "r") as f:
                         loaded = yaml.safe_load(f)
-                        if loaded and "active_model" in loaded and "models" in loaded:
+                        if (
+                            isinstance(loaded, dict)
+                            and "active_model" in loaded
+                            and "models" in loaded
+                        ):
                             active = loaded["active_model"]
                             matched = None
                             for m in loaded["models"]:
@@ -79,7 +83,11 @@ class Settings(BaseSettings):
                                 model_file = matched.get("model", "")
                                 if repo and model_file:
                                     self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
-                        elif loaded and "models" in loaded and len(loaded["models"]) > 0:
+                        elif (
+                            isinstance(loaded, dict)
+                            and "models" in loaded
+                            and len(loaded["models"]) > 0
+                        ):
                             # No active_model key — use first model
                             first = loaded["models"][0]
                             repo = first.get("hf_model_repo_id", "")

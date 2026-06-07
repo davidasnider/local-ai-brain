@@ -262,7 +262,7 @@ def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
                     name = parts[8]
                     # name looks like localhost:52345->localhost:8000
                     if "->" in name:
-                        src, dst = name.split("->")
+                        src, _ = name.split("->", 1)
                         src_port = int(src.split(":")[-1])
                         client_pid_map[src_port] = pid
                 except (ValueError, IndexError):

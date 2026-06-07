@@ -70,7 +70,12 @@ n_ctx: 1024
 @patch("os.execvp")
 def test_main_no_config(mock_exec, mock_log):
     """Verify that main() uses defaults when no config file exists."""
+    from local_ai_brain.config import settings
     from local_ai_brain.models.llm_server import main
+
+    # Pin the expected default so a real llm_config.yaml at repo root
+    # cannot override QWEN_MODEL_PATH via the Settings singleton.
+    settings.QWEN_MODEL_PATH = "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL"
 
     with patch("local_ai_brain.models.llm_server.Path.exists", return_value=False):
         with patch("sys.argv", ["llm_server"]):

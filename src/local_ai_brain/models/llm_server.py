@@ -124,7 +124,7 @@ def main():
         try:
             with open(config_path, "r") as f:
                 loaded = yaml.safe_load(f)
-                if loaded and "active_model" in loaded and "models" in loaded:
+                if isinstance(loaded, dict) and "active_model" in loaded and "models" in loaded:
                     active = loaded["active_model"]
                     for m in loaded["models"]:
                         if m.get("name") == active:
@@ -132,9 +132,9 @@ def main():
                             break
                     if not config and len(loaded["models"]) > 0:
                         config = loaded["models"][0]
-                elif loaded and "models" in loaded and len(loaded["models"]) > 0:
+                elif isinstance(loaded, dict) and "models" in loaded and len(loaded["models"]) > 0:
                     config = loaded["models"][0]
-                elif loaded:
+                elif isinstance(loaded, dict):
                     config = loaded
         except Exception as e:
             logger.error(f"Failed to parse {config_path}: {e}")
