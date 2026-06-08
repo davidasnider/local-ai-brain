@@ -17,33 +17,79 @@ from local_ai_brain.logging import configure_logging
 
 def build_command(config: dict, host: str, port: str) -> list[str]:
     """Build the CLI arguments for llama-server."""
+    from local_ai_brain.config import settings
+
     cmd = ["llama-server"]
 
     # Model settings
-    hf_repo = config.get("hf_model_repo_id", "unsloth/Qwen3.6-35B-A3B-MTP-GGUF")
-    model_file = config.get("model", "UD-Q4_K_M")
+    default_repo = ""
+    default_file = settings.QWEN_MODEL_PATH
+    if ":" in settings.QWEN_MODEL_PATH:
+        default_repo, default_file = settings.QWEN_MODEL_PATH.split(":", 1)
+
+    hf_repo_val = config.get("hf_model_repo_id")
+    hf_repo = str(hf_repo_val if hf_repo_val is not None else default_repo)
+    model_file_val = config.get("model")
+    model_file = str(model_file_val if model_file_val is not None else default_file)
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:
-        # Original script used -hf repo:file format
-        cmd.extend(["-hf", f"{hf_repo}:{model_file}"])
+        model_id = f"{hf_repo}:{model_file}"
+        cmd.extend(["-hf", model_id])
+        cmd.extend(["--alias", model_id])
     else:
         cmd.extend(["--model", model_file])
+        cmd.extend(["--alias", model_file])
 
     # Performance tunables
-    cmd.extend(["-ngl", str(config.get("n_gpu_layers", 99))])
-    cmd.extend(["--ctx-size", str(config.get("n_ctx", 98304))])
+    cmd.extend(
+        ["-ngl", str(config.get("n_gpu_layers") if config.get("n_gpu_layers") is not None else 99)]
+    )
+    cmd.extend(
+        ["--ctx-size", str(config.get("n_ctx") if config.get("n_ctx") is not None else 98304)]
+    )
 
     if config.get("flash_attn", True):
-        cmd.extend(["--flash-attn", "on"])
+        cmd.extend(["-fa", "on"])
 
-    cmd.extend(["--batch-size", str(config.get("n_batch", 2048))])
-    cmd.extend(["--ubatch-size", str(config.get("n_ubatch", 2048))])
+    cmd.extend(
+        ["--batch-size", str(config.get("n_batch") if config.get("n_batch") is not None else 2048)]
+    )
+    cmd.extend(
+        [
+            "--ubatch-size",
+            str(config.get("n_ubatch") if config.get("n_ubatch") is not None else 2048),
+        ]
+    )
 
     # Slots and Speculative Decoding (sourced from config or defaults)
-    cmd.extend(["-np", str(config.get("n_parallel", 1))])
-    cmd.extend(["--spec-draft-n-max", str(config.get("spec_draft_n_max", 2))])
-    cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min", 0.75))])
+    cmd.extend(
+        ["-np", str(config.get("n_parallel") if config.get("n_parallel") is not None else 1)]
+    )
+    cmd.extend(
+        [
+            "--spec-type",
+            str(config.get("spec_type") if config.get("spec_type") is not None else "draft-mtp"),
+        ]
+    )
+    cmd.extend(
+        [
+            "--spec-draft-n-max",
+            str(
+                config.get("spec_draft_n_max") if config.get("spec_draft_n_max") is not None else 2
+            ),
+        ]
+    )
+    cmd.extend(
+        [
+            "--spec-draft-p-min",
+            str(
+                config.get("spec_draft_p_min")
+                if config.get("spec_draft_p_min") is not None
+                else 0.75
+            ),
+        ]
+    )
 
     # Cache quantization (mapping 8 -> q8_0 for llama-server)
     type_k = config.get("type_k")
@@ -78,9 +124,17 @@ def main():
         try:
             with open(config_path, "r") as f:
                 loaded = yaml.safe_load(f)
-                if loaded and "models" in loaded and len(loaded["models"]) > 0:
+                if isinstance(loaded, dict) and "active_model" in loaded and "models" in loaded:
+                    active = loaded["active_model"]
+                    for m in loaded["models"]:
+                        if m.get("name") == active:
+                            config = m
+                            break
+                    if not config and len(loaded["models"]) > 0:
+                        config = loaded["models"][0]
+                elif isinstance(loaded, dict) and "models" in loaded and len(loaded["models"]) > 0:
                     config = loaded["models"][0]
-                elif loaded:
+                elif isinstance(loaded, dict):
                     config = loaded
         except Exception as e:
             logger.error(f"Failed to parse {config_path}: {e}")

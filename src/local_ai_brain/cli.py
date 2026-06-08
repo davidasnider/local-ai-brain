@@ -1,11 +1,16 @@
 import argparse
 import json
 import os
+import re
+import select
+import signal
+import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from loguru import logger
 
@@ -232,6 +237,129 @@ def shutdown_processes(processes):
             p.kill()
 
 
+def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
+    """Returns a dict mapping client port to PID for local established connections.
+
+    Args:
+        ports (list): List of destination ports to filter by. Defaults to [8000, 8001, 8002, 8003].
+
+    Returns:
+        dict: Mapping of source port (int) to PID (int).
+    """
+    if ports is None:
+        ports = [8000, 8001, 8002, 8003]
+    client_pid_map = {}
+    try:
+        # lsof -iTCP:8000,8001,... -sTCP:ESTABLISHED -n -P
+        port_spec = ",".join(map(str, ports))
+        cmd = ["lsof", f"-iTCP:{port_spec}", "-sTCP:ESTABLISHED", "-n", "-P"]
+        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 9 and "TCP" in line:
+                try:
+                    pid = int(parts[1])
+                    name = parts[8]
+                    # name looks like localhost:52345->localhost:8000
+                    if "->" in name:
+                        src, _ = name.split("->", 1)
+                        src_port = int(src.split(":")[-1])
+                        client_pid_map[src_port] = pid
+                except (ValueError, IndexError):
+                    continue
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # lsof might not be installed or might return non-zero if no matches
+        pass
+    except Exception as e:
+        logger.debug(f"Error in get_active_client_pids: {e}")
+    return client_pid_map
+
+
+def trace():
+    """Tails the local-ai-brain log file and maps incoming requests to client PIDs.
+
+    Provides real-time visibility into which local processes are talking to the brain.
+    Supports an interactive 'k' command to kill identified client processes.
+    """
+    print(f"{COLOR_SYSTEM}Starting real-time conversation trace...{COLOR_RESET}")
+    print(f"{COLOR_SYSTEM}Press 'k' and enter to kill a process.{COLOR_RESET}")
+    print(f"{COLOR_SYSTEM}Press Ctrl+C to exit.{COLOR_RESET}")
+
+    log_path = os.path.expanduser(
+        os.getenv("LOCAL_AI_BRAIN_LOG_PATH", "~/Library/Logs/local-ai-brain.log")
+    )
+    if not os.path.exists(log_path):
+        print(f"{COLOR_ERROR}Log file not found: {log_path}{COLOR_RESET}")
+        sys.exit(1)
+
+    try:
+        with open(log_path, "r") as f:
+            # Seek to end
+            f.seek(0, 2)
+            pattern = re.compile(
+                r"Incoming chat from (?:.+):(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])"
+            )
+
+            while True:
+                line = f.readline()
+                if line:
+                    match = pattern.search(line)
+                    if match:
+                        port = int(match.group(1))
+                        msg = match.group(2) or "[PROMPT REDACTED]"
+
+                        client_pids = get_active_client_pids()
+                        pid = client_pids.get(port)
+
+                        if pid:
+                            try:
+                                cmdline = (
+                                    subprocess.check_output(
+                                        ["ps", "-p", str(pid), "-o", "command="]
+                                    )
+                                    .decode()
+                                    .strip()
+                                )
+                                print(
+                                    f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
+                                    f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
+                                )
+                            except subprocess.CalledProcessError:
+                                print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
+                        else:
+                            print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
+
+                        print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
+                    else:
+                        # Log completion/stats if needed, or ignore
+                        pass
+                else:
+                    # Check for interactive kill command
+                    i, _, _ = select.select([sys.stdin], [], [], 0.1)
+                    if i:
+                        user_input = sys.stdin.readline().strip().lower()
+                        if user_input == "k":
+                            try:
+                                pid_to_kill = input(
+                                    f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}"
+                                )
+                                pid_int = int(pid_to_kill)
+                                os.kill(pid_int, signal.SIGKILL)
+                                print(
+                                    f"{COLOR_ASSISTANT}Successfully killed PID "
+                                    f"{pid_int}{COLOR_RESET}\n"
+                                )
+                            except ValueError:
+                                print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
+                            except Exception as e:
+                                print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
+                    else:
+                        time.sleep(0.05)
+    except KeyboardInterrupt:
+        print(f"\n{COLOR_SYSTEM}Exiting trace...{COLOR_RESET}")
+        sys.exit(0)
+
+
 def serve():
     import shutil
     import subprocess
@@ -366,11 +494,16 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("serve", help="Start the API servers")
+    subparsers.add_parser("trace", help="Trace conversations in real time")
 
     args = parser.parse_args()
 
     if args.command == "serve":
         serve()
+        return
+
+    if args.command == "trace":
+        trace()
         return
 
     if args.help_cmd:
