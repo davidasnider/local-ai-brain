@@ -30,20 +30,6 @@ class Settings(BaseSettings):
     KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
 
     # LLM engine settings
-    LLM_KV_CACHE_QUANTIZATION: bool = Field(
-        default=True, description="Enable KV cache quantization for memory efficiency"
-    )
-    LLM_KV_CACHE_BITS: int = Field(
-        default=4, ge=4, le=8, description="Number of bits for KV cache quantization"
-    )
-    LLM_SPECPREFILL_ENABLED: bool = Field(
-        default=True, description="Enable speculative prefill for faster generation"
-    )
-    LLM_SPECPREFILL_DRAFT_MODEL: str = Field(
-        default="mlx-community/Qwen2.5-0.5B-Instruct-4bit",
-        description="Draft model for speculative prefill",
-    )
-    LLM_MAX_KV_SIZE: int = Field(default=8192, ge=0, description="Maximum KV cache size")
     LLM_PREFILL_STEP_SIZE: int = Field(
         default=128,
         gt=0,
@@ -86,7 +72,7 @@ class Settings(BaseSettings):
             )
         return self
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
