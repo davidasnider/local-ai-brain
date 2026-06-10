@@ -29,18 +29,6 @@ class Settings(BaseSettings):
     KOKORO_ONNX_FILE: str = "kokoro-v1.0.onnx"
     KOKORO_VOICES_FILE: str = "voices-v1.0.bin"
 
-    # LLM engine settings
-    LLM_PREFILL_STEP_SIZE: int = Field(
-        default=128,
-        gt=0,
-        description="Prefill step size (prevents Metal GPU timeouts)",
-    )
-    LLM_MAX_NUM_SEQS: int = Field(
-        default=1,
-        gt=0,
-        description="Max concurrent sequences (prevents Metal GPU timeouts)",
-    )
-
     # Legacy model ID aliases (accepted in addition to QWEN_MODEL_PATH)
     QWEN_MODEL_ALIASES: list[str] = Field(default=["mlx-community/Qwen3.6-35B-A3B-8bit"])
 
