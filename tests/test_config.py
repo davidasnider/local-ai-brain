@@ -1,3 +1,8 @@
+import os
+
+# Set testing environment variables before importing config
+os.environ["LOCAL_API_KEY"] = "test-api-key"  # pragma: allowlist secret
+
 import pytest
 from pydantic import ValidationError
 
@@ -10,6 +15,18 @@ def test_settings_validation():
     assert settings.LOCAL_API_KEY == "test"  # pragma: allowlist secret
     assert settings.MAX_CONTEXT_TOKENS == 98304
     assert settings.DEFAULT_MAX_TOKENS == 16384
+
+
+def test_settings_ignores_extra_fields():
+    # Verify the Settings class ignores extra/unknown fields
+    settings = Settings(
+        LOCAL_API_KEY="test",  # pragma: allowlist secret
+        LLM_KV_CACHE_BITS=4,
+        UNSUPPORTED_PARAMETER="value",
+    )
+    assert settings.LOCAL_API_KEY == "test"  # pragma: allowlist secret
+    assert not hasattr(settings, "LLM_KV_CACHE_BITS")
+    assert not hasattr(settings, "UNSUPPORTED_PARAMETER")
 
 
 def test_settings_max_tokens_validation():
