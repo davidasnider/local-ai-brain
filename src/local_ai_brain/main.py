@@ -141,6 +141,20 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                         prompt_preview = last_msg[:100].replace("\n", " ") + (
                             "..." if len(last_msg) > 100 else ""
                         )
+                    elif isinstance(last_msg, list):
+                        # Multi-part content (vision/tooling) — extract text parts
+                        text_parts = [
+                            part.get("text", "")
+                            for part in last_msg
+                            if isinstance(part, dict) and part.get("type") == "text"
+                        ]
+                        combined = " ".join(text_parts)
+                        if combined:
+                            prompt_preview = combined[:100].replace("\n", " ") + (
+                                "..." if len(combined) > 100 else ""
+                            )
+                        else:
+                            prompt_preview = "[multi-part content]"
             elif "prompt" in payload and isinstance(payload["prompt"], str):
                 prompt_preview = payload["prompt"][:100].replace("\n", " ") + (
                     "..." if len(payload["prompt"]) > 100 else ""
