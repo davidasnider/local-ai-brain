@@ -344,6 +344,8 @@ def trace():
                                     f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}"
                                 )
                                 pid_int = int(pid_to_kill)
+                                if pid_int <= 0:
+                                    raise ValueError("PID must be a positive integer")
                                 os.kill(pid_int, signal.SIGKILL)
                                 print(
                                     f"{COLOR_ASSISTANT}Successfully killed PID "
