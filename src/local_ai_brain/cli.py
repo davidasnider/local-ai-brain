@@ -287,6 +287,26 @@ def trace():
     Provides real-time visibility into which local processes are talking to the brain.
     Supports an interactive 'k' command to kill identified client processes.
     """
+
+    def display_msg(pid, port, msg):
+        if pid:
+            try:
+                cmdline = (
+                    subprocess.check_output(["ps", "-p", str(pid), "-o", "command="])
+                    .decode()
+                    .strip()
+                )
+                print(
+                    f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
+                    f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
+                )
+            except subprocess.CalledProcessError:
+                print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
+        else:
+            print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
+
+        print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
+
     print(f"{COLOR_SYSTEM}Starting real-time conversation trace...{COLOR_RESET}")
     print(f"{COLOR_SYSTEM}Press 'k' and enter to kill a process.{COLOR_RESET}")
     print(f"{COLOR_SYSTEM}Press Ctrl+C to exit.{COLOR_RESET}")
@@ -312,6 +332,7 @@ def trace():
         last_pid_refresh = 0.0
         last_prune_time = 0.0
         waiting_for_pid = False
+        buffered_messages = []
         client_pids = {}
         monitor_stdin = sys.stdin.isatty()
 
@@ -378,27 +399,10 @@ def trace():
                         trace_pids.add(pid)
 
                     if waiting_for_pid:
+                        buffered_messages.append((pid, port, msg))
                         print("[message received — finish entering PID first]")
                     else:
-                        if pid:
-                            try:
-                                cmdline = (
-                                    subprocess.check_output(
-                                        ["ps", "-p", str(pid), "-o", "command="]
-                                    )
-                                    .decode()
-                                    .strip()
-                                )
-                                print(
-                                    f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
-                                    f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
-                                )
-                            except subprocess.CalledProcessError:
-                                print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
-                        else:
-                            print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
-
-                        print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
+                        display_msg(pid, port, msg)
                 else:
                     # Log completion/stats if needed, or ignore
                     pass
@@ -445,6 +449,10 @@ def trace():
                                 print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
                             except Exception as e:
                                 print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
+
+                        for b_pid, b_port, b_msg in buffered_messages:
+                            display_msg(b_pid, b_port, b_msg)
+                        buffered_messages.clear()
                     else:
                         user_input_lower = user_input.lower()
                         if user_input_lower == "k":

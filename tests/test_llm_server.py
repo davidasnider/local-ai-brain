@@ -335,10 +335,12 @@ models:
             assert "models/qwen.gguf" in cmd
 
 
-def test_build_command_api_key_fallback_to_settings(monkeypatch):
-    """Verify that build_command falls back to settings.LOCAL_API_KEY when env keys are missing."""
+@patch("local_ai_brain.models.llm_server.configure_logging")
+@patch("os.execvp")
+def test_build_command_api_key_fallback_to_settings(mock_exec, mock_log, monkeypatch):
+    """Verify that main() falls back to settings.LOCAL_API_KEY when env keys are missing."""
     from local_ai_brain.config import settings
-    from local_ai_brain.models.llm_server import build_command
+    from local_ai_brain.models.llm_server import main
 
     # Ensure environment does not contain the keys
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -348,16 +350,20 @@ def test_build_command_api_key_fallback_to_settings(monkeypatch):
     # Set the fallback value on settings
     monkeypatch.setattr(settings, "LOCAL_API_KEY", "fallback-secret-key")
 
-    # Call build_command
-    build_command({}, "127.0.0.1", "8001")
+    monkeypatch.setattr(Path, "exists", lambda self: False)
+    with patch("sys.argv", ["llm_server"]):
+        main()
 
     # Verify that LLAMA_API_KEY is set to settings.LOCAL_API_KEY
     assert os.environ.get("LLAMA_API_KEY") == "fallback-secret-key"
 
 
-def test_build_command_tilde_expansion():
+def test_build_command_tilde_expansion(monkeypatch):
     """Verify that build_command expands tilde (~) paths before executing llama-server."""
     from local_ai_brain.models.llm_server import build_command
+
+    # Isolate environment
+    monkeypatch.delenv("LLAMA_API_KEY", raising=False)
 
     config = {"model": "~/models/my_model.gguf"}
     cmd = build_command(config, "127.0.0.1", "8001")
@@ -372,9 +378,12 @@ def test_build_command_tilde_expansion():
     assert cmd[cmd.index("--alias") + 1] == expected_path
 
 
-def test_is_local_path_has_fs_characteristics():
+def test_is_local_path_has_fs_characteristics(monkeypatch):
     """Verify that models with FS characteristics are treated as local if they do not exist."""
     from local_ai_brain.models.llm_server import build_command
+
+    # Isolate environment
+    monkeypatch.delenv("LLAMA_API_KEY", raising=False)
 
     # Using a model name that doesn't exist and ends in .gguf
     config = {"model": "nonexistent_model_with_fs_characteristics.gguf"}

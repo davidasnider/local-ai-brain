@@ -974,5 +974,6 @@ def test_trace_waiting_for_pid_mutes_incoming_messages(
         captured = capsys.readouterr()
         # Verify the message muted line was printed
         assert "[message received — finish entering PID first]" in captured.out
-        # Verify normal says was NOT printed for log_line_1 since it was muted
-        assert "Says: Hello test" not in captured.out
+        # Verify the message was buffered and eventually displayed once input completed
+        assert "Says:" in captured.out
+        assert "Hello test" in captured.out

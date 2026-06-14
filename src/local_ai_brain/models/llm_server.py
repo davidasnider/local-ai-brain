@@ -133,15 +133,6 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     cmd.extend(["--host", host])
     cmd.extend(["--port", port])
 
-    # API Key injection
-    api_key = (
-        os.environ.get("OPENAI_API_KEY")
-        or os.environ.get("LOCAL_API_KEY")
-        or settings.LOCAL_API_KEY
-    )
-    if api_key:
-        os.environ["LLAMA_API_KEY"] = api_key
-
     return cmd
 
 
@@ -187,6 +178,15 @@ def main():
             host = sys.argv[i + 1]
         elif arg == "--port" and i + 1 < len(sys.argv):
             port = sys.argv[i + 1]
+
+    # API Key injection
+    api_key = (
+        os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("LOCAL_API_KEY")
+        or settings.LOCAL_API_KEY
+    )
+    if api_key:
+        os.environ["LLAMA_API_KEY"] = api_key
 
     cmd = build_command(config, host, port)
 

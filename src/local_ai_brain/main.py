@@ -490,7 +490,7 @@ async def ollama_tags_compat(request: Request):
                 modified_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
             else:
                 modified_at = datetime.now(timezone.utc).isoformat()
-        except (TypeError, ValueError, OSError):
+        except (TypeError, ValueError, OSError, OverflowError):
             modified_at = datetime.now(timezone.utc).isoformat()
         transformed.append(
             {
