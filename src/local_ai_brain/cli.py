@@ -304,6 +304,8 @@ def trace():
 
         trace_pids = set()
         last_pid_refresh = 0.0
+        last_prune_time = 0.0
+        waiting_for_pid = False
         client_pids = {}
         monitor_stdin = sys.stdin.isatty()
 
@@ -329,6 +331,19 @@ def trace():
                         f = new_f
                     except Exception:
                         pass
+
+            # Prune dead PIDs from trace_pids every 5 seconds
+            if now - last_prune_time > 5.0:
+                last_prune_time = now
+                dead_pids = set()
+                for pid in trace_pids:
+                    try:
+                        os.kill(pid, 0)
+                    except PermissionError:
+                        pass
+                    except OSError:
+                        dead_pids.add(pid)
+                trace_pids -= dead_pids
 
             line = f.readline()
             if line:
@@ -368,6 +383,12 @@ def trace():
                         print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
 
                     print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
+                    if waiting_for_pid:
+                        print(
+                            f"{COLOR_SYSTEM}Enter PID (Esc to cancel): {COLOR_RESET}",
+                            end="",
+                            flush=True,
+                        )
                 else:
                     # Log completion/stats if needed, or ignore
                     pass
@@ -380,28 +401,40 @@ def trace():
                     if not raw_line:
                         # stdin closed/EOF — stop monitoring
                         break
-                    user_input = raw_line.strip().lower()
-                    if user_input == "k":
-                        try:
-                            pid_to_kill = input(f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}")
-                            pid_int = int(pid_to_kill)
-                            if pid_int <= 0:
-                                raise ValueError("PID must be a positive integer")
-                            if pid_int not in trace_pids:
-                                print(
-                                    f"{COLOR_ERROR}PID not tracked by this trace session"
-                                    f"{COLOR_RESET}\n"
-                                )
-                            else:
-                                os.kill(pid_int, signal.SIGKILL)
-                                print(
-                                    f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}"
-                                    f"{COLOR_RESET}\n"
-                                )
-                        except ValueError:
-                            print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
-                        except Exception as e:
-                            print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
+                    user_input = raw_line.strip()
+                    if waiting_for_pid:
+                        waiting_for_pid = False
+                        if not user_input or "esc" in user_input.lower() or "\x1b" in user_input:
+                            print(f"{COLOR_SYSTEM}Cancelled.{COLOR_RESET}\n")
+                        else:
+                            try:
+                                pid_int = int(user_input)
+                                if pid_int <= 0:
+                                    raise ValueError("PID must be a positive integer")
+                                if pid_int not in trace_pids:
+                                    print(
+                                        f"{COLOR_ERROR}PID not tracked by this trace session"
+                                        f"{COLOR_RESET}\n"
+                                    )
+                                else:
+                                    os.kill(pid_int, signal.SIGKILL)
+                                    print(
+                                        f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}"
+                                        f"{COLOR_RESET}\n"
+                                    )
+                            except ValueError:
+                                print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
+                            except Exception as e:
+                                print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
+                    else:
+                        user_input_lower = user_input.lower()
+                        if user_input_lower == "k":
+                            waiting_for_pid = True
+                            print(
+                                f"{COLOR_SYSTEM}Enter PID (Esc to cancel): {COLOR_RESET}",
+                                end="",
+                                flush=True,
+                            )
                 elif not line:
                     time.sleep(0.05)
             else:

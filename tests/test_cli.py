@@ -480,20 +480,19 @@ def test_trace_basic(mock_select, mock_check_output, mock_pids, mock_file, mock_
 @patch("builtins.open", new_callable=mock_open)
 @patch("local_ai_brain.cli.get_active_client_pids")
 @patch("select.select")
-@patch("builtins.input")
 @patch("os.kill")
 @patch("subprocess.check_output")
 def test_trace_kill(
-    mock_check_output, mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
+    mock_check_output, mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys
 ):
     mock_exists.return_value = True
     mock_pids.return_value = {54321: 9999}
     mock_check_output.return_value = b"test-command\n"
 
-    # Mock select to return stdin available once
+    # Mock select to return stdin available twice
     mock_stdin = MagicMock()
     mock_stdin.isatty.return_value = True
-    mock_stdin.readline.return_value = "k\n"
+    mock_stdin.readline.side_effect = ["k\n", "9999\n"]
 
     # Use patch to replace sys.stdin
     with patch("sys.stdin", mock_stdin):
@@ -503,10 +502,13 @@ def test_trace_kill(
             "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
             'Incoming chat from 127.0.0.1:54321 - "Hello test"\n',
             "",  # End of loop iteration
+            "",
         ]
-        mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
-
-        mock_input.return_value = "9999"
+        mock_select.side_effect = [
+            ([mock_stdin], [], []),
+            ([mock_stdin], [], []),
+            KeyboardInterrupt(),
+        ]
 
         with pytest.raises(SystemExit):
             trace()
@@ -538,25 +540,24 @@ def test_trace_stdin_eof(mock_select, mock_file, mock_exists):
 @patch("builtins.open", new_callable=mock_open)
 @patch("local_ai_brain.cli.get_active_client_pids")
 @patch("select.select")
-@patch("builtins.input")
 @patch("os.kill")
-def test_trace_kill_untracked(
-    mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
-):
+def test_trace_kill_untracked(mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys):
     mock_exists.return_value = True
     mock_pids.return_value = {}
 
-    # Mock select to return stdin available once
+    # Mock select to return stdin available twice
     mock_stdin = MagicMock()
     mock_stdin.isatty.return_value = True
-    mock_stdin.readline.return_value = "k\n"
+    mock_stdin.readline.side_effect = ["k\n", "9999\n"]
 
     # Use patch to replace sys.stdin
     with patch("sys.stdin", mock_stdin):
         mock_file().readline.return_value = ""
-        mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
-
-        mock_input.return_value = "9999"
+        mock_select.side_effect = [
+            ([mock_stdin], [], []),
+            ([mock_stdin], [], []),
+            KeyboardInterrupt(),
+        ]
 
         with pytest.raises(SystemExit):
             trace()
@@ -602,11 +603,8 @@ def test_trace_non_tty(mock_select, mock_check_output, mock_pids, mock_file, moc
 @patch("builtins.open", new_callable=mock_open)
 @patch("local_ai_brain.cli.get_active_client_pids")
 @patch("select.select")
-@patch("builtins.input")
 @patch("os.kill")
-def test_trace_kill_recycled(
-    mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
-):
+def test_trace_kill_recycled(mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys):
     mock_exists.return_value = True
 
     # First, the PID is tracked
@@ -616,10 +614,10 @@ def test_trace_kill_recycled(
         {},  # Subsequent read
     ]
 
-    # Mock select to return stdin available once
+    # Mock select to return stdin available twice
     mock_stdin = MagicMock()
     mock_stdin.isatty.return_value = True
-    mock_stdin.readline.return_value = "k\n"
+    mock_stdin.readline.side_effect = ["k\n", "9999\n"]
 
     # Use patch to replace sys.stdin
     with patch("sys.stdin", mock_stdin):
@@ -629,10 +627,13 @@ def test_trace_kill_recycled(
             "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
             'Incoming chat from 127.0.0.1:54321 - "Hello test"\n',
             "",  # End of loop iteration
+            "",
         ]
-        mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
-
-        mock_input.return_value = "9999"
+        mock_select.side_effect = [
+            ([mock_stdin], [], []),
+            ([mock_stdin], [], []),
+            KeyboardInterrupt(),
+        ]
 
         with pytest.raises(SystemExit):
             trace()
@@ -702,3 +703,111 @@ def test_trace_log_rotation(
     assert mock_open_fn.call_count == 2
     # Verify that the old file was closed
     file1.close.assert_called_once()
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("os.kill")
+def test_trace_prunes_dead_pids(mock_kill, mock_select, mock_pids, mock_file, mock_exists):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 9999, 54322: 8888}
+
+    def kill_side_effect(pid, sig):
+        if sig == 0:
+            if pid == 9999:
+                raise ProcessLookupError("No such process")
+            return None
+        return None
+
+    mock_kill.side_effect = kill_side_effect
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    mock_stdin.readline.side_effect = ["k\n", "9999\n"]
+
+    with patch("sys.stdin", mock_stdin):
+        handle = mock_file()
+        log_line_1 = (
+            "2023-01-01 12:00:00.000 | INFO     | "
+            "local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54321 - "Hello test"\n'
+        )
+        log_line_2 = (
+            "2023-01-01 12:00:00.000 | INFO     | "
+            "local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54322 - "Hello test 2"\n'
+        )
+        handle.readline.side_effect = [
+            log_line_1,
+            log_line_2,
+            "",
+            "",
+            "",
+        ]
+
+        class TimeSimulator:
+            def __init__(self):
+                self.val = 1000.0
+
+            def __call__(self):
+                self.val += 6.0
+                return self.val
+
+        with patch("time.time", new_callable=TimeSimulator):
+            mock_select.side_effect = [
+                ([], [], []),
+                ([mock_stdin], [], []),
+                ([mock_stdin], [], []),
+                KeyboardInterrupt(),
+            ]
+
+            with pytest.raises(SystemExit):
+                trace()
+
+        for call in mock_kill.call_args_list:
+            pid, sig = call[0]
+            if pid == 9999:
+                assert sig == 0
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("os.kill")
+def test_trace_kill_cancel(mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 9999}
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    mock_stdin.readline.side_effect = ["k\n", "esc\n"]
+
+    with patch("sys.stdin", mock_stdin):
+        handle = mock_file()
+        log_line_1 = (
+            "2023-01-01 12:00:00.000 | INFO     | "
+            "local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54321 - "Hello test"\n'
+        )
+        handle.readline.side_effect = [
+            log_line_1,
+            "",
+            "",
+        ]
+        mock_select.side_effect = [
+            ([mock_stdin], [], []),
+            ([mock_stdin], [], []),
+            KeyboardInterrupt(),
+        ]
+
+        with pytest.raises(SystemExit):
+            trace()
+
+        for call in mock_kill.call_args_list:
+            pid, sig = call[0]
+            assert sig != signal.SIGKILL
+        captured = capsys.readouterr()
+        assert "Cancelled." in captured.out

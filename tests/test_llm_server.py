@@ -305,3 +305,25 @@ models:
             assert "-hf" not in cmd
             assert "--model" in cmd
             assert "existing_model.gguf" in cmd
+
+
+@patch("local_ai_brain.models.llm_server.configure_logging")
+@patch("os.execvp")
+def test_main_local_model_relative_path_slash(mock_exec, mock_log, monkeypatch):
+    """Verify local model resolution when model is a relative path containing a slash."""
+    from local_ai_brain.models.llm_server import main
+
+    yaml_content = """
+models:
+  - name: "local-model"
+    model: "models/qwen.gguf"
+"""
+    monkeypatch.setattr(Path, "exists", lambda self: self.name == "llm_config.yaml")
+    with patch("builtins.open", mock_open(read_data=yaml_content)):
+        with patch("sys.argv", ["llm_server"]):
+            main()
+            mock_exec.assert_called_once()
+            cmd = mock_exec.call_args[0][1]
+            assert "-hf" not in cmd
+            assert "--model" in cmd
+            assert "models/qwen.gguf" in cmd
