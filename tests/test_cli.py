@@ -610,10 +610,10 @@ def test_trace_kill_recycled(
     mock_exists.return_value = True
 
     # First, the PID is tracked
-    # Second, when re-verified before kill, it is NOT in the returned active client pids
+    # Second, it is NOT in the returned active client pids when re-read
     mock_pids.side_effect = [
         {54321: 9999},  # First refresh
-        {},  # Re-verification before kill
+        {},  # Subsequent read
     ]
 
     # Mock select to return stdin available once
@@ -637,9 +637,9 @@ def test_trace_kill_recycled(
         with pytest.raises(SystemExit):
             trace()
 
-        mock_kill.assert_not_called()
+        mock_kill.assert_called_with(9999, signal.SIGKILL)
         captured = capsys.readouterr()
-        assert "no longer has an active connection" in captured.out
+        assert "Successfully killed PID 9999" in captured.out
 
 
 @patch("os.path.exists")

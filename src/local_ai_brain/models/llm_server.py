@@ -90,14 +90,14 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     if config.get("spec_draft_p_min") is not None:
         cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min"))])
 
-    # Cache quantization (mapping 8 -> q8_0 for llama-server)
+    # Cache quantization
     type_k = config.get("type_k")
-    if type_k == 8 or type_k == "q8_0":
-        cmd.extend(["--cache-type-k", "q8_0"])
+    if type_k is not None:
+        cmd.extend(["--cache-type-k", str(type_k)])
 
     type_v = config.get("type_v")
-    if type_v == 8 or type_v == "q8_0":
-        cmd.extend(["--cache-type-v", "q8_0"])
+    if type_v is not None:
+        cmd.extend(["--cache-type-v", str(type_v)])
 
     cmd.extend(["--host", host])
     cmd.extend(["--port", port])
@@ -105,7 +105,7 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     # API Key injection
     api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LOCAL_API_KEY")
     if api_key:
-        cmd.extend(["--api-key", api_key])
+        os.environ["LLAMA_API_KEY"] = api_key
 
     return cmd
 
@@ -145,7 +145,7 @@ def main():
     # Handle Network & Security (prioritizing CLI args passed to this wrapper)
     # We look for --host and --port in sys.argv first
     host = "127.0.0.1"
-    port = "8000"
+    port = "8001"
 
     for i, arg in enumerate(sys.argv):
         if arg == "--host" and i + 1 < len(sys.argv):

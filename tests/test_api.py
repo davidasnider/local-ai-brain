@@ -836,3 +836,85 @@ def test_proxy_chat_multipart_malformed_text_handling(mock_send, client):
         },
     )
     assert response2.status_code == 200
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_ollama_compatibility_endpoints(mock_get, client):
+    # Mock the vLLM response
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = lambda: {
+        "object": "list",
+        "data": [
+            {
+                "id": "Qwen/Qwen2.5-14B-Instruct-1M",
+                "object": "model",
+                "created": 1234567890,
+                "owned_by": "vllm",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    # 1. GET /api/v1/models returns same data as /v1/models
+    resp_v1 = client.get("/v1/models", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_v1.status_code == 200
+    data_v1 = resp_v1.json()
+
+    resp_compat = client.get("/api/v1/models", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_compat.status_code == 200
+    assert resp_compat.json() == data_v1
+
+    # 2. GET /api/tags returns {"models": [...]}
+    resp_tags = client.get("/api/tags", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_tags.status_code == 200
+    data_tags = resp_tags.json()
+    assert "models" in data_tags
+    assert isinstance(data_tags["models"], list)
+    assert len(data_tags["models"]) == len(data_v1["data"])
+    assert data_tags["models"][0]["id"] == data_v1["data"][0]["id"]
+
+
+def test_version_and_props_endpoints(client):
+    # GET /version returns {"version": "..."}
+    response = client.get("/version", headers={"Authorization": "Bearer test-api-key"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+
+    # GET /v1/props and /props return {"status": "ok", ...}
+    for path in ["/v1/props", "/props"]:
+        response = client.get(path, headers={"Authorization": "Bearer test-api-key"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert "features" in data
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_model_detail_errors(mock_get, client):
+    # GET /v1/models/nonexistent returns 404 when backend is up
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "object": "list",
+        "data": [
+            {
+                "id": "some-vllm-model",
+                "object": "model",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    response = client.get(
+        "/v1/models/nonexistent", headers={"Authorization": "Bearer test-api-key"}
+    )
+    assert response.status_code == 404
+
+    # GET /v1/models/{id} returns 502 when backend is down
+    mock_get.side_effect = Exception("vLLM connection refused")
+    response = client.get(
+        "/v1/models/some-vllm-model", headers={"Authorization": "Bearer test-api-key"}
+    )
+    assert response.status_code == 502

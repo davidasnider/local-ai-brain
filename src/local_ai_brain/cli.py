@@ -392,11 +392,6 @@ def trace():
                                     f"{COLOR_ERROR}PID not tracked by this trace session"
                                     f"{COLOR_RESET}\n"
                                 )
-                            elif pid_int not in get_active_client_pids().values():
-                                print(
-                                    f"{COLOR_ERROR}PID {pid_int} no longer has an active connection"
-                                    f"{COLOR_RESET}\n"
-                                )
                             else:
                                 os.kill(pid_int, signal.SIGKILL)
                                 print(

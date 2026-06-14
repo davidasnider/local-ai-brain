@@ -8,6 +8,8 @@ import pytest
 os.environ.setdefault("LOCAL_API_KEY", "test-key")
 os.environ.setdefault("TESTING", "1")
 
+from local_ai_brain.config import settings
+
 
 @patch("local_ai_brain.models.llm_server.configure_logging")
 @patch.dict("os.environ", {"LOCAL_API_KEY": "test-api-key"})  # pragma: allowlist secret
@@ -42,6 +44,7 @@ models:
             assert "2048" in cmd
             assert "-ngl" in cmd
             assert "30" in cmd
+            assert os.environ.get("LLAMA_API_KEY") == "test-api-key"
 
 
 @patch("local_ai_brain.models.llm_server.configure_logging")
@@ -71,7 +74,6 @@ n_ctx: 1024
 @patch("os.execvp")
 def test_main_no_config(mock_exec, mock_log, monkeypatch):
     """Verify that main() uses defaults when no config file exists."""
-    from local_ai_brain.config import settings
     from local_ai_brain.models.llm_server import main
 
     # Pin the expected default so a real llm_config.yaml at repo root
@@ -247,10 +249,11 @@ models:
             assert "-hf" not in cmd
             assert "--model" in cmd
             assert "/path/to/local/model.gguf" in cmd
-            # It should map type_k and type_v to q8_0
+            # It should pass type_k and type_v directly
             assert "--cache-type-k" in cmd
-            assert "q8_0" in cmd
+            assert "8" in cmd
             assert "--cache-type-v" in cmd
+            assert "q8_0" in cmd
 
 
 @patch("local_ai_brain.models.llm_server.configure_logging")
