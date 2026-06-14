@@ -13,6 +13,8 @@ from local_ai_brain.config import Settings
 def mock_llm_config_path(tmp_path, monkeypatch, request):
     if "tmp_path" not in request.fixturenames:
         return
+    if request.node.name == "test_get_config_path_resolution":
+        return
 
     import builtins
     from pathlib import Path
@@ -20,13 +22,30 @@ def mock_llm_config_path(tmp_path, monkeypatch, request):
     orig_exists = Path.exists
     orig_open = builtins.open
 
+    # Find the expected project root config path relative to tests directory
+    test_dir = Path(__file__).resolve().parent
+    real_project_root = test_dir
+    for parent in [test_dir] + list(test_dir.parents):
+        if (parent / "pyproject.toml").exists() or (parent / "llm_config.yaml").exists():
+            real_project_root = parent
+            break
+    expected_config_path = (real_project_root / "llm_config.yaml").resolve()
+
     def mock_exists(self):
-        if self.name == "llm_config.yaml":
+        try:
+            resolved_self = self.resolve()
+        except Exception:
+            resolved_self = self
+        if resolved_self == expected_config_path:
             return orig_exists(tmp_path / "llm_config.yaml")
         return orig_exists(self)
 
     def mock_open_fn(file, mode="r", *args, **kwargs):
-        if isinstance(file, (str, Path)) and str(file).endswith("llm_config.yaml"):
+        try:
+            resolved_file = Path(file).resolve()
+        except Exception:
+            resolved_file = Path(file)
+        if resolved_file == expected_config_path:
             return orig_open(tmp_path / "llm_config.yaml", mode, *args, **kwargs)
         return orig_open(file, mode, *args, **kwargs)
 
@@ -229,3 +248,23 @@ def test_legacy_flat_config_handling(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
     assert settings.QWEN_MODEL_PATH == "test-repo:test-model.gguf"
+
+
+def test_get_config_path_resolution():
+    """Verify that get_config_path resolves to the repository root relative to the source file."""
+    from pathlib import Path
+
+    from local_ai_brain.config import get_config_path
+
+    start_path = Path(__file__).resolve()
+    current = start_path.parent
+    expected_root = None
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists():
+            expected_root = parent
+            break
+
+    assert expected_root is not None
+    expected_path = expected_root / "llm_config.yaml"
+
+    assert get_config_path(start_path) == expected_path

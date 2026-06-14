@@ -1,8 +1,22 @@
+from pathlib import Path
 from typing import Optional
 
 from loguru import logger
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def get_config_path(start_path: Optional[Path | str] = None) -> Path:
+    """Find the path to llm_config.yaml by walking up from the start_path."""
+    if start_path is None:
+        start_path = Path(__file__)
+    current = Path(start_path).resolve()
+    if current.is_file():
+        current = current.parent
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists() or (parent / "llm_config.yaml").exists():
+            return parent / "llm_config.yaml"
+    return current / "llm_config.yaml"
 
 
 class Settings(BaseSettings):
@@ -55,12 +69,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_and_load_config(self) -> "Settings":
         try:
-            from pathlib import Path
-
             import yaml
 
             if "QWEN_MODEL_PATH" not in self.model_fields_set:
-                config_path = Path(__file__).resolve().parent.parent / "llm_config.yaml"
+                config_path = get_config_path(__file__)
                 if config_path.exists():
                     with open(config_path, "r") as f:
                         loaded = yaml.safe_load(f)

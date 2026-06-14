@@ -27,10 +27,27 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     if ":" in settings.QWEN_MODEL_PATH:
         default_repo, default_file = settings.QWEN_MODEL_PATH.split(":", 1)
 
-    hf_repo_val = config.get("hf_model_repo_id")
-    hf_repo = str(hf_repo_val if hf_repo_val is not None else default_repo)
     model_file_val = config.get("model")
     model_file = str(model_file_val if model_file_val is not None else default_file)
+
+    # Check if model_file looks like a local path (starts with /, ./, ../, ~, or exists on disk)
+    is_local_path = (
+        model_file.startswith("/")
+        or model_file.startswith("./")
+        or model_file.startswith("../")
+        or model_file.startswith("~")
+        or Path(model_file).exists()
+    )
+
+    hf_repo_val = config.get("hf_model_repo_id")
+    if hf_repo_val is not None:
+        hf_repo = str(hf_repo_val)
+    else:
+        # If not provided, only default to default_repo if model_file is NOT a local path
+        if is_local_path:
+            hf_repo = ""
+        else:
+            hf_repo = default_repo
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:
@@ -100,7 +117,9 @@ def main():
     configure_logging(testing=settings.TESTING)
 
     # 1. Parse YAML config if it exists
-    config_path = Path(__file__).resolve().parent.parent / "llm_config.yaml"
+    from local_ai_brain.config import get_config_path
+
+    config_path = get_config_path(__file__)
     config = {}
     if config_path.exists():
         try:
