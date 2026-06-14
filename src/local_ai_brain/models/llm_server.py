@@ -64,6 +64,7 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
         or model_file.startswith("~")
         or ("/" in model_file and ":" not in model_file and Path(model_file).exists())
         or (has_fs_characteristics and Path(model_file).exists())
+        or has_fs_characteristics
     )
 
     hf_repo_val = config.get("hf_model_repo_id")
@@ -75,6 +76,9 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
             hf_repo = ""
         else:
             hf_repo = default_repo
+
+    if model_file.startswith("~"):
+        model_file = os.path.expanduser(model_file)
 
     # Check if we should use the -hf flag or local model path
     if hf_repo:

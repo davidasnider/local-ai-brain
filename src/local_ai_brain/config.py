@@ -76,6 +76,10 @@ class Settings(BaseSettings):
                 if config_path.exists():
                     with open(config_path, "r") as f:
                         loaded = yaml.safe_load(f)
+                        if loaded is not None and not isinstance(loaded, dict):
+                            raise ValueError(
+                                f"llm_config.yaml must be a mapping, got {type(loaded).__name__}"
+                            )
                         if (
                             isinstance(loaded, dict)
                             and "active_model" in loaded

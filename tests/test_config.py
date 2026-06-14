@@ -337,3 +337,16 @@ def test_config_file_not_found_during_open(tmp_path, monkeypatch):
         settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
         # Check that it fell back to the default instead of crashing
         assert settings.LOCAL_API_KEY == "test"  # pragma: allowlist secret
+
+
+def test_non_dict_config_fails_fast(tmp_path, monkeypatch):
+    """Fail fast with ValueError if llm_config.yaml is a non-dictionary (like a list)."""
+    config_path = tmp_path / "llm_config.yaml"
+    with open(config_path, "w") as f:
+        f.write("- model: qwen\n  name: qwen-list\n")
+
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+
+    assert "llm_config.yaml must be a mapping, got list" in str(excinfo.value)

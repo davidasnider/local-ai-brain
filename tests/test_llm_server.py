@@ -34,7 +34,8 @@ models:
             args = mock_exec.call_args[0]
             assert args[0] == "llama-server"
             cmd = args[1]
-            assert "-hf" in cmd
+            assert "--model" in cmd
+            assert "-hf" not in cmd
             assert any("test-model.gguf" in arg for arg in cmd)
             assert "--host" in cmd
             assert "1.2.3.4" in cmd
@@ -64,7 +65,8 @@ n_ctx: 1024
             main()
             mock_exec.assert_called_once()
             cmd = mock_exec.call_args[0][1]
-            assert "-hf" in cmd
+            assert "--model" in cmd
+            assert "-hf" not in cmd
             assert any("direct-model.gguf" in arg for arg in cmd)
             assert "--ctx-size" in cmd
             assert "1024" in cmd
@@ -351,3 +353,34 @@ def test_build_command_api_key_fallback_to_settings(monkeypatch):
 
     # Verify that LLAMA_API_KEY is set to settings.LOCAL_API_KEY
     assert os.environ.get("LLAMA_API_KEY") == "fallback-secret-key"
+
+
+def test_build_command_tilde_expansion():
+    """Verify that build_command expands tilde (~) paths before executing llama-server."""
+    from local_ai_brain.models.llm_server import build_command
+
+    config = {"model": "~/models/my_model.gguf"}
+    cmd = build_command(config, "127.0.0.1", "8001")
+
+    # It should not contain '~' in the --model or --alias arguments
+    assert "~/models/my_model.gguf" not in cmd
+
+    # It should contain the expanded path
+    expected_path = os.path.expanduser("~/models/my_model.gguf")
+    assert expected_path in cmd
+    assert cmd[cmd.index("--model") + 1] == expected_path
+    assert cmd[cmd.index("--alias") + 1] == expected_path
+
+
+def test_is_local_path_has_fs_characteristics():
+    """Verify that models with FS characteristics are treated as local if they do not exist."""
+    from local_ai_brain.models.llm_server import build_command
+
+    # Using a model name that doesn't exist and ends in .gguf
+    config = {"model": "nonexistent_model_with_fs_characteristics.gguf"}
+    cmd = build_command(config, "127.0.0.1", "8001")
+
+    # It should build command using --model, not -hf
+    assert "--model" in cmd
+    assert cmd[cmd.index("--model") + 1] == "nonexistent_model_with_fs_characteristics.gguf"
+    assert "-hf" not in cmd
