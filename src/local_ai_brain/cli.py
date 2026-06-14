@@ -292,57 +292,88 @@ def trace():
         print(f"{COLOR_ERROR}Log file not found: {log_path}{COLOR_RESET}")
         sys.exit(1)
 
+    f = None
     try:
-        with open(log_path, "r") as f:
-            # Seek to end
-            f.seek(0, 2)
-            pattern = re.compile(
-                r"Incoming chat from (?:.+):(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])"
-            )
+        f = open(log_path, "r")
+        # Seek to end
+        f.seek(0, 2)
+        current_ino = os.fstat(f.fileno()).st_ino
+        last_rotation_check = time.time()
 
-            trace_pids = set()
-            last_pid_refresh = 0.0
-            client_pids = {}
+        pattern = re.compile(r"Incoming chat from (?:.+):(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])")
 
-            while True:
-                line = f.readline()
-                if line:
-                    match = pattern.search(line)
-                    if match:
-                        port = int(match.group(1))
-                        msg = match.group(2) or "[PROMPT REDACTED]"
+        trace_pids = set()
+        last_pid_refresh = 0.0
+        client_pids = {}
+        monitor_stdin = sys.stdin.isatty()
 
-                        now = time.time()
-                        if now - last_pid_refresh > 2.0:
-                            client_pids = get_active_client_pids()
-                            last_pid_refresh = now
-                        pid = client_pids.get(port)
+        while True:
+            # Check for log rotation every 2 seconds
+            now = time.time()
+            if now - last_rotation_check > 2.0:
+                last_rotation_check = now
+                rotated = False
+                try:
+                    if os.path.exists(log_path):
+                        stat_info = os.stat(log_path)
+                        if stat_info.st_ino != current_ino or stat_info.st_size < f.tell():
+                            rotated = True
+                except Exception:
+                    pass
 
-                        if pid:
-                            trace_pids.add(pid)
-                            try:
-                                cmdline = (
-                                    subprocess.check_output(
-                                        ["ps", "-p", str(pid), "-o", "command="]
-                                    )
-                                    .decode()
-                                    .strip()
-                                )
-                                print(
-                                    f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
-                                    f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
-                                )
-                            except subprocess.CalledProcessError:
-                                print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
-                        else:
-                            print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
-
-                        print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
-                    else:
-                        # Log completion/stats if needed, or ignore
+                if rotated:
+                    try:
+                        new_f = open(log_path, "r")
+                        current_ino = os.fstat(new_f.fileno()).st_ino
+                        f.close()
+                        f = new_f
+                    except Exception:
                         pass
 
-                # Check for interactive kill command
+            line = f.readline()
+            if line:
+                match = pattern.search(line)
+                if match:
+                    port = int(match.group(1))
+                    raw_msg = match.group(2)
+                    if raw_msg is not None:
+                        try:
+                            msg = json.loads(f'"{raw_msg}"')
+                        except Exception:
+                            msg = raw_msg
+                    else:
+                        msg = "[PROMPT REDACTED]"
+
+                    now_time = time.time()
+                    if now_time - last_pid_refresh > 2.0:
+                        client_pids = get_active_client_pids()
+                        last_pid_refresh = now_time
+                    pid = client_pids.get(port)
+
+                    if pid:
+                        trace_pids.add(pid)
+                        try:
+                            cmdline = (
+                                subprocess.check_output(["ps", "-p", str(pid), "-o", "command="])
+                                .decode()
+                                .strip()
+                            )
+                            print(
+                                f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
+                                f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
+                            )
+                        except subprocess.CalledProcessError:
+                            print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
+                    else:
+                        print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
+
+                    print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
+                else:
+                    # Log completion/stats if needed, or ignore
+                    pass
+
+            # Check for interactive kill command
+            if monitor_stdin:
                 i, _, _ = select.select([sys.stdin], [], [], 0.0)
                 if i:
                     raw_line = sys.stdin.readline()
@@ -361,6 +392,11 @@ def trace():
                                     f"{COLOR_ERROR}PID not tracked by this trace session"
                                     f"{COLOR_RESET}\n"
                                 )
+                            elif pid_int not in get_active_client_pids().values():
+                                print(
+                                    f"{COLOR_ERROR}PID {pid_int} no longer has an active connection"
+                                    f"{COLOR_RESET}\n"
+                                )
                             else:
                                 os.kill(pid_int, signal.SIGKILL)
                                 print(
@@ -373,9 +409,15 @@ def trace():
                             print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
                 elif not line:
                     time.sleep(0.05)
+            else:
+                if not line:
+                    time.sleep(0.05)
     except KeyboardInterrupt:
         print(f"\n{COLOR_SYSTEM}Exiting trace...{COLOR_RESET}")
         sys.exit(0)
+    finally:
+        if f is not None:
+            f.close()
 
 
 def serve():

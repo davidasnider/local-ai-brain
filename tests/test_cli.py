@@ -463,8 +463,11 @@ def test_trace_basic(mock_select, mock_check_output, mock_pids, mock_file, mock_
     # Trigger KeyboardInterrupt after first iteration
     mock_select.side_effect = KeyboardInterrupt()
 
-    with pytest.raises(SystemExit):
-        trace()
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    with patch("sys.stdin", mock_stdin):
+        with pytest.raises(SystemExit):
+            trace()
 
     captured = capsys.readouterr()
     assert "[PID 12345]" in captured.out
@@ -489,6 +492,7 @@ def test_trace_kill(
 
     # Mock select to return stdin available once
     mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
     mock_stdin.readline.return_value = "k\n"
 
     # Use patch to replace sys.stdin
@@ -519,6 +523,7 @@ def test_trace_stdin_eof(mock_select, mock_file, mock_exists):
     mock_exists.return_value = True
 
     mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
     mock_stdin.readline.return_value = ""
 
     with patch("sys.stdin", mock_stdin):
@@ -543,6 +548,7 @@ def test_trace_kill_untracked(
 
     # Mock select to return stdin available once
     mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
     mock_stdin.readline.return_value = "k\n"
 
     # Use patch to replace sys.stdin
@@ -558,3 +564,141 @@ def test_trace_kill_untracked(
         mock_kill.assert_not_called()
         captured = capsys.readouterr()
         assert "PID not tracked by this trace session" in captured.out
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("subprocess.check_output")
+@patch("select.select")
+def test_trace_non_tty(mock_select, mock_check_output, mock_pids, mock_file, mock_exists, capsys):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 12345}
+    mock_check_output.return_value = b"python app.py\n"
+
+    # Mock log file content
+    handle = mock_file()
+    handle.readline.side_effect = [
+        "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
+        'Incoming chat from 127.0.0.1:54321 - "Hello non-tty"\n',
+        KeyboardInterrupt(),
+    ]
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = False
+
+    with patch("sys.stdin", mock_stdin):
+        with pytest.raises(SystemExit):
+            trace()
+
+    mock_select.assert_not_called()
+    captured = capsys.readouterr()
+    assert "[PID 12345]" in captured.out
+    assert "Says:" in captured.out
+    assert "Hello non-tty" in captured.out
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("builtins.input")
+@patch("os.kill")
+def test_trace_kill_recycled(
+    mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+
+    # First, the PID is tracked
+    # Second, when re-verified before kill, it is NOT in the returned active client pids
+    mock_pids.side_effect = [
+        {54321: 9999},  # First refresh
+        {},  # Re-verification before kill
+    ]
+
+    # Mock select to return stdin available once
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    mock_stdin.readline.return_value = "k\n"
+
+    # Use patch to replace sys.stdin
+    with patch("sys.stdin", mock_stdin):
+        # Mock log file content
+        handle = mock_file()
+        handle.readline.side_effect = [
+            "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54321 - "Hello test"\n',
+            "",  # End of loop iteration
+        ]
+        mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
+
+        mock_input.return_value = "9999"
+
+        with pytest.raises(SystemExit):
+            trace()
+
+        mock_kill.assert_not_called()
+        captured = capsys.readouterr()
+        assert "no longer has an active connection" in captured.out
+
+
+@patch("os.path.exists")
+@patch("builtins.open")
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("os.stat")
+@patch("os.fstat")
+def test_trace_log_rotation(
+    mock_fstat, mock_stat, mock_select, mock_pids, mock_open_fn, mock_exists
+):
+    mock_exists.return_value = True
+    mock_pids.return_value = {}
+    mock_select.side_effect = KeyboardInterrupt()
+
+    # Mock fstat for the initial file descriptor to return inode 123
+    mock_fstat_initial = MagicMock()
+    mock_fstat_initial.st_ino = 123
+    mock_fstat.return_value = mock_fstat_initial
+
+    # Mock file handles
+    file1 = MagicMock()
+    file1.readline.return_value = ""
+    file1.tell.return_value = 0
+
+    file2 = MagicMock()
+    file2.readline.return_value = ""
+    file2.tell.return_value = 0
+
+    # Mock open to return file1 first, then file2 upon reopening
+    mock_open_fn.side_effect = [file1, file2]
+
+    # Mock stat for the path to return inode 456 (simulating rotation)
+    mock_stat_info = MagicMock()
+    mock_stat_info.st_ino = 456
+    mock_stat_info.st_size = 0
+    mock_stat.return_value = mock_stat_info
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+
+    # Use patch to replace sys.stdin
+    with patch("sys.stdin", mock_stdin):
+        # We want time.time() to simulate time passing so that rotation check runs
+        with patch("time.time") as mock_time:
+            # 1. Start time
+            # 2. Time during loop iteration (passed 2.0s)
+            # 3. Time for logging refresh or whatever
+            mock_time.side_effect = [1000.0, 1003.0, 1004.0, 1005.0]
+
+            # Mock fstat to return inode 456 when the new file is opened
+            mock_fstat_new = MagicMock()
+            mock_fstat_new.st_ino = 456
+            mock_fstat.side_effect = [mock_fstat_initial, mock_fstat_new]
+
+            with pytest.raises(SystemExit):
+                trace()
+
+    # Verify that open was called twice (once for initial, once for reopened)
+    assert mock_open_fn.call_count == 2
+    # Verify that the old file was closed
+    file1.close.assert_called_once()

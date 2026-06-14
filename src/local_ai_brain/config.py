@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def get_config_path(start_path: Optional[Path | str] = None) -> Path:
     """Find the path to llm_config.yaml by walking up from the start_path."""
-    if start_path is None:
+    if start_path is None or start_path == "":
         start_path = Path(__file__)
     current = Path(start_path).resolve()
     if current.is_file():

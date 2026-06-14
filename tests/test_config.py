@@ -268,3 +268,13 @@ def test_get_config_path_resolution():
     expected_path = expected_root / "llm_config.yaml"
 
     assert get_config_path(start_path) == expected_path
+
+
+def test_get_config_path_empty_string():
+    """Verify that get_config_path with an empty string or None resolves using __file__."""
+    from local_ai_brain.config import get_config_path
+
+    path_from_empty = get_config_path("")
+    path_from_none = get_config_path(None)
+
+    assert path_from_empty == path_from_none

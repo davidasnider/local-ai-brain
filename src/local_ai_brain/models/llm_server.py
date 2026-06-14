@@ -31,7 +31,7 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     model_file = str(model_file_val if model_file_val is not None else default_file)
 
     # Check if model_file looks like a local path (starts with /, ./, ../, ~, or exists on disk)
-    is_local_path = (
+    is_local_path = model_file != "" and (
         model_file.startswith("/")
         or model_file.startswith("./")
         or model_file.startswith("../")
