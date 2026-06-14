@@ -66,30 +66,12 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     cmd.extend(
         ["-np", str(config.get("n_parallel") if config.get("n_parallel") is not None else 1)]
     )
-    cmd.extend(
-        [
-            "--spec-type",
-            str(config.get("spec_type") if config.get("spec_type") is not None else "draft-mtp"),
-        ]
-    )
-    cmd.extend(
-        [
-            "--spec-draft-n-max",
-            str(
-                config.get("spec_draft_n_max") if config.get("spec_draft_n_max") is not None else 2
-            ),
-        ]
-    )
-    cmd.extend(
-        [
-            "--spec-draft-p-min",
-            str(
-                config.get("spec_draft_p_min")
-                if config.get("spec_draft_p_min") is not None
-                else 0.75
-            ),
-        ]
-    )
+    if config.get("spec_type") is not None:
+        cmd.extend(["--spec-type", str(config.get("spec_type"))])
+    if config.get("spec_draft_n_max") is not None:
+        cmd.extend(["--spec-draft-n-max", str(config.get("spec_draft_n_max"))])
+    if config.get("spec_draft_p_min") is not None:
+        cmd.extend(["--spec-draft-p-min", str(config.get("spec_draft_p_min"))])
 
     # Cache quantization (mapping 8 -> q8_0 for llama-server)
     type_k = config.get("type_k")

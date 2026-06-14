@@ -333,33 +333,30 @@ def trace():
                     else:
                         # Log completion/stats if needed, or ignore
                         pass
-                else:
-                    # Check for interactive kill command
-                    i, _, _ = select.select([sys.stdin], [], [], 0.1)
-                    if i:
-                        user_input = sys.stdin.readline().strip().lower()
-                        if user_input == "":
-                            # stdin closed/EOF — stop monitoring
-                            break
-                        if user_input == "k":
-                            try:
-                                pid_to_kill = input(
-                                    f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}"
-                                )
-                                pid_int = int(pid_to_kill)
-                                if pid_int <= 0:
-                                    raise ValueError("PID must be a positive integer")
-                                os.kill(pid_int, signal.SIGKILL)
-                                print(
-                                    f"{COLOR_ASSISTANT}Successfully killed PID "
-                                    f"{pid_int}{COLOR_RESET}\n"
-                                )
-                            except ValueError:
-                                print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
-                            except Exception as e:
-                                print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
-                    else:
-                        time.sleep(0.05)
+
+                # Check for interactive kill command
+                i, _, _ = select.select([sys.stdin], [], [], 0.0)
+                if i:
+                    user_input = sys.stdin.readline().strip().lower()
+                    if user_input == "":
+                        # stdin closed/EOF — stop monitoring
+                        break
+                    if user_input == "k":
+                        try:
+                            pid_to_kill = input(f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}")
+                            pid_int = int(pid_to_kill)
+                            if pid_int <= 0:
+                                raise ValueError("PID must be a positive integer")
+                            os.kill(pid_int, signal.SIGKILL)
+                            print(
+                                f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}{COLOR_RESET}\n"
+                            )
+                        except ValueError:
+                            print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
+                        except Exception as e:
+                            print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
+                elif not line:
+                    time.sleep(0.05)
     except KeyboardInterrupt:
         print(f"\n{COLOR_SYSTEM}Exiting trace...{COLOR_RESET}")
         sys.exit(0)
