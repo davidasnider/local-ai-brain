@@ -297,3 +297,43 @@ def test_malformed_config_structure_fails_fast(tmp_path, monkeypatch):
         Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
 
     assert "Invalid llm_config.yaml structure" in str(excinfo.value)
+
+
+def test_syntax_broken_config_fails_fast(tmp_path, monkeypatch):
+    """When llm_config.yaml is syntax-broken, it should fail fast on startup with a ValueError."""
+    config_path = tmp_path / "llm_config.yaml"
+    with open(config_path, "w") as f:
+        f.write("active_model: [unclosed_bracket")
+
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+
+    assert "Syntax error in llm_config.yaml" in str(excinfo.value)
+
+
+def test_config_file_not_found_during_open(tmp_path, monkeypatch):
+    """When open() raises FileNotFoundError, it should log a warning instead of failing fast."""
+    from unittest.mock import patch
+
+    # Force config_path to exist so it attempts to open it
+    config_path = tmp_path / "llm_config.yaml"
+    with open(config_path, "w") as f:
+        f.write("active_model: dummy")
+
+    monkeypatch.chdir(tmp_path)
+
+    # Mock builtins.open to raise FileNotFoundError only when opening the config file
+    import builtins
+
+    orig_open = builtins.open
+
+    def mock_open_fn(file, *args, **kwargs):
+        if str(file).endswith("llm_config.yaml"):
+            raise FileNotFoundError("Mocked file not found")
+        return orig_open(file, *args, **kwargs)
+
+    with patch("builtins.open", mock_open_fn):
+        settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+        # Check that it fell back to the default instead of crashing
+        assert settings.LOCAL_API_KEY == "test"  # pragma: allowlist secret

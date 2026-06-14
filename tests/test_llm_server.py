@@ -318,7 +318,11 @@ models:
   - name: "local-model"
     model: "models/qwen.gguf"
 """
-    monkeypatch.setattr(Path, "exists", lambda self: self.name == "llm_config.yaml")
+    monkeypatch.setattr(
+        Path,
+        "exists",
+        lambda self: self.name in ("llm_config.yaml", "qwen.gguf"),
+    )
     with patch("builtins.open", mock_open(read_data=yaml_content)):
         with patch("sys.argv", ["llm_server"]):
             main()
@@ -327,3 +331,23 @@ models:
             assert "-hf" not in cmd
             assert "--model" in cmd
             assert "models/qwen.gguf" in cmd
+
+
+def test_build_command_api_key_fallback_to_settings(monkeypatch):
+    """Verify that build_command falls back to settings.LOCAL_API_KEY when env keys are missing."""
+    from local_ai_brain.config import settings
+    from local_ai_brain.models.llm_server import build_command
+
+    # Ensure environment does not contain the keys
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("LOCAL_API_KEY", raising=False)
+    monkeypatch.delenv("LLAMA_API_KEY", raising=False)
+
+    # Set the fallback value on settings
+    monkeypatch.setattr(settings, "LOCAL_API_KEY", "fallback-secret-key")
+
+    # Call build_command
+    build_command({}, "127.0.0.1", "8001")
+
+    # Verify that LLAMA_API_KEY is set to settings.LOCAL_API_KEY
+    assert os.environ.get("LLAMA_API_KEY") == "fallback-secret-key"

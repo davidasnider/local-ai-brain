@@ -62,7 +62,7 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
         or model_file.startswith("./")
         or model_file.startswith("../")
         or model_file.startswith("~")
-        or ("/" in model_file and ":" not in model_file)
+        or ("/" in model_file and ":" not in model_file and Path(model_file).exists())
         or (has_fs_characteristics and Path(model_file).exists())
     )
 
@@ -130,7 +130,11 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     cmd.extend(["--port", port])
 
     # API Key injection
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LOCAL_API_KEY")
+    api_key = (
+        os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("LOCAL_API_KEY")
+        or settings.LOCAL_API_KEY
+    )
     if api_key:
         os.environ["LLAMA_API_KEY"] = api_key
 

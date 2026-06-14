@@ -119,8 +119,10 @@ class Settings(BaseSettings):
                                 )
         except (TypeError, AttributeError, KeyError) as e:
             raise ValueError(f"Invalid llm_config.yaml structure: {e}") from e
-        except (FileNotFoundError, yaml.YAMLError) as e:
+        except FileNotFoundError as e:
             logger.warning(f"Failed to load active model from llm_config.yaml: {e}")
+        except yaml.YAMLError as e:
+            raise ValueError(f"Syntax error in llm_config.yaml: {e}") from e
 
         if self.DEFAULT_MAX_TOKENS > self.MAX_CONTEXT_TOKENS:
             raise ValueError(
