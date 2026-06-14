@@ -9,6 +9,31 @@ from pydantic import ValidationError
 from local_ai_brain.config import Settings
 
 
+@pytest.fixture(autouse=True)
+def mock_llm_config_path(tmp_path, monkeypatch, request):
+    if "tmp_path" not in request.fixturenames:
+        return
+
+    import builtins
+    from pathlib import Path
+
+    orig_exists = Path.exists
+    orig_open = builtins.open
+
+    def mock_exists(self):
+        if self.name == "llm_config.yaml":
+            return orig_exists(tmp_path / "llm_config.yaml")
+        return orig_exists(self)
+
+    def mock_open_fn(file, mode="r", *args, **kwargs):
+        if isinstance(file, (str, Path)) and str(file).endswith("llm_config.yaml"):
+            return orig_open(tmp_path / "llm_config.yaml", mode, *args, **kwargs)
+        return orig_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "exists", mock_exists)
+    monkeypatch.setattr(builtins, "open", mock_open_fn)
+
+
 def test_settings_validation():
     # Valid settings — ensures Settings can be constructed with minimal config
     settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
@@ -188,3 +213,19 @@ def test_local_model_resolution(tmp_path, monkeypatch):
         yaml.dump(config2, f)
     settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
     assert settings.QWEN_MODEL_PATH == "/path/to/local/model.gguf"
+
+
+def test_legacy_flat_config_handling(tmp_path, monkeypatch):
+    import yaml
+
+    config = {
+        "hf_model_repo_id": "test-repo",
+        "model": "test-model.gguf",
+    }
+    config_path = tmp_path / "llm_config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    monkeypatch.chdir(tmp_path)
+    settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+    assert settings.QWEN_MODEL_PATH == "test-repo:test-model.gguf"

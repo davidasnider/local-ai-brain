@@ -60,7 +60,7 @@ class Settings(BaseSettings):
             import yaml
 
             if "QWEN_MODEL_PATH" not in self.model_fields_set:
-                config_path = Path("llm_config.yaml")
+                config_path = Path(__file__).resolve().parent.parent / "llm_config.yaml"
                 if config_path.exists():
                     with open(config_path, "r") as f:
                         loaded = yaml.safe_load(f)
@@ -94,6 +94,13 @@ class Settings(BaseSettings):
                             first = loaded["models"][0]
                             repo = first.get("hf_model_repo_id", "")
                             model_file = first.get("model", "")
+                            if model_file:
+                                self.QWEN_MODEL_PATH = (
+                                    f"{repo}:{model_file}" if repo else model_file
+                                )
+                        elif isinstance(loaded, dict) and "models" not in loaded:
+                            repo = loaded.get("hf_model_repo_id", "")
+                            model_file = loaded.get("model", "")
                             if model_file:
                                 self.QWEN_MODEL_PATH = (
                                     f"{repo}:{model_file}" if repo else model_file

@@ -300,6 +300,10 @@ def trace():
                 r"Incoming chat from (?:.+):(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])"
             )
 
+            trace_pids = set()
+            last_pid_refresh = 0.0
+            client_pids = {}
+
             while True:
                 line = f.readline()
                 if line:
@@ -308,10 +312,14 @@ def trace():
                         port = int(match.group(1))
                         msg = match.group(2) or "[PROMPT REDACTED]"
 
-                        client_pids = get_active_client_pids()
+                        now = time.time()
+                        if now - last_pid_refresh > 2.0:
+                            client_pids = get_active_client_pids()
+                            last_pid_refresh = now
                         pid = client_pids.get(port)
 
                         if pid:
+                            trace_pids.add(pid)
                             try:
                                 cmdline = (
                                     subprocess.check_output(
@@ -337,20 +345,28 @@ def trace():
                 # Check for interactive kill command
                 i, _, _ = select.select([sys.stdin], [], [], 0.0)
                 if i:
-                    user_input = sys.stdin.readline().strip().lower()
-                    if user_input == "":
+                    raw_line = sys.stdin.readline()
+                    if not raw_line:
                         # stdin closed/EOF — stop monitoring
                         break
+                    user_input = raw_line.strip().lower()
                     if user_input == "k":
                         try:
                             pid_to_kill = input(f"{COLOR_SYSTEM}Enter PID to kill: {COLOR_RESET}")
                             pid_int = int(pid_to_kill)
                             if pid_int <= 0:
                                 raise ValueError("PID must be a positive integer")
-                            os.kill(pid_int, signal.SIGKILL)
-                            print(
-                                f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}{COLOR_RESET}\n"
-                            )
+                            if pid_int not in trace_pids:
+                                print(
+                                    f"{COLOR_ERROR}PID not tracked by this trace session"
+                                    f"{COLOR_RESET}\n"
+                                )
+                            else:
+                                os.kill(pid_int, signal.SIGKILL)
+                                print(
+                                    f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}"
+                                    f"{COLOR_RESET}\n"
+                                )
                         except ValueError:
                             print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
                         except Exception as e:

@@ -100,7 +100,7 @@ def main():
     configure_logging(testing=settings.TESTING)
 
     # 1. Parse YAML config if it exists
-    config_path = Path("llm_config.yaml")
+    config_path = Path(__file__).resolve().parent.parent / "llm_config.yaml"
     config = {}
     if config_path.exists():
         try:

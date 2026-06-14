@@ -479,8 +479,13 @@ def test_trace_basic(mock_select, mock_check_output, mock_pids, mock_file, mock_
 @patch("select.select")
 @patch("builtins.input")
 @patch("os.kill")
-def test_trace_kill(mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys):
+@patch("subprocess.check_output")
+def test_trace_kill(
+    mock_check_output, mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
+):
     mock_exists.return_value = True
+    mock_pids.return_value = {54321: 9999}
+    mock_check_output.return_value = b"test-command\n"
 
     # Mock select to return stdin available once
     mock_stdin = MagicMock()
@@ -488,9 +493,13 @@ def test_trace_kill(mock_kill, mock_input, mock_select, mock_pids, mock_file, mo
 
     # Use patch to replace sys.stdin
     with patch("sys.stdin", mock_stdin):
-        # First iteration: no line in file, select returns something
-        # Second iteration: KeyboardInterrupt
-        mock_file().readline.return_value = ""
+        # Mock log file content
+        handle = mock_file()
+        handle.readline.side_effect = [
+            "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54321 - "Hello test"\n',
+            "",  # End of loop iteration
+        ]
         mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
 
         mock_input.return_value = "9999"
@@ -518,3 +527,34 @@ def test_trace_stdin_eof(mock_select, mock_file, mock_exists):
 
         # Should return cleanly without spinning or throwing an error
         trace()
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("builtins.input")
+@patch("os.kill")
+def test_trace_kill_untracked(
+    mock_kill, mock_input, mock_select, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+    mock_pids.return_value = {}
+
+    # Mock select to return stdin available once
+    mock_stdin = MagicMock()
+    mock_stdin.readline.return_value = "k\n"
+
+    # Use patch to replace sys.stdin
+    with patch("sys.stdin", mock_stdin):
+        mock_file().readline.return_value = ""
+        mock_select.side_effect = [([mock_stdin], [], []), KeyboardInterrupt()]
+
+        mock_input.return_value = "9999"
+
+        with pytest.raises(SystemExit):
+            trace()
+
+        mock_kill.assert_not_called()
+        captured = capsys.readouterr()
+        assert "PID not tracked by this trace session" in captured.out
