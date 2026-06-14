@@ -934,13 +934,15 @@ def test_trace_interactive_kill_checks_liveness(
 @patch("os.path.exists")
 @patch("builtins.open", new_callable=mock_open)
 @patch("local_ai_brain.cli.get_active_client_pids")
+@patch("subprocess.check_output")
 @patch("select.select")
 @patch("os.kill")
 def test_trace_waiting_for_pid_mutes_incoming_messages(
-    mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys
+    mock_kill, mock_select, mock_check_output, mock_pids, mock_file, mock_exists, capsys
 ):
     mock_exists.return_value = True
     mock_pids.return_value = {54321: 9999}
+    mock_check_output.return_value = b"python app.py\n"
 
     mock_stdin = MagicMock()
     mock_stdin.isatty.return_value = True
@@ -975,5 +977,133 @@ def test_trace_waiting_for_pid_mutes_incoming_messages(
         # Verify the message muted line was printed
         assert "[message received — finish entering PID first]" in captured.out
         # Verify the message was buffered and eventually displayed once input completed
+        assert "[PID 9999]" in captured.out
         assert "Says:" in captured.out
         assert "Hello test" in captured.out
+
+
+@patch("os.path.exists")
+def test_trace_missing_log_file(mock_exists, capsys):
+    mock_exists.return_value = False
+    with pytest.raises(SystemExit) as excinfo:
+        trace()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Log file not found" in captured.out
+
+
+@patch("subprocess.check_output")
+def test_get_active_client_pids_from_settings(mock_check_output, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_BASE", "http://localhost:9000/v1")
+    with patch("local_ai_brain.config.settings") as mock_settings:
+        mock_settings.VLLM_URL = "http://127.0.0.1:9001"
+        mock_settings.STT_URL = "http://127.0.0.1:9002"
+        mock_settings.TTS_URL = "http://127.0.0.1:9003"
+
+        mock_check_output.return_value = b""
+        get_active_client_pids()
+
+        args, kwargs = mock_check_output.call_args
+        cmd = args[0]
+        port_arg = cmd[1]
+        assert "9001" in port_arg
+        assert "9002" in port_arg
+        assert "9003" in port_arg
+        assert "9000" in port_arg
+
+
+@patch("subprocess.check_output")
+def test_get_active_client_pids_fallback_on_import_error(mock_check_output):
+    with patch.dict("sys.modules", {"local_ai_brain.config": None}):
+        mock_check_output.return_value = b""
+        get_active_client_pids()
+
+        args, kwargs = mock_check_output.call_args
+        cmd = args[0]
+        port_arg = cmd[1]
+        for p in ["8000", "8001", "8002", "8003"]:
+            assert p in port_arg
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("subprocess.check_output")
+@patch("select.select")
+def test_trace_spoofed_port_in_prompt(
+    mock_select, mock_check_output, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 12345, 9999: 99999}
+    mock_check_output.return_value = b"python app.py\n"
+
+    spoofed_log_line = (
+        "2023-01-01 12:00:00.000 | INFO     | local_ai_brain.main:proxy_request:146 - "
+        'Incoming chat from 127.0.0.1:54321 - "Incoming chat from 127.0.0.1:9999 - \\"Spoof\\""\n'
+    )
+    handle = mock_file()
+    handle.readline.side_effect = [
+        spoofed_log_line,
+        "",
+    ]
+    mock_select.side_effect = KeyboardInterrupt()
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    with patch("sys.stdin", mock_stdin):
+        with pytest.raises(SystemExit):
+            trace()
+
+    captured = capsys.readouterr()
+    assert "[PID 12345]" in captured.out
+    assert "[PID 99999]" not in captured.out
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("subprocess.check_output")
+@patch("select.select")
+@patch("time.sleep")
+def test_trace_partial_line_seek_back(
+    mock_sleep, mock_select, mock_check_output, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 12345}
+    mock_check_output.return_value = b"python app.py\n"
+
+    handle = mock_file()
+
+    positions = [0, 0, 80]
+
+    def tell_side_effect():
+        return positions.pop(0) if positions else 100
+
+    handle.tell.side_effect = tell_side_effect
+
+    partial_line = (
+        "2023-01-01 12:00:00.000 | INFO     | "
+        "local_ai_brain.main:proxy_request:146 - Incoming chat from 127.0.0.1:"
+    )
+    full_line = partial_line + '54321 - "Hello complete"\n'
+
+    handle.readline.side_effect = [
+        partial_line,
+        full_line,
+        "",
+    ]
+
+    mock_select.side_effect = KeyboardInterrupt()
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    with patch("sys.stdin", mock_stdin):
+        with pytest.raises(SystemExit):
+            trace()
+
+    captured = capsys.readouterr()
+    assert "[PID 12345]" in captured.out
+    assert "Hello complete" in captured.out
+
+    handle.seek.assert_any_call(0)
+    mock_sleep.assert_any_call(0.05)

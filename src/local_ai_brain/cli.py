@@ -247,7 +247,38 @@ def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
         dict: Mapping of source port (int) to PID (int).
     """
     if ports is None:
-        ports = [8000, 8001, 8002, 8003]
+        fallback_ports = [8000, 8001, 8002, 8003]
+        try:
+            from urllib.parse import urlparse
+
+            from local_ai_brain.config import settings
+
+            extracted_ports = []
+            for url_str in [settings.VLLM_URL, settings.STT_URL, settings.TTS_URL]:
+                if url_str:
+                    try:
+                        p = urlparse(url_str).port
+                        if p is not None:
+                            extracted_ports.append(p)
+                    except Exception:
+                        pass
+
+            try:
+                base_url = get_base_url()
+                p = urlparse(base_url).port
+                if p is not None:
+                    extracted_ports.append(p)
+                else:
+                    extracted_ports.append(8000)
+            except Exception:
+                extracted_ports.append(8000)
+
+            if extracted_ports:
+                ports = list(dict.fromkeys(extracted_ports))
+            else:
+                ports = fallback_ports
+        except Exception:
+            ports = fallback_ports
     client_pid_map = {}
     try:
         # lsof -iTCP:8000,8001,... -sTCP:ESTABLISHED,TIME_WAIT,FIN_WAIT_1,FIN_WAIT_2 -n -P
@@ -326,7 +357,7 @@ def trace():
         current_ino = os.fstat(f.fileno()).st_ino
         last_rotation_check = time.time()
 
-        pattern = re.compile(r"Incoming chat from (?:.+):(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])")
+        pattern = re.compile(r"Incoming chat from \S+:(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])")
 
         trace_pids = set()
         last_pid_refresh = 0.0
@@ -375,8 +406,13 @@ def trace():
                         dead_pids.add(pid)
                 trace_pids -= dead_pids
 
+            pos = f.tell()
             line = f.readline()
             if line:
+                if not line.endswith("\n"):
+                    f.seek(pos)
+                    time.sleep(0.05)
+                    continue
                 match = pattern.search(line)
                 if match:
                     port = int(match.group(1))
