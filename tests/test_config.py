@@ -270,14 +270,17 @@ def test_get_config_path_resolution():
     assert get_config_path(start_path) == expected_path
 
 
-def test_get_config_path_empty_string():
-    """Verify that get_config_path with an empty string or None resolves using __file__."""
+def test_get_config_path_empty_string(tmp_path, monkeypatch):
+    """Verify that get_config_path with an empty string or None resolves using Path.cwd()."""
     from local_ai_brain.config import get_config_path
 
+    monkeypatch.chdir(tmp_path)
     path_from_empty = get_config_path("")
     path_from_none = get_config_path(None)
+    path_from_cwd = get_config_path(tmp_path)
 
-    assert path_from_empty == path_from_none
+    assert path_from_empty == path_from_cwd
+    assert path_from_none == path_from_cwd
 
 
 def test_malformed_config_structure_fails_fast(tmp_path, monkeypatch):

@@ -64,7 +64,7 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
         or model_file.startswith("~")
         or ("/" in model_file and ":" not in model_file and Path(model_file).exists())
         or (has_fs_characteristics and Path(model_file).exists())
-        or has_fs_characteristics
+        or any(model_file.endswith(ext) for ext in (".gguf", ".bin", ".pt", ".safetensors", ".mlx"))
     )
 
     hf_repo_val = config.get("hf_model_repo_id")
@@ -154,7 +154,7 @@ def main():
     # 1. Parse YAML config if it exists
     from local_ai_brain.config import get_config_path
 
-    config_path = get_config_path(__file__)
+    config_path = get_config_path()
     config = {}
     if config_path.exists():
         try:

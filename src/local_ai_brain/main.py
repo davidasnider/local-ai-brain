@@ -483,9 +483,14 @@ async def ollama_tags_compat(request: Request):
     transformed = []
     for model in data.get("data", []):
         created = model.get("created", 0)
-        if created:
-            modified_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
-        else:
+        try:
+            if isinstance(created, str):
+                created = float(created) if "." in created else int(created)
+            if isinstance(created, (int, float)) and created > 0:
+                modified_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
+            else:
+                modified_at = datetime.now(timezone.utc).isoformat()
+        except (TypeError, ValueError, OSError):
             modified_at = datetime.now(timezone.utc).isoformat()
         transformed.append(
             {

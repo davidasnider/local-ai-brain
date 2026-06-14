@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 def get_config_path(start_path: Optional[Path | str] = None) -> Path:
     """Find the path to llm_config.yaml by walking up from the start_path."""
     if start_path is None or start_path == "":
-        start_path = Path(__file__)
+        start_path = Path.cwd()
     current = Path(start_path).resolve()
     if current.is_file():
         current = current.parent
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
             import yaml
 
             if "QWEN_MODEL_PATH" not in self.model_fields_set:
-                config_path = get_config_path(__file__)
+                config_path = get_config_path()
                 if config_path.exists():
                     with open(config_path, "r") as f:
                         loaded = yaml.safe_load(f)

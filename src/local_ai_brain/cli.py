@@ -330,12 +330,15 @@ def trace():
                     pass
 
                 if rotated:
+                    new_f = None
                     try:
                         new_f = open(log_path, "r")
                         current_ino = os.fstat(new_f.fileno()).st_ino
                         f.close()
                         f = new_f
                     except Exception:
+                        if new_f is not None:
+                            new_f.close()
                         pass
 
             # Prune dead PIDs from trace_pids every 5 seconds

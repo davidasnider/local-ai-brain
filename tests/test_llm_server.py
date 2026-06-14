@@ -384,3 +384,19 @@ def test_is_local_path_has_fs_characteristics():
     assert "--model" in cmd
     assert cmd[cmd.index("--model") + 1] == "nonexistent_model_with_fs_characteristics.gguf"
     assert "-hf" not in cmd
+
+
+def test_hf_repo_not_treated_as_local_path():
+    """Verify that Hugging Face repo paths (which contain a slash but no
+    known model extension) are not treated as local paths.
+    """
+    from local_ai_brain.models.llm_server import build_command
+
+    # Using a model name that looks like a Hugging Face repo path
+    config = {"hf_model_repo_id": "Qwen/Qwen2.5-7B", "model": "qwen2.5-7b-instruct-q4_k_m.gguf"}
+    cmd = build_command(config, "127.0.0.1", "8001")
+
+    # It should build command using -hf, not --model
+    assert "-hf" in cmd
+    assert cmd[cmd.index("-hf") + 1] == "Qwen/Qwen2.5-7B:qwen2.5-7b-instruct-q4_k_m.gguf"
+    assert "--model" not in cmd
