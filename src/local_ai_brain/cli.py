@@ -250,9 +250,15 @@ def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
         ports = [8000, 8001, 8002, 8003]
     client_pid_map = {}
     try:
-        # lsof -iTCP:8000,8001,... -sTCP:ESTABLISHED -n -P
+        # lsof -iTCP:8000,8001,... -sTCP:ESTABLISHED,TIME_WAIT,FIN_WAIT_1,FIN_WAIT_2 -n -P
         port_spec = ",".join(map(str, ports))
-        cmd = ["lsof", f"-iTCP:{port_spec}", "-sTCP:ESTABLISHED", "-n", "-P"]
+        cmd = [
+            "lsof",
+            f"-iTCP:{port_spec}",
+            "-sTCP:ESTABLISHED,TIME_WAIT,FIN_WAIT_1,FIN_WAIT_2",
+            "-n",
+            "-P",
+        ]
         output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
         for line in output.splitlines():
             parts = line.split()

@@ -5,7 +5,7 @@ from unittest.mock import mock_open, patch
 import pytest
 
 # Set dummy env vars for module-level settings imports in some modules
-os.environ.setdefault("LOCAL_API_KEY", "test-key")
+os.environ.setdefault("LOCAL_API_KEY", "test-api-key")
 os.environ.setdefault("TESTING", "1")
 
 from local_ai_brain.config import settings
@@ -249,11 +249,11 @@ models:
             assert "-hf" not in cmd
             assert "--model" in cmd
             assert "/path/to/local/model.gguf" in cmd
-            # It should pass type_k and type_v directly
+            # It should map type_k and pass through type_v correctly
             assert "--cache-type-k" in cmd
-            assert "8" in cmd
+            assert cmd[cmd.index("--cache-type-k") + 1] == "q8_0"
             assert "--cache-type-v" in cmd
-            assert "q8_0" in cmd
+            assert cmd[cmd.index("--cache-type-v") + 1] == "q8_0"
 
 
 @patch("local_ai_brain.models.llm_server.configure_logging")

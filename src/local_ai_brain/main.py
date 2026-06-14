@@ -477,8 +477,25 @@ async def ollama_models_compat(request: Request):
 
 @app.get("/api/tags")
 async def ollama_tags_compat(request: Request):
+    from datetime import datetime, timezone
+
     data = await list_models(request)
-    return {"models": data.get("data", [])}
+    transformed = []
+    for model in data.get("data", []):
+        created = model.get("created", 0)
+        if created:
+            modified_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
+        else:
+            modified_at = datetime.now(timezone.utc).isoformat()
+        transformed.append(
+            {
+                "name": model["id"],
+                "model": model["id"],
+                "modified_at": modified_at,
+                "details": {"format": "gguf", "family": "llama", "parameter_size": "unknown"},
+            }
+        )
+    return {"models": transformed}
 
 
 @app.get("/version")

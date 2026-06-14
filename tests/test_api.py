@@ -872,7 +872,11 @@ def test_ollama_compatibility_endpoints(mock_get, client):
     assert "models" in data_tags
     assert isinstance(data_tags["models"], list)
     assert len(data_tags["models"]) == len(data_v1["data"])
-    assert data_tags["models"][0]["id"] == data_v1["data"][0]["id"]
+    first_model = data_tags["models"][0]
+    assert "name" in first_model
+    assert "model" in first_model
+    assert "modified_at" in first_model
+    assert "details" in first_model
 
 
 def test_version_and_props_endpoints(client):

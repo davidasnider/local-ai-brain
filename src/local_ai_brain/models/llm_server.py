@@ -15,6 +15,24 @@ from loguru import logger
 from local_ai_brain.logging import configure_logging
 
 
+def _quant_str(value) -> str:
+    """Map integer cache quantization values to string equivalents, passing others as-is."""
+    mapping = {
+        8: "q8_0",
+        4: "q4_0",
+        16: "f16",
+    }
+    if value in mapping:
+        return mapping[value]
+    try:
+        val_int = int(value)
+        if val_int in mapping:
+            return mapping[val_int]
+    except (ValueError, TypeError):
+        pass
+    return str(value)
+
+
 def build_command(config: dict, host: str, port: str) -> list[str]:
     """Build the CLI arguments for llama-server."""
     from local_ai_brain.config import settings
@@ -95,11 +113,11 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     # Cache quantization
     type_k = config.get("type_k")
     if type_k is not None:
-        cmd.extend(["--cache-type-k", str(type_k)])
+        cmd.extend(["--cache-type-k", _quant_str(type_k)])
 
     type_v = config.get("type_v")
     if type_v is not None:
-        cmd.extend(["--cache-type-v", str(type_v)])
+        cmd.extend(["--cache-type-v", _quant_str(type_v)])
 
     cmd.extend(["--host", host])
     cmd.extend(["--port", port])
@@ -158,20 +176,7 @@ def main():
     cmd = build_command(config, host, port)
 
     # 3. Launch the binary
-    # Sanitize command for logging (redact API key)
-    log_cmd = []
-    skip_next = False
-    for i, arg in enumerate(cmd):
-        if skip_next:
-            skip_next = False
-            continue
-        if arg == "--api-key":
-            log_cmd.extend([arg, "********"])
-            skip_next = True
-        else:
-            log_cmd.append(arg)
-
-    logger.info(f"Launching engine: {' '.join(log_cmd)}")
+    logger.info(f"Launching engine: {' '.join(cmd)}")
     try:
         # We use execvp to replace the current process with llama-server
         # so that signals and process management work correctly.
