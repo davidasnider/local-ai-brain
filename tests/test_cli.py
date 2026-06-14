@@ -811,3 +811,168 @@ def test_trace_kill_cancel(mock_kill, mock_select, mock_pids, mock_file, mock_ex
             assert sig != signal.SIGKILL
         captured = capsys.readouterr()
         assert "Cancelled." in captured.out
+
+
+@patch("os.path.exists")
+@patch("os.path.getsize")
+@patch("urllib.request.urlopen")
+def test_stt_streaming_body_stop_iteration(mock_urlopen, mock_getsize, mock_exists):
+    mock_exists.return_value = True
+    mock_getsize.return_value = 100
+
+    captured_streaming_body = None
+
+    def mock_urlopen_fn(req, *args, **kwargs):
+        nonlocal captured_streaming_body
+        captured_streaming_body = req.data
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"text": "mocked"}'
+        mock_response.__enter__.return_value = mock_response
+        return mock_response
+
+    mock_urlopen.side_effect = mock_urlopen_fn
+
+    with patch("builtins.open", mock_open(read_data=b"small content")):
+        stt("dummy.wav", "http://base", "key")
+
+        assert captured_streaming_body is not None
+        # Read everything from it within open mock context
+        while True:
+            chunk = captured_streaming_body.read(10)
+            if not chunk:
+                break
+
+        # After it finishes, reading again should return b"" (raising and handling StopIteration)
+        assert captured_streaming_body.read(10) == b""
+        assert captured_streaming_body.read() == b""
+
+
+@patch("os.path.exists")
+@patch("os.path.getsize")
+@patch("urllib.request.urlopen")
+def test_stt_http_error_invalid_json(mock_urlopen, mock_getsize, mock_exists, capsys):
+    mock_exists.return_value = True
+    mock_getsize.return_value = 1000
+
+    import io
+    import urllib.error
+
+    fp = io.BytesIO(b"not a valid json")
+    err = urllib.error.HTTPError("http://base/audio/transcriptions", 400, "Bad Request", {}, fp)
+    mock_urlopen.side_effect = err
+
+    with patch("builtins.open", mock_open(read_data=b"filedata")):
+        stt("dummy.wav", "http://base", "key")
+
+    captured = capsys.readouterr()
+    assert "STT HTTP Error: 400 - Bad Request" in captured.out
+
+
+@patch("subprocess.check_output")
+def test_get_active_client_pids_unexpected_exception(mock_check_output):
+    mock_check_output.side_effect = RuntimeError("Unexpected subprocess failure")
+
+    with patch("local_ai_brain.cli.logger") as mock_logger:
+        pids = get_active_client_pids()
+        assert pids == {}
+        mock_logger.debug.assert_called_once()
+        assert "Unexpected subprocess failure" in mock_logger.debug.call_args[0][0]
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("os.kill")
+def test_trace_interactive_kill_checks_liveness(
+    mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 9999}
+
+    # First call to os.kill(9999, 0) should raise ProcessLookupError
+    def kill_side_effect(pid, sig):
+        if sig == 0:
+            raise ProcessLookupError("No such process")
+        return None
+
+    mock_kill.side_effect = kill_side_effect
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    mock_stdin.readline.side_effect = ["k\n", "9999\n"]
+
+    with patch("sys.stdin", mock_stdin):
+        handle = mock_file()
+        log_line_1 = (
+            "2023-01-01 12:00:00.000 | INFO     | "
+            "local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54321 - "Hello test"\n'
+        )
+        handle.readline.side_effect = [
+            log_line_1,
+            "",
+            "",
+        ]
+        mock_select.side_effect = [
+            ([mock_stdin], [], []),
+            ([mock_stdin], [], []),
+            KeyboardInterrupt(),
+        ]
+
+        with pytest.raises(SystemExit):
+            trace()
+
+        captured = capsys.readouterr()
+        assert "Process has already exited" in captured.out
+        # Verify sigkill was not sent
+        for call in mock_kill.call_args_list:
+            pid, sig = call[0]
+            assert sig != signal.SIGKILL
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("local_ai_brain.cli.get_active_client_pids")
+@patch("select.select")
+@patch("os.kill")
+def test_trace_waiting_for_pid_mutes_incoming_messages(
+    mock_kill, mock_select, mock_pids, mock_file, mock_exists, capsys
+):
+    mock_exists.return_value = True
+    mock_pids.return_value = {54321: 9999}
+
+    mock_stdin = MagicMock()
+    mock_stdin.isatty.return_value = True
+    mock_stdin.readline.side_effect = ["k\n", "esc\n"]
+
+    with patch("sys.stdin", mock_stdin):
+        handle = mock_file()
+        log_line_1 = (
+            "2023-01-01 12:00:00.000 | INFO     | "
+            "local_ai_brain.main:proxy_request:146 - "
+            'Incoming chat from 127.0.0.1:54321 - "Hello test"\n'
+        )
+        handle.readline.side_effect = [
+            "",
+            log_line_1,
+            "",
+            "",
+            "",
+        ]
+
+        mock_select.side_effect = [
+            ([mock_stdin], [], []),
+            ([], [], []),
+            ([mock_stdin], [], []),
+            KeyboardInterrupt(),
+        ]
+
+        with pytest.raises(SystemExit):
+            trace()
+
+        captured = capsys.readouterr()
+        # Verify the message muted line was printed
+        assert "[message received — finish entering PID first]" in captured.out
+        # Verify normal says was NOT printed for log_line_1 since it was muted
+        assert "Says: Hello test" not in captured.out

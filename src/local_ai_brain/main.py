@@ -489,8 +489,8 @@ async def ollama_tags_compat(request: Request):
             modified_at = datetime.now(timezone.utc).isoformat()
         transformed.append(
             {
-                "name": model["id"],
-                "model": model["id"],
+                "name": model.get("id", "unknown"),
+                "model": model.get("id", "unknown"),
                 "modified_at": modified_at,
                 "details": {"format": "gguf", "family": "llama", "parameter_size": "unknown"},
             }

@@ -373,28 +373,29 @@ def trace():
 
                     if pid:
                         trace_pids.add(pid)
-                        try:
-                            cmdline = (
-                                subprocess.check_output(["ps", "-p", str(pid), "-o", "command="])
-                                .decode()
-                                .strip()
-                            )
-                            print(
-                                f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
-                                f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
-                            )
-                        except subprocess.CalledProcessError:
-                            print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
-                    else:
-                        print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
 
-                    print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
                     if waiting_for_pid:
-                        print(
-                            f"{COLOR_SYSTEM}Enter PID (Esc to cancel): {COLOR_RESET}",
-                            end="",
-                            flush=True,
-                        )
+                        print("[message received — finish entering PID first]")
+                    else:
+                        if pid:
+                            try:
+                                cmdline = (
+                                    subprocess.check_output(
+                                        ["ps", "-p", str(pid), "-o", "command="]
+                                    )
+                                    .decode()
+                                    .strip()
+                                )
+                                print(
+                                    f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
+                                    f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
+                                )
+                            except subprocess.CalledProcessError:
+                                print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
+                        else:
+                            print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
+
+                        print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
                 else:
                     # Log completion/stats if needed, or ignore
                     pass
@@ -423,11 +424,20 @@ def trace():
                                         f"{COLOR_RESET}\n"
                                     )
                                 else:
-                                    os.kill(pid_int, signal.SIGKILL)
-                                    print(
-                                        f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}"
-                                        f"{COLOR_RESET}\n"
-                                    )
+                                    try:
+                                        os.kill(pid_int, 0)
+                                    except ProcessLookupError:
+                                        trace_pids.discard(pid_int)
+                                        print(
+                                            f"{COLOR_ERROR}Process has already exited"
+                                            f"{COLOR_RESET}\n"
+                                        )
+                                    else:
+                                        os.kill(pid_int, signal.SIGKILL)
+                                        print(
+                                            f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}"
+                                            f"{COLOR_RESET}\n"
+                                        )
                             except ValueError:
                                 print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
                             except Exception as e:

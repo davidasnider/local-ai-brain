@@ -48,15 +48,22 @@ def build_command(config: dict, host: str, port: str) -> list[str]:
     model_file_val = config.get("model")
     model_file = str(model_file_val if model_file_val is not None else default_file)
 
-    # Check if model_file looks like a local path
-    # (starts with /, ./, ../, ~, exists on disk, or contains '/' but not ':')
+    has_fs_characteristics = (
+        "/" in model_file
+        or any(model_file.endswith(ext) for ext in (".gguf", ".bin", ".pt", ".safetensors", ".mlx"))
+        or model_file.startswith("/")
+        or model_file.startswith("./")
+        or model_file.startswith("../")
+        or model_file.startswith("~")
+    )
+
     is_local_path = model_file != "" and (
         model_file.startswith("/")
         or model_file.startswith("./")
         or model_file.startswith("../")
         or model_file.startswith("~")
         or ("/" in model_file and ":" not in model_file)
-        or Path(model_file).exists()
+        or (has_fs_characteristics and Path(model_file).exists())
     )
 
     hf_repo_val = config.get("hf_model_repo_id")

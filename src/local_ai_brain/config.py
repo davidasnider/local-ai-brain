@@ -117,7 +117,9 @@ class Settings(BaseSettings):
                                 self.QWEN_MODEL_PATH = (
                                     f"{repo}:{model_file}" if repo else model_file
                                 )
-        except Exception as e:
+        except (TypeError, AttributeError, KeyError) as e:
+            raise ValueError(f"Invalid llm_config.yaml structure: {e}") from e
+        except (FileNotFoundError, yaml.YAMLError) as e:
             logger.warning(f"Failed to load active model from llm_config.yaml: {e}")
 
         if self.DEFAULT_MAX_TOKENS > self.MAX_CONTEXT_TOKENS:

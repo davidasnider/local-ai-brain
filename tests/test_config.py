@@ -278,3 +278,22 @@ def test_get_config_path_empty_string():
     path_from_none = get_config_path(None)
 
     assert path_from_empty == path_from_none
+
+
+def test_malformed_config_structure_fails_fast(tmp_path, monkeypatch):
+    """When llm_config.yaml has a malformed structure, it should fail fast on startup."""
+    import yaml
+
+    config = {
+        "active_model": "qwen-27b",
+        "models": "not_a_list",
+    }
+    config_path = tmp_path / "llm_config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+
+    assert "Invalid llm_config.yaml structure" in str(excinfo.value)

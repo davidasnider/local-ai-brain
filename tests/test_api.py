@@ -922,3 +922,29 @@ def test_model_detail_errors(mock_get, client):
         "/v1/models/some-vllm-model", headers={"Authorization": "Bearer test-api-key"}
     )
     assert response.status_code == 502
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_ollama_compatibility_endpoints_missing_id(mock_get, client):
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = lambda: {
+        "object": "list",
+        "data": [
+            {
+                "object": "model",
+                "created": 1234567890,
+                "owned_by": "vllm",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    resp_tags = client.get("/api/tags", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_tags.status_code == 200
+    data_tags = resp_tags.json()
+    assert "models" in data_tags
+    assert len(data_tags["models"]) == 3
+    unknown_models = [m for m in data_tags["models"] if m["name"] == "unknown"]
+    assert len(unknown_models) == 1
+    assert unknown_models[0]["model"] == "unknown"
