@@ -785,3 +785,54 @@ def test_proxy_chat_logging_redacted(mock_send, client):
             assert any("Incoming chat from" in msg for msg in log_messages)
             assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
             assert not any("Sensitive information" in msg for msg in log_messages)
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_multipart_malformed_text_handling(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={
+            "model": "test-model",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "hello"},
+                        {"type": "text", "text": None},
+                        {"type": "image_url", "image_url": {"url": "http://example.com/image.jpg"}},
+                    ],
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+
+    # Test fallback to "[multi-part content]" when there are no valid text parts
+    response2 = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={
+            "model": "test-model",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": "http://example.com/image.jpg"}},
+                    ],
+                }
+            ],
+        },
+    )
+    assert response2.status_code == 200

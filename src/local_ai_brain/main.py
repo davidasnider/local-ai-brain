@@ -146,7 +146,9 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                         text_parts = [
                             part.get("text", "")
                             for part in last_msg
-                            if isinstance(part, dict) and part.get("type") == "text"
+                            if isinstance(part, dict)
+                            and part.get("type") == "text"
+                            and isinstance(part.get("text"), str)
                         ]
                         combined = " ".join(text_parts)
                         if combined:

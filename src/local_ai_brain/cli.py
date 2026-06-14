@@ -338,6 +338,9 @@ def trace():
                     i, _, _ = select.select([sys.stdin], [], [], 0.1)
                     if i:
                         user_input = sys.stdin.readline().strip().lower()
+                        if user_input == "":
+                            # stdin closed/EOF — stop monitoring
+                            break
                         if user_input == "k":
                             try:
                                 pid_to_kill = input(

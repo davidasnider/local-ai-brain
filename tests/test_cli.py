@@ -501,3 +501,20 @@ def test_trace_kill(mock_kill, mock_input, mock_select, mock_pids, mock_file, mo
         mock_kill.assert_called_with(9999, signal.SIGKILL)
         captured = capsys.readouterr()
         assert "Successfully killed PID 9999" in captured.out
+
+
+@patch("os.path.exists")
+@patch("builtins.open", new_callable=mock_open)
+@patch("select.select")
+def test_trace_stdin_eof(mock_select, mock_file, mock_exists):
+    mock_exists.return_value = True
+
+    mock_stdin = MagicMock()
+    mock_stdin.readline.return_value = ""
+
+    with patch("sys.stdin", mock_stdin):
+        mock_file().readline.return_value = ""
+        mock_select.return_value = ([mock_stdin], [], [])
+
+        # Should return cleanly without spinning or throwing an error
+        trace()

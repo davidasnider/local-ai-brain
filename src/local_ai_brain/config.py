@@ -81,8 +81,10 @@ class Settings(BaseSettings):
                             if matched:
                                 repo = matched.get("hf_model_repo_id", "")
                                 model_file = matched.get("model", "")
-                                if repo and model_file:
-                                    self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
+                                if model_file:
+                                    self.QWEN_MODEL_PATH = (
+                                        f"{repo}:{model_file}" if repo else model_file
+                                    )
                         elif (
                             isinstance(loaded, dict)
                             and "models" in loaded
@@ -92,8 +94,10 @@ class Settings(BaseSettings):
                             first = loaded["models"][0]
                             repo = first.get("hf_model_repo_id", "")
                             model_file = first.get("model", "")
-                            if repo and model_file:
-                                self.QWEN_MODEL_PATH = f"{repo}:{model_file}"
+                            if model_file:
+                                self.QWEN_MODEL_PATH = (
+                                    f"{repo}:{model_file}" if repo else model_file
+                                )
         except Exception as e:
             logger.warning(f"Failed to load active model from llm_config.yaml: {e}")
 

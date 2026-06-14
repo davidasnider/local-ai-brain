@@ -151,3 +151,40 @@ def test_env_qwen_model_path_takes_precedence(tmp_path, monkeypatch):
     settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
     # Env var should take precedence over YAML config
     assert settings.QWEN_MODEL_PATH == "custom/repo:custom-file"
+
+
+def test_local_model_resolution(tmp_path, monkeypatch):
+    import yaml
+
+    config = {
+        "active_model": "qwen-local",
+        "models": [
+            {
+                "name": "qwen-local",
+                "hf_model_repo_id": "",
+                "model": "/path/to/local/model.gguf",
+            },
+        ],
+    }
+    config_path = tmp_path / "llm_config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    monkeypatch.chdir(tmp_path)
+    settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+    assert settings.QWEN_MODEL_PATH == "/path/to/local/model.gguf"
+
+    # Also test first fallback without active_model
+    config2 = {
+        "models": [
+            {
+                "name": "qwen-local",
+                "hf_model_repo_id": "",
+                "model": "/path/to/local/model.gguf",
+            },
+        ],
+    }
+    with open(config_path, "w") as f:
+        yaml.dump(config2, f)
+    settings = Settings(LOCAL_API_KEY="test")  # pragma: allowlist secret
+    assert settings.QWEN_MODEL_PATH == "/path/to/local/model.gguf"
