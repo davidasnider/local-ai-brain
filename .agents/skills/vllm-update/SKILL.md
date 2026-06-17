@@ -21,7 +21,7 @@ if [ "$CURRENT_HASH" != "$LATEST_HASH" ]; then
   # Use sed to replace the hash only within vllm-mlx context (macOS syntax)
   # Handles both single-line and two-line TOML formats
   sed -i '' "/vllm-mlx/{s/rev = \"$CURRENT_HASH\"/rev = \"$LATEST_HASH\"/};:a;N;/vllm-mlx/{s/rev = \"$CURRENT_HASH\"/rev = \"$LATEST_HASH\"/};ba" pyproject.toml 2>/dev/null || \
-    sed -i '' "s/rev = \"$CURRENT_HASH\"/rev = \"$LATEST_HASH\"/" pyproject.toml
+    sed -i '' "/vllm-mlx/{N;s/rev = \"$CURRENT_HASH\"/rev = \"$LATEST_HASH\"/}" pyproject.toml
   echo "✅ Updated pyproject.toml"
   echo "🔄 Running uv sync (this may take a minute)..."
   uv sync
