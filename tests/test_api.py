@@ -722,3 +722,256 @@ def test_proxy_request_stream_options_edge_cases(mock_send, client):
     assert response.status_code == 200
     sent_payload = json.loads(mock_send.call_args[0][0].content.decode("utf-8"))
     assert sent_payload["stream_options"] == {"include_usage": True}
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_logging(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    with patch("local_ai_brain.main.logger") as mock_logger:
+        with patch("local_ai_brain.main.settings.LOG_PROMPTS", True):
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer test-api-key"},
+                json={
+                    "model": "test-model",
+                    "messages": [{"role": "user", "content": "Tell me a story about a brain."}],
+                },
+            )
+        assert response.status_code == 200
+
+        # Check that logger.info was called with the chat preview
+        log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+        assert any("Incoming chat from" in msg for msg in log_messages)
+        assert any("Tell me a story about a brain." in msg for msg in log_messages)
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_logging_redacted(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    with patch("local_ai_brain.main.logger") as mock_logger:
+        # LOG_PROMPTS is False by default; override env in case it leaks
+        with patch.object(settings, "LOG_PROMPTS", False):
+            response = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": "Bearer test-api-key"},
+                json={
+                    "model": "test-model",
+                    "messages": [{"role": "user", "content": "Sensitive information"}],
+                },
+            )
+            assert response.status_code == 200
+
+            log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+            assert any("Incoming chat from" in msg for msg in log_messages)
+            assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
+            assert not any("Sensitive information" in msg for msg in log_messages)
+
+
+@patch("httpx.AsyncClient.send", new_callable=AsyncMock)
+def test_proxy_chat_multipart_malformed_text_handling(mock_send, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {}
+    mock_response.aclose = AsyncMock()
+
+    async def async_iter():
+        yield b'{"id": "chat-1"}'
+
+    mock_response.aiter_bytes = async_iter
+    mock_send.return_value = mock_response
+
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={
+            "model": "test-model",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "hello"},
+                        {"type": "text", "text": None},
+                        {"type": "image_url", "image_url": {"url": "http://example.com/image.jpg"}},
+                    ],
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+
+    # Test fallback to "[multi-part content]" when there are no valid text parts
+    response2 = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer test-api-key"},
+        json={
+            "model": "test-model",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": "http://example.com/image.jpg"}},
+                    ],
+                }
+            ],
+        },
+    )
+    assert response2.status_code == 200
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_ollama_compatibility_endpoints(mock_get, client):
+    # Mock the vLLM response
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = lambda: {
+        "object": "list",
+        "data": [
+            {
+                "id": "Qwen/Qwen2.5-14B-Instruct-1M",
+                "object": "model",
+                "created": 1234567890,
+                "owned_by": "vllm",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    # 1. GET /api/v1/models returns same data as /v1/models
+    resp_v1 = client.get("/v1/models", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_v1.status_code == 200
+    data_v1 = resp_v1.json()
+
+    resp_compat = client.get("/api/v1/models", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_compat.status_code == 200
+    assert resp_compat.json() == data_v1
+
+    # 2. GET /api/tags returns {"models": [...]}
+    resp_tags = client.get("/api/tags", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_tags.status_code == 200
+    data_tags = resp_tags.json()
+    assert "models" in data_tags
+    assert isinstance(data_tags["models"], list)
+    assert len(data_tags["models"]) == len(data_v1["data"])
+    first_model = data_tags["models"][0]
+    assert "name" in first_model
+    assert "model" in first_model
+    assert "modified_at" in first_model
+    assert "details" in first_model
+
+
+def test_version_and_props_endpoints(client):
+    # GET /version returns {"version": "..."}
+    response = client.get("/version", headers={"Authorization": "Bearer test-api-key"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+
+    # GET /v1/props and /props return {"status": "ok", ...}
+    for path in ["/v1/props", "/props"]:
+        response = client.get(path, headers={"Authorization": "Bearer test-api-key"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert "features" in data
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_model_detail_errors(mock_get, client):
+    # GET /v1/models/nonexistent returns 404 when backend is up
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "object": "list",
+        "data": [
+            {
+                "id": "some-vllm-model",
+                "object": "model",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    response = client.get(
+        "/v1/models/nonexistent", headers={"Authorization": "Bearer test-api-key"}
+    )
+    assert response.status_code == 404
+
+    # GET /v1/models/{id} returns 502 when backend is down
+    mock_get.side_effect = Exception("vLLM connection refused")
+    response = client.get(
+        "/v1/models/some-vllm-model", headers={"Authorization": "Bearer test-api-key"}
+    )
+    assert response.status_code == 502
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_ollama_compatibility_endpoints_missing_id(mock_get, client):
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = lambda: {
+        "object": "list",
+        "data": [
+            {
+                "object": "model",
+                "created": 1234567890,
+                "owned_by": "vllm",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    resp_tags = client.get("/api/tags", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_tags.status_code == 200
+    data_tags = resp_tags.json()
+    assert "models" in data_tags
+    assert len(data_tags["models"]) == 3
+    unknown_models = [m for m in data_tags["models"] if m["name"] == "unknown"]
+    assert len(unknown_models) == 1
+    assert unknown_models[0]["model"] == "unknown"
+
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+def test_ollama_compatibility_endpoints_overflow(mock_get, client):
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = lambda: {
+        "object": "list",
+        "data": [
+            {
+                "id": "overflow-model",
+                "object": "model",
+                "created": "1e1000",
+                "owned_by": "vllm",
+            }
+        ],
+    }
+    mock_get.return_value = mock_response
+
+    resp_tags = client.get("/api/tags", headers={"Authorization": "Bearer test-api-key"})
+    assert resp_tags.status_code == 200
+    data_tags = resp_tags.json()
+    assert "models" in data_tags
+    assert len(data_tags["models"]) == 3
+    overflow_model = [m for m in data_tags["models"] if m["name"] == "overflow-model"]
+    assert len(overflow_model) == 1
+    assert overflow_model[0]["model"] == "overflow-model"

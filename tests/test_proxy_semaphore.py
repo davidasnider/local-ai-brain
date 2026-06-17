@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-os.environ.setdefault("LOCAL_API_KEY", "test-key")
+os.environ.setdefault("LOCAL_API_KEY", "test-api-key")
 os.environ.setdefault("TESTING", "1")
 
 from local_ai_brain.main import proxy_request

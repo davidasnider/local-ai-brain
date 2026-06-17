@@ -55,6 +55,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 * An interactive CLI tool (`local-brain`) must be provided for directly interacting with and testing the API endpoints.
 * It should be built using only standard Python libraries (e.g., `urllib.request`) to minimize dependencies.
 * Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
+* Must provide a `trace` command (`uv run local-brain trace`) to tail the API chat logs in real-time, trace requests to their originating client application PIDs via `lsof`, and offer an interactive hotkey (`k`) to selectively kill misbehaving client processes.
 
 ## 7. Testing Scripts
 * Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the `llama-server` wrapper module standalone with predefined stability settings from `llm_config.yaml` without needing the full microservices stack.

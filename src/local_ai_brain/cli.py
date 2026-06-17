@@ -1,11 +1,16 @@
 import argparse
 import json
 import os
+import re
+import select
+import signal
+import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from loguru import logger
 
@@ -232,6 +237,280 @@ def shutdown_processes(processes):
             p.kill()
 
 
+def get_active_client_pids(ports: Optional[list[int]] = None) -> dict[int, int]:
+    """Returns a dict mapping client port to PID for local established connections.
+
+    Args:
+        ports (list): List of destination ports to filter by. Defaults to [8000, 8001, 8002, 8003].
+
+    Returns:
+        dict: Mapping of source port (int) to PID (int).
+    """
+    if ports is None:
+        fallback_ports = [8000, 8001, 8002, 8003]
+        try:
+            from urllib.parse import urlparse
+
+            from local_ai_brain.config import settings
+
+            extracted_ports = []
+            for url_str in [settings.VLLM_URL, settings.STT_URL, settings.TTS_URL]:
+                if url_str:
+                    try:
+                        p = urlparse(url_str).port
+                        if p is not None:
+                            extracted_ports.append(p)
+                    except Exception:
+                        pass
+
+            try:
+                base_url = get_base_url()
+                p = urlparse(base_url).port
+                if p is not None:
+                    extracted_ports.append(p)
+                else:
+                    extracted_ports.append(8000)
+            except Exception:
+                extracted_ports.append(8000)
+
+            if extracted_ports:
+                ports = list(dict.fromkeys(extracted_ports))
+            else:
+                ports = fallback_ports
+        except Exception:
+            ports = fallback_ports
+    client_pid_map = {}
+    try:
+        # lsof -iTCP:8000,8001,... -sTCP:ESTABLISHED,TIME_WAIT,FIN_WAIT_1,FIN_WAIT_2 -n -P
+        port_spec = ",".join(map(str, ports))
+        cmd = [
+            "lsof",
+            f"-iTCP:{port_spec}",
+            "-sTCP:ESTABLISHED,TIME_WAIT,FIN_WAIT_1,FIN_WAIT_2",
+            "-n",
+            "-P",
+        ]
+        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 9 and "TCP" in line:
+                try:
+                    pid = int(parts[1])
+                    name = parts[8]
+                    # name looks like localhost:52345->localhost:8000
+                    if "->" in name:
+                        src, _ = name.split("->", 1)
+                        src_port = int(src.split(":")[-1])
+                        client_pid_map[src_port] = pid
+                except (ValueError, IndexError):
+                    continue
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # lsof might not be installed or might return non-zero if no matches
+        pass
+    except Exception as e:
+        logger.debug(f"Error in get_active_client_pids: {e}")
+    return client_pid_map
+
+
+def trace():
+    """Tails the local-ai-brain log file and maps incoming requests to client PIDs.
+
+    Provides real-time visibility into which local processes are talking to the brain.
+    Supports an interactive 'k' command to kill identified client processes.
+    """
+
+    def display_msg(pid, port, msg):
+        if pid:
+            try:
+                cmdline = (
+                    subprocess.check_output(["ps", "-p", str(pid), "-o", "command="])
+                    .decode()
+                    .strip()
+                )
+                print(
+                    f"{COLOR_PROMPT}[PID {pid}]{COLOR_RESET} "
+                    f"{COLOR_ASSISTANT}{cmdline}{COLOR_RESET}"
+                )
+            except subprocess.CalledProcessError:
+                print(f"{COLOR_PROMPT}[PID {pid} (Unknown)]{COLOR_RESET}")
+        else:
+            print(f"{COLOR_PROMPT}[Port {port}]{COLOR_RESET}")
+
+        print(f"{COLOR_USER}Says:{COLOR_RESET} {msg}\n")
+
+    print(f"{COLOR_SYSTEM}Starting real-time conversation trace...{COLOR_RESET}")
+    print(f"{COLOR_SYSTEM}Press 'k' and enter to kill a process.{COLOR_RESET}")
+    print(f"{COLOR_SYSTEM}Press Ctrl+C to exit.{COLOR_RESET}")
+
+    log_path = os.path.expanduser(
+        os.getenv("LOCAL_AI_BRAIN_LOG_PATH", "~/Library/Logs/local-ai-brain.log")
+    )
+    if not os.path.exists(log_path):
+        print(f"{COLOR_ERROR}Log file not found: {log_path}{COLOR_RESET}")
+        sys.exit(1)
+
+    f = None
+    try:
+        f = open(log_path, "r")
+        # Seek to end
+        f.seek(0, 2)
+        current_ino = os.fstat(f.fileno()).st_ino
+        last_rotation_check = time.time()
+
+        pattern = re.compile(r"Incoming chat from \S+:(\d+) - (?:\"(.*)\"|\[PROMPT REDACTED\])")
+
+        trace_pids = set()
+        last_pid_refresh = 0.0
+        last_prune_time = 0.0
+        waiting_for_pid = False
+        buffered_messages = []
+        client_pids = {}
+        monitor_stdin = sys.stdin.isatty()
+
+        while True:
+            # Check for log rotation every 2 seconds
+            now = time.time()
+            if now - last_rotation_check > 2.0:
+                last_rotation_check = now
+                rotated = False
+                try:
+                    if os.path.exists(log_path):
+                        stat_info = os.stat(log_path)
+                        if stat_info.st_ino != current_ino or stat_info.st_size < f.tell():
+                            rotated = True
+                except Exception:
+                    pass
+
+                if rotated:
+                    new_f = None
+                    try:
+                        new_f = open(log_path, "r")
+                        current_ino = os.fstat(new_f.fileno()).st_ino
+                        f.close()
+                        f = new_f
+                    except Exception:
+                        if new_f is not None:
+                            new_f.close()
+                        pass
+
+            # Prune dead PIDs from trace_pids every 5 seconds
+            if now - last_prune_time > 5.0:
+                last_prune_time = now
+                dead_pids = set()
+                for pid in trace_pids:
+                    try:
+                        os.kill(pid, 0)
+                    except PermissionError:
+                        pass
+                    except OSError:
+                        dead_pids.add(pid)
+                trace_pids -= dead_pids
+
+            pos = f.tell()
+            line = f.readline()
+            if line:
+                if not line.endswith("\n"):
+                    f.seek(pos)
+                    time.sleep(0.05)
+                    continue
+                match = pattern.search(line)
+                if match:
+                    port = int(match.group(1))
+                    raw_msg = match.group(2)
+                    if raw_msg is not None:
+                        try:
+                            msg = json.loads(f'"{raw_msg}"')
+                        except Exception:
+                            msg = raw_msg
+                    else:
+                        msg = "[PROMPT REDACTED]"
+
+                    now_time = time.time()
+                    if now_time - last_pid_refresh > 2.0:
+                        client_pids = get_active_client_pids()
+                        last_pid_refresh = now_time
+                    pid = client_pids.get(port)
+
+                    if pid:
+                        trace_pids.add(pid)
+
+                    if waiting_for_pid:
+                        buffered_messages.append((pid, port, msg))
+                        print("[message received — finish entering PID first]")
+                    else:
+                        display_msg(pid, port, msg)
+                else:
+                    # Log completion/stats if needed, or ignore
+                    pass
+
+            # Check for interactive kill command
+            if monitor_stdin:
+                i, _, _ = select.select([sys.stdin], [], [], 0.0)
+                if i:
+                    raw_line = sys.stdin.readline()
+                    if not raw_line:
+                        # stdin closed/EOF — stop monitoring
+                        break
+                    user_input = raw_line.strip()
+                    if waiting_for_pid:
+                        waiting_for_pid = False
+                        if not user_input or "esc" in user_input.lower() or "\x1b" in user_input:
+                            print(f"{COLOR_SYSTEM}Cancelled.{COLOR_RESET}\n")
+                        else:
+                            try:
+                                pid_int = int(user_input)
+                                if pid_int <= 0:
+                                    raise ValueError("PID must be a positive integer")
+                                if pid_int not in trace_pids:
+                                    print(
+                                        f"{COLOR_ERROR}PID not tracked by this trace session"
+                                        f"{COLOR_RESET}\n"
+                                    )
+                                else:
+                                    try:
+                                        os.kill(pid_int, 0)
+                                    except ProcessLookupError:
+                                        trace_pids.discard(pid_int)
+                                        print(
+                                            f"{COLOR_ERROR}Process has already exited"
+                                            f"{COLOR_RESET}\n"
+                                        )
+                                    else:
+                                        os.kill(pid_int, signal.SIGKILL)
+                                        print(
+                                            f"{COLOR_ASSISTANT}Successfully killed PID {pid_int}"
+                                            f"{COLOR_RESET}\n"
+                                        )
+                            except ValueError:
+                                print(f"{COLOR_ERROR}Invalid PID{COLOR_RESET}\n")
+                            except Exception as e:
+                                print(f"{COLOR_ERROR}Failed to kill: {e}{COLOR_RESET}\n")
+
+                        for b_pid, b_port, b_msg in buffered_messages:
+                            display_msg(b_pid, b_port, b_msg)
+                        buffered_messages.clear()
+                    else:
+                        user_input_lower = user_input.lower()
+                        if user_input_lower == "k":
+                            waiting_for_pid = True
+                            print(
+                                f"{COLOR_SYSTEM}Enter PID (Esc to cancel): {COLOR_RESET}",
+                                end="",
+                                flush=True,
+                            )
+                elif not line:
+                    time.sleep(0.05)
+            else:
+                if not line:
+                    time.sleep(0.05)
+    except KeyboardInterrupt:
+        print(f"\n{COLOR_SYSTEM}Exiting trace...{COLOR_RESET}")
+        sys.exit(0)
+    finally:
+        if f is not None:
+            f.close()
+
+
 def serve():
     import shutil
     import subprocess
@@ -366,11 +645,16 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("serve", help="Start the API servers")
+    subparsers.add_parser("trace", help="Trace conversations in real time")
 
     args = parser.parse_args()
 
     if args.command == "serve":
         serve()
+        return
+
+    if args.command == "trace":
+        trace()
         return
 
     if args.help_cmd:
