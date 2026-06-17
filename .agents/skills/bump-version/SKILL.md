@@ -9,6 +9,8 @@ description: Bumps the project version in pyproject.toml and updates uv.lock.
 4. Commits the version bump.
 
 ```bash
+set -e
+
 # Get current version
 CURRENT_VERSION=$(grep -m 1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
 echo "ℹ️ Current version: $CURRENT_VERSION"
@@ -33,7 +35,7 @@ sed -i '' "s/^version = \"$CURRENT_VERSION\"/version = \"$NEXT_VERSION\"/" pypro
 echo "🔄 Updating uv.lock..."
 uv lock
 
-# Commit changes
+# Commit changes (will abort if other uncommitted changes exist)
 echo "💾 Committing version bump..."
 git add pyproject.toml uv.lock
 git commit -m "chore: bump version to $NEXT_VERSION"
