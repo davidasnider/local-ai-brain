@@ -56,6 +56,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 9. **Interactive CLI Tool:**
    * Maintain the `local-brain` CLI tool located in `src/local_ai_brain/cli.py`.
    * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
+   * The `local-brain` CLI includes a `trace` command (`uv run local-brain trace`) that tails chat logs in real-time, correlates incoming requests to local client process PIDs using `lsof`, and allows interactive killing of client applications via a hotkey (`k`).
 
 10. **LLM Execution & GPU Timeout Prevention:**
     * Always run `llama-cpp-python` via the `llama-server` binary wrapper (`src/local_ai_brain/models/llm_server.py`) ensuring stability overrides for Apple Silicon (e.g., `-ngl`, `--ctx-size`, `-fa on`, `--batch-size`, `--ubatch-size`, `-np`, `--spec-type`, `--spec-draft-n-max`, `--spec-draft-p-min`, `--cache-type-k`, `--cache-type-v`) are parsed from `llm_config.yaml` to prevent macOS Metal watchdog timeouts during large model operations.
