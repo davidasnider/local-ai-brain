@@ -15,7 +15,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
-* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 27B parameter) quantized (GGUF to respect RAM limits). The `local-brain serve` orchestrator starts the llama-cpp-python backend (via `llama-server`) configured via `llm_config.yaml`. It supports a **96K context window** (`MAX_CONTEXT_TOKENS` = 98304) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 98304) to prevent extremely large values from causing backend generation failures, improving compatibility with upstream tools like Hermes. KV cache quantization and optimized batch sizes (e.g., `-ngl`, `--ctx-size`, `--flash-attn`, `--batch-size`, `--ubatch-size`, `--cache-type-k q8_0`) are enabled for improved performance and memory efficiency on Apple Silicon. Must use stability overrides and gateway-level request serialization to prevent macOS Metal watchdog timeouts.
+* **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 27B parameter) quantized (GGUF to respect RAM limits). The `local-brain serve` orchestrator starts the llama-cpp-python backend (via `llama-server`) configured via `llm_config.yaml`. It supports a **96K context window** (`MAX_CONTEXT_TOKENS` = 98304) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 98304) to prevent extremely large values from causing backend generation failures, improving compatibility with upstream tools like Hermes. KV cache quantization and optimized batch sizes (e.g., `-ngl`, `--ctx-size`, `-fa on`, `--batch-size`, `--ubatch-size`, `--spec-type`, `--cache-type-k q8_0`) are enabled for improved performance and memory efficiency on Apple Silicon. Must use stability overrides and gateway-level request serialization to prevent macOS Metal watchdog timeouts. Token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`) are configured via environment variables (`.env`).
 * **Speech-to-Text (STT):** Lightning Whisper MLX.
 * **Text-to-Speech (TTS):** Kokoro TTS via MLX (or ONNX).
 
@@ -55,6 +55,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 * An interactive CLI tool (`local-brain`) must be provided for directly interacting with and testing the API endpoints.
 * It should be built using only standard Python libraries (e.g., `urllib.request`) to minimize dependencies.
 * Must support standard chat functionality, plus special commands for testing TTS (`/tts`) and STT (`/stt`).
+* Must provide a `trace` command (`uv run local-brain trace`) to tail the API chat logs in real-time, trace requests to their originating client application PIDs via `lsof`, and offer an interactive hotkey (`k`) to selectively kill misbehaving client processes.
 
 ## 7. Testing Scripts
 * Provide utility scripts, such as `scripts/start_llm.sh`, to allow developers to start and test the `llama-server` wrapper module standalone with predefined stability settings from `llm_config.yaml` without needing the full microservices stack.

@@ -137,6 +137,14 @@ You can start the CLI using `uv`:
 uv run local-brain
 ```
 
+You can also run the CLI tools trace command:
+
+```bash
+uv run local-brain trace
+```
+
+This tool monitors the incoming chat requests to the main API, attempting to correlate requests to local process PIDs so you can monitor what applications are using the brain in real time. It also provides a hotkey (`k`) to selectively kill client applications right from the log trace view.
+
 ### CLI Features
 
 The CLI connects to your local instance (default: `http://localhost:8000/v1`) and requires the `LOCAL_API_KEY` (or `OPENAI_API_KEY`) to be set in your environment.
