@@ -8,7 +8,6 @@ description: Bumps the project version in pyproject.toml and updates uv.lock.
 3. Updates `pyproject.toml` and runs `uv lock` to synchronize the lockfile.
 4. Commits the version bump.
 
-// turbo
 ```bash
 # Get current version
 CURRENT_VERSION=$(grep -m 1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
@@ -37,7 +36,7 @@ uv lock
 # Commit changes
 echo "💾 Committing version bump..."
 git add pyproject.toml uv.lock
-git commit -m "chore: bump version to $NEXT_VERSION" --no-verify
+git commit -m "chore: bump version to $NEXT_VERSION"
 
 echo "✅ Version bumped and committed."
 ```

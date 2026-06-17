@@ -16,5 +16,5 @@ If the `run-dev` process gets stuck or you need to cleanly restart it in the bac
 lsof -ti:8888 | xargs kill 2>/dev/null || true
 
 # 2. Start the development server again
-set -a && source .env && set +a && PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload > /tmp/localbrain-dev.log 2>&1
+set -a && source .env && set +a && PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload > /tmp/localbrain-dev.log 2>&1 &
 ```

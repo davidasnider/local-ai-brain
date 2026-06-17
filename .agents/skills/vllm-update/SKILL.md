@@ -1,5 +1,5 @@
 ---
-name: update-vllm-mlx
+name: vllm-update
 description: Updates vllm-mlx to the latest version and checks for model updates on Hugging Face.
 ---
 
@@ -8,7 +8,6 @@ description: Updates vllm-mlx to the latest version and checks for model updates
 3. Runs `uv sync` to update the lockfile and install dependencies.
 4. Checks Hugging Face for new commits on the models in use.
 
-// turbo
 ```bash
 # Update vllm-mlx
 echo "🔄 Checking for vllm-mlx updates..."
