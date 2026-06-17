@@ -6,7 +6,7 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 
 ## Core Capabilities
 
-- **LLM (Text/Reasoning/Vision):** Qwen 3.6 35B quantized (GGUF). The API is backed by the `llama-cpp-python` server. It supports a large **96K context window** (`MAX_CONTEXT_TOKENS` = 98304) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API clamps requested `max_tokens` to `MAX_CONTEXT_TOKENS` (98304) to prevent `max_tokens` from exceeding the context window. It utilizes Flash Attention, KV cache quantization (Q8_0), and optimized batch sizes for maximum performance on Apple Silicon. To ensure stability and prevent timeouts, the `local-brain serve` CLI command manages the server lifecycle, and concurrent requests are serialized at the API Gateway level. Token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`) are configured via environment variables (`.env`). The underlying llama-server process is configured separately via `llm_config.yaml`.
+- **LLM (Text/Reasoning/Vision):** Qwen 3.6 27B quantized (GGUF). The API is backed by the `llama-cpp-python` server. It supports a large **96K context window** (`MAX_CONTEXT_TOKENS` = 98304) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API clamps requested `max_tokens` to `MAX_CONTEXT_TOKENS` (98304) to prevent `max_tokens` from exceeding the context window. It utilizes Flash Attention, KV cache quantization (Q8_0), and optimized batch sizes for maximum performance on Apple Silicon. To ensure stability and prevent timeouts, the `local-brain serve` CLI command manages the server lifecycle, and concurrent requests are serialized at the API Gateway level. Token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`) are configured via environment variables (`.env`). The underlying llama-server process is configured separately via `llm_config.yaml`.
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
@@ -95,7 +95,7 @@ curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $LOCAL_API_KEY" \
   -d '{
-    "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_M",
+    "model": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
     "messages": [{"role": "user", "content": "How do I build a DIY smart mirror?"}],
     "stream": true
   }'
@@ -136,6 +136,14 @@ You can start the CLI using `uv`:
 ```bash
 uv run local-brain
 ```
+
+You can also run the CLI tools trace command:
+
+```bash
+uv run local-brain trace
+```
+
+This tool monitors the incoming chat requests to the main API, attempting to correlate requests to local process PIDs so you can monitor what applications are using the brain in real time. It also provides a hotkey (`k`) to selectively kill client applications right from the log trace view.
 
 ### CLI Features
 

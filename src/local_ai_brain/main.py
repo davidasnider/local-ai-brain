@@ -128,6 +128,46 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                     )
                     payload["max_tokens"] = settings.MAX_CONTEXT_TOKENS
 
+            # Log who is talking
+            client_host = request.client.host if request.client else "unknown"
+            client_port = request.client.port if request.client else 0
+            messages = payload.get("messages", [])
+            prompt_preview = ""
+            if messages and isinstance(messages, list):
+                last_msg_obj = messages[-1]
+                if isinstance(last_msg_obj, dict):
+                    last_msg = last_msg_obj.get("content", "")
+                    if isinstance(last_msg, str):
+                        prompt_preview = last_msg[:100].replace("\n", " ") + (
+                            "..." if len(last_msg) > 100 else ""
+                        )
+                    elif isinstance(last_msg, list):
+                        # Multi-part content (vision/tooling) — extract text parts
+                        text_parts = [
+                            part.get("text", "")
+                            for part in last_msg
+                            if isinstance(part, dict)
+                            and part.get("type") == "text"
+                            and isinstance(part.get("text"), str)
+                        ]
+                        combined = " ".join(text_parts)
+                        if combined:
+                            prompt_preview = combined[:100].replace("\n", " ") + (
+                                "..." if len(combined) > 100 else ""
+                            )
+                        else:
+                            prompt_preview = "[multi-part content]"
+            elif "prompt" in payload and isinstance(payload["prompt"], str):
+                prompt_preview = payload["prompt"][:100].replace("\n", " ") + (
+                    "..." if len(payload["prompt"]) > 100 else ""
+                )
+
+            if settings.LOG_PROMPTS:
+                preview = json.dumps(prompt_preview if prompt_preview else "[empty prompt]")
+                logger.info(f"Incoming chat from {client_host}:{client_port} - {preview}")
+            else:
+                logger.info(f"Incoming chat from {client_host}:{client_port} - [PROMPT REDACTED]")
+
             body = json.dumps(payload).encode("utf-8")
         content = body
 
@@ -437,8 +477,30 @@ async def ollama_models_compat(request: Request):
 
 @app.get("/api/tags")
 async def ollama_tags_compat(request: Request):
+    from datetime import datetime, timezone
+
     data = await list_models(request)
-    return {"models": data.get("data", [])}
+    transformed = []
+    for model in data.get("data", []):
+        created = model.get("created", 0)
+        try:
+            if isinstance(created, str):
+                created = float(created) if "." in created else int(created)
+            if isinstance(created, (int, float)) and created > 0:
+                modified_at = datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
+            else:
+                modified_at = datetime.now(timezone.utc).isoformat()
+        except (TypeError, ValueError, OSError, OverflowError):
+            modified_at = datetime.now(timezone.utc).isoformat()
+        transformed.append(
+            {
+                "name": model.get("id", "unknown"),
+                "model": model.get("id", "unknown"),
+                "modified_at": modified_at,
+                "details": {"format": "gguf", "family": "llama", "parameter_size": "unknown"},
+            }
+        )
+    return {"models": transformed}
 
 
 @app.get("/version")
