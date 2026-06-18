@@ -55,6 +55,7 @@ TTS_PID=""
 # Trap Ctrl+C and clean up
 cleanup() {
   local exit_code="${1:-0}"
+  trap - EXIT INT TERM
   echo ""
   echo "🛑 Shutting down backend services..."
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
@@ -82,7 +83,7 @@ trap cleanup EXIT
 
 # Pre-check port occupancy before starting services (finding #5)
 for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
-  if uv run python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', $_port))" 2>/dev/null; then
+  if PORT="$_port" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
     echo "⚠ Port $_port is already in use. Check for conflicting services."
   fi
 done
@@ -91,7 +92,7 @@ done
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
 LLM_PID=$!
 for _i in $(seq 30); do
-  if uv run python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $LLM_PORT))" 2>/dev/null; then
+  if PORT="$LLM_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$LLM_PID" 2>/dev/null; then
@@ -108,7 +109,7 @@ fi
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
 STT_PID=$!
 for _i in $(seq 30); do
-  if uv run python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $STT_PORT))" 2>/dev/null; then
+  if PORT="$STT_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$STT_PID" 2>/dev/null; then
@@ -125,7 +126,7 @@ fi
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
 TTS_PID=$!
 for _i in $(seq 30); do
-  if uv run python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $TTS_PORT))" 2>/dev/null; then
+  if PORT="$TTS_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$TTS_PID" 2>/dev/null; then
@@ -163,19 +164,22 @@ while true; do
 
   # Check for unexpected stops — use wait to get exit code and
   # differentiate clean exit from crash (finding #1)
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-      # Get the exit status to differentiate clean exit from crash
-      wait "$pid" 2>/dev/null
-      exit_code=$?
-      if [ "$exit_code" = 0 ]; then
-        echo "⚠ Backend process $pid exited cleanly (code 0). Continuing with remaining services."
+  for _var in LLM_PID STT_PID TTS_PID; do
+    _pid="${!_var}"
+    if [ -n "$_pid" ] && ! kill -0 "$_pid" 2>/dev/null; then
+      wait "$_pid" 2>/dev/null
+      _exit_code=$?
+      if [ "$_exit_code" = 0 ]; then
+        echo "⚠ Backend process $_pid ($_var) exited cleanly (code 0). Continuing with remaining services."
+        eval "$_var="
       else
-        echo "❌ Backend process $pid stopped unexpectedly (exit code $exit_code)!"
+        echo "❌ Backend process $_pid ($_var) stopped unexpectedly (exit code $_exit_code)!"
         cleanup 1
       fi
     fi
   done
 done
 ```
+
+Note: These scripts do not have automated tests. ShellCheck and manual smoke tests are recommended before deploying changes.
 
