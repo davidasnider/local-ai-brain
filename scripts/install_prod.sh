@@ -21,12 +21,12 @@ update_env_key() {
     LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c '
 import sys, re, os
 env_file = sys.argv[1]
-key = os.environ["LOCAL_API_KEY_VALUE"].replace("\\\"", "\"").replace("\"", "\\\"")
+key = os.environ["LOCAL_API_KEY_VALUE"].replace("\\", "\\\\").replace("\"", "\\\"")
 with open(env_file, "r") as f:
     content = f.read()
 new_content = re.sub(
-    r"^[ \t]*(export[ \t]+)?LOCAL_API_KEY[ \t]*=.*",
-    lambda m: f"LOCAL_API_KEY=\"{key}\"",
+    r"^([ \t]*(?:export[ \t]+)?)LOCAL_API_KEY[ \t]*=.*",
+    "\\1LOCAL_API_KEY=\"" + key + "\"",
     content,
     flags=re.MULTILINE
 )
@@ -47,10 +47,10 @@ with open(sys.argv[1]) as f:
             val = m.group(1).strip()
             if val.startswith("\""):
                 q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
-                if q: val = q.group(1).replace("\\\"", "\"")
+                if q: val = q.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
             elif val.startswith("\x27"):
                 q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
-                if q: val = q.group(1)
+                if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
             else:
                 val = re.sub(r"\s*#.*", "", val)
             print(val)
@@ -148,7 +148,7 @@ chmod 600 "$PROD_DIR/.env"
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
-sed -i "" "s|__HOME__|$HOME|g" "$PLIST_PATH"
+python3 -c "import sys; p = sys.argv[1]; c = open(p).read().replace('__HOME__', sys.argv[2]); open(p, 'w').write(c)" "$PLIST_PATH" "$HOME"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
