@@ -105,10 +105,7 @@ if ! PORT="$LLM_PORT" uv run python -c "import os, socket; s=socket.socket(); s.
   echo "❌ LLM Server failed to become ready (timeout)!"
   cleanup 1
 fi
-if ! kill -0 "$LLM_PID" 2>/dev/null; then
-  echo "❌ LLM Server failed to start!"
-  cleanup 1
-fi
+
 
 # STT Server
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
@@ -126,10 +123,7 @@ if ! PORT="$STT_PORT" uv run python -c "import os, socket; s=socket.socket(); s.
   echo "❌ STT Server failed to become ready (timeout)!"
   cleanup 1
 fi
-if ! kill -0 "$STT_PID" 2>/dev/null; then
-  echo "❌ STT Server failed to start!"
-  cleanup 1
-fi
+
 
 # TTS Server
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
@@ -147,10 +141,7 @@ if ! PORT="$TTS_PORT" uv run python -c "import os, socket; s=socket.socket(); s.
   echo "❌ TTS Server failed to become ready (timeout)!"
   cleanup 1
 fi
-if ! kill -0 "$TTS_PID" 2>/dev/null; then
-  echo "❌ TTS Server failed to start!"
-  cleanup 1
-fi
+
 
 echo "✅ LLM Server (pid $LLM_PID) on 127.0.0.1:$LLM_PORT"
 echo "✅ STT Server (pid $STT_PID) on 127.0.0.1:$STT_PORT"
@@ -180,6 +171,7 @@ while true; do
   for _var in LLM_PID STT_PID TTS_PID; do
     _pid="${!_var}"
     if [ -n "$_pid" ] && ! kill -0 "$_pid" 2>/dev/null; then
+      _exit_code=0
       wait "$_pid" 2>/dev/null || _exit_code=$?
       if [ "$_exit_code" = 0 ]; then
         echo "⚠ Backend process $_pid ($_var) exited cleanly (code 0). Continuing with remaining services."

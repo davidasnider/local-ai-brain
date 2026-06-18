@@ -54,19 +54,7 @@ check_model() {
     echo "Local path does not exist yet -- skipping remote check"
     return
   fi
-  # Check for relative local paths that arent caught by the / or . prefix checks
-  if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" == */* ]]; then
-    local _parent="${url%/*}"
-    local _base="${url##*/}"
-    if [ -d "$PROJECT_ROOT/$_parent" ] 2>/dev/null; then
-      echo "Relative local path does not exist yet -- skipping remote check"
-      return
-    fi
-    if [ -f "$PROJECT_ROOT/$url" ] 2>/dev/null; then
-      echo "Local file detected -- skipping remote check"
-      return
-    fi
-  fi
+
   # Prepend https://huggingface.co/ if it's a simple repo identifier
   if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
     url="https://huggingface.co/$url"
