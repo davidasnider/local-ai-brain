@@ -61,10 +61,17 @@ check_model() {
 
 echo "Checking models from llm_config.yaml..."
 uv run python -c "
-import yaml, sys, subprocess
-from local_ai_brain.config import get_config_path
-with open(get_config_path()) as f:
-    cfg = yaml.safe_load(f) or {}
+import yaml
+from pathlib import Path
+cfg_path = Path.cwd()
+for parent in [cfg_path] + list(cfg_path.parents):
+    if (parent / 'pyproject.toml').exists() or (parent / 'llm_config.yaml').exists():
+        cfg_path = parent / 'llm_config.yaml'
+        break
+else:
+    cfg_path = cfg_path / 'llm_config.yaml'
+with open(cfg_path) as f:
+    cfg = yaml.safe_load(f) or {}"
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []
 for m in models:
@@ -87,8 +94,8 @@ for m in models:
   fi
 done
 
-WHISPER_URL="${WHISPER_MODEL_PATH:-$(uv run python -c "from local_ai_brain.config import settings; print(settings.WHISPER_MODEL_PATH)" 2>/dev/null || echo "https://huggingface.co/mlx-community/whisper-large-v3-mlx")}"
-KOKORO_URL="${KOKORO_HF_REPO:-$(uv run python -c "from local_ai_brain.config import settings; print(settings.KOKORO_HF_REPO)" 2>/dev/null || echo "https://huggingface.co/fastrtc/kokoro-onnx")}"
+WHISPER_URL="${WHISPER_MODEL_PATH:-https://huggingface.co/mlx-community/whisper-large-v3-mlx}"
+KOKORO_URL="${KOKORO_HF_REPO:-https://huggingface.co/fastrtc/kokoro-onnx}"
 check_model "Whisper" "$WHISPER_URL"
 check_model "Kokoro" "$KOKORO_URL"
 

@@ -33,10 +33,18 @@ if [ -f .env ]; then
   set -a && source .env && set +a
 fi
 
+# Fail fast if LOCAL_API_KEY is not set (required for config module)
+if [ -z "${LOCAL_API_KEY:-}" ]; then
+  echo "❌ LOCAL_API_KEY is not set. Set it in .env or export it before running." >&2
+  exit 1
+fi
+
 export PYTHONPATH=src
 
-# Extract backend ports from config so servers match the gateway's expectations
-read LLM_PORT STT_PORT TTS_PORT <<<$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(f\"{urlparse(settings.VLLM_URL).port or 8001} {urlparse(settings.STT_URL).port or 8002} {urlparse(settings.TTS_URL).port or 8003}\")" 2>/dev/null || echo "8001 8002 8003")
+# Ports match the defaults in local_ai_brain.config.Settings (llm_config.yaml does not store ports)
+LLM_PORT=8001
+STT_PORT=8002
+TTS_PORT=8003
 
 # Initialize PID variables to avoid unbound variable errors in cleanup trap
 LLM_PID=""
@@ -70,7 +78,7 @@ trap "cleanup 143" TERM
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
 LLM_PID=$!
 for _i in $(seq 5); do
-  if timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$LLM_PORT" 2>/dev/null; then
+  if python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $LLM_PORT))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$LLM_PID" 2>/dev/null; then
@@ -87,7 +95,7 @@ fi
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
 STT_PID=$!
 for _i in $(seq 5); do
-  if timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$STT_PORT" 2>/dev/null; then
+  if python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $STT_PORT))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$STT_PID" 2>/dev/null; then
@@ -104,7 +112,7 @@ fi
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
 TTS_PID=$!
 for _i in $(seq 5); do
-  if timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$TTS_PORT" 2>/dev/null; then
+  if python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $TTS_PORT))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$TTS_PID" 2>/dev/null; then
