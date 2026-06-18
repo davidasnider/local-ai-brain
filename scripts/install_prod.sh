@@ -62,6 +62,8 @@ fi
 if [ -n "$LATEST_TAG" ]; then
     echo "Checking out latest tag: $LATEST_TAG"
     git checkout "$LATEST_TAG"
+else
+    git pull
 fi
 
 # Install uv if not present
@@ -71,7 +73,7 @@ if ! command -v uv &> /dev/null; then
     else
         echo "brew not found, attempting to install uv via standalone installer..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.cargo/bin:$PATH"
+        export PATH="$HOME/.local/bin:$PATH"
     fi
 fi
 
@@ -92,6 +94,9 @@ if [ -f "$ENV_FILE" ]; then
         echo ".env already exists at destination; skipping copy."
     else
         cp "$ENV_FILE" "$PROD_DIR/.env"
+        if ! grep -q "LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+            echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+        fi
     fi
 else
     echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
@@ -99,7 +104,7 @@ fi
 chmod 600 "$PROD_DIR/.env"
 
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
-perl -0pe 's/\n[ \t]*<key>LOCAL_API_KEY<\/key>[ \t]*\n[ \t]*<string>__REPLACE_WITH_LOCAL_API_KEY__<\/string>[ \t]*\n/\n/g' com.localbrain.api.plist > "$PLIST_PATH"
+perl -0pe 's/<key>LOCAL_API_KEY<\/key>\s*<string>__REPLACE_WITH_LOCAL_API_KEY__<\/string>\s*//gs' com.localbrain.api.plist > "$PLIST_PATH"
 
 # Unload existing instance if present
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
