@@ -71,6 +71,11 @@ REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
 echo "Installing Local AI Brain Production to $PROD_DIR"
 mkdir -p "$(dirname "$PROD_DIR")"
+# If PROD_DIR exists but is not a git repository, remove it first so git clone can succeed
+if [ -d "$PROD_DIR" ] && [ ! -d "$PROD_DIR/.git" ]; then
+    echo "Removing existing non-git directory $PROD_DIR before cloning..."
+    rm -rf "$PROD_DIR"
+fi
 if [ ! -d "$PROD_DIR/.git" ]; then
     git clone "$REPO_URL" "$PROD_DIR"
 fi
@@ -97,6 +102,7 @@ if ! command -v uv &> /dev/null; then
         echo "brew not found, attempting to install uv via standalone installer..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
     fi
+    hash -r 2>/dev/null || true
 fi
 
 uv sync --frozen --no-dev

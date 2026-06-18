@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 from unittest.mock import mock_open, patch
 
 # Locate the installation script relative to this test file
@@ -42,6 +43,11 @@ def test_update_env_key():
             "# LOCAL_API_KEY is not active\nLOCAL_API_KEY = something\n",
             "new#key",
             '# LOCAL_API_KEY is not active\nLOCAL_API_KEY="new#key"\n',
+        ),
+        (
+            "OTHER_VAR=value\nANOTHER=foo",
+            "newkey",
+            "OTHER_VAR=value\nANOTHER=foo",
         ),
     ]
 
@@ -116,34 +122,57 @@ def test_read_env_key_comment_stripping():
                 mock_print.assert_called_once_with(expected_key)
 
 
-def test_write_env_key_escaping():
-    """Verify that _write_env_key correctly escapes backslashes and double quotes."""
+def test_write_env_key_escaping(tmp_path):
+    """Verify that _write_env_key correctly escapes backslashes and double quotes
+    by extracting and executing the actual bash function from install_prod.sh."""
+    # Extract the _write_env_key function definition from the script
     with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Assert that the bash function exists and has the expected escaping substitutions
-    assert "_write_env_key() {" in content
-    # Look for the string replacement pattern
-    assert "LOCAL_API_KEY//\\\\/\\\\\\\\" in content or "LOCAL_API_KEY//\\/\\\\" in content
-    assert '_ekey//\\"/\\\\\\"' in content or '_ekey//"/\\"' in content
+    func_start = content.find("_write_env_key() {")
+    assert func_start != -1, "_write_env_key() not found in install_prod.sh"
 
-    # Implement the Python equivalent of bash replacements:
-    # _ekey="${LOCAL_API_KEY//\\/\\\\}" -> replaces all \ with \\
-    # _ekey="${_ekey//\"/\\\"}" -> replaces all " with \"
-    def write_env_key_py(key):
-        escaped = key.replace("\\", "\\\\").replace('"', '\\"')
-        return f'LOCAL_API_KEY="{escaped}"'
+    # Find the closing brace by counting depth
+    brace_depth = 0
+    in_body = False
+    func_end = func_start
+    for i in range(func_start, len(content)):
+        if content[i] == "{":
+            brace_depth += 1
+            in_body = True
+        elif content[i] == "}":
+            brace_depth -= 1
+            if in_body and brace_depth == 0:
+                func_end = i + 1
+                break
+
+    func_body = content[func_start:func_end]
+
+    # Write the extracted function to a temp file for sourcing
+    func_file = tmp_path / "_write_env_key.sh"
+    func_file.write_text(func_body)
 
     test_cases = [
-        ("simplekey", 'LOCAL_API_KEY="simplekey"'),
-        ("key\\with\\backslashes", 'LOCAL_API_KEY="key\\\\with\\\\backslashes"'),
-        ('key"with"quotes', 'LOCAL_API_KEY="key\\"with\\"quotes"'),
-        ('key\\with"both', 'LOCAL_API_KEY="key\\\\with\\"both"'),
-        ("key\\\\double\\\\backslashes", 'LOCAL_API_KEY="key\\\\\\\\double\\\\\\\\backslashes"'),
+        ("simplekey", 'LOCAL_API_KEY="simplekey"\n'),
+        ("key\\with\\backslashes", 'LOCAL_API_KEY="key\\\\with\\\\backslashes"\n'),
+        ('key"with"quotes', 'LOCAL_API_KEY="key\\"with\\"quotes"\n'),
+        ('key\\with"both', 'LOCAL_API_KEY="key\\\\with\\"both"\n'),
+        ("key\\\\double\\\\backslashes", 'LOCAL_API_KEY="key\\\\\\\\double\\\\\\\\backslashes"\n'),
     ]
 
     for input_key, expected in test_cases:
-        assert write_env_key_py(input_key) == expected
+        result = subprocess.run(
+            ["bash", "-c", f'source "{func_file}"; _write_env_key'],
+            env={**os.environ, "LOCAL_API_KEY": input_key},
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"bash _write_env_key failed: {result.stderr}"
+        assert result.stdout == expected, (
+            f"for key={input_key!r}:\n"
+            f"  expected: {expected!r}\n"
+            f"  got:      {result.stdout!r}"
+        )
 
 
 def test_no_redundant_chmod():
