@@ -8,7 +8,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; if ! command -v uv &gt;/dev/null 2&gt;&amp;1; then export PATH="$HOME/.local/bin:$PATH"; fi &amp;&amp; exec uv run local-brain serve</string>
+        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; if ! command -v uv &gt;/dev/null 2&gt;&amp;1; then export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; fi &amp;&amp; exec uv run local-brain serve</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

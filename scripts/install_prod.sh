@@ -75,7 +75,7 @@ if ! command -v uv &> /dev/null; then
     else
         echo "brew not found, attempting to install uv via standalone installer..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.local/bin:$PATH"
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
     fi
 fi
 
@@ -91,21 +91,30 @@ if [ -z "$LOCAL_API_KEY" ]; then
 fi
 
 # Copy the .env file or create one if it doesn't exist
-if [ -f "$ENV_FILE" ]; then
-    if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-        echo ".env already exists at destination; skipping copy."
-    else
-        cp "$ENV_FILE" "$PROD_DIR/.env"
-        if ! grep -q "LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-            echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
-        fi
-    fi
+if [ -f "$PROD_DIR/.env" ]; then
+    echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
 else
-    echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+    # Pre-create the file with secure permissions to prevent permission race condition
+    touch "$PROD_DIR/.env"
+    chmod 600 "$PROD_DIR/.env"
+
+    if [ -f "$ENV_FILE" ]; then
+        if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
+            echo ".env already exists at destination; skipping copy."
+        else
+            cp "$ENV_FILE" "$PROD_DIR/.env"
+            if ! grep -q "LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+                echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+            fi
+        fi
+    else
+        echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+    fi
 fi
 chmod 600 "$PROD_DIR/.env"
 
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
+mkdir -p "$HOME/Library/LaunchAgents"
 cp com.localbrain.api.plist "$PLIST_PATH"
 plutil -remove EnvironmentVariables.LOCAL_API_KEY "$PLIST_PATH" 2>/dev/null || true
 
