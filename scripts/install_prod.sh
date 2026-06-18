@@ -17,11 +17,10 @@ command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1;
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    local key="$2"
-    python3 -c '
-import sys, re
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c '
+import sys, re, os
 env_file = sys.argv[1]
-key = sys.argv[2]
+key = os.environ["LOCAL_API_KEY_VALUE"].replace("\"", "\\\"")
 with open(env_file, "r") as f:
     content = f.read()
 new_content = re.sub(
@@ -32,7 +31,7 @@ new_content = re.sub(
 )
 with open(env_file, "w") as f:
     f.write(new_content)
-' "$env_file" "$key"
+' "$env_file"
 }
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
@@ -69,7 +68,7 @@ if [ ! -d "$PROD_DIR" ]; then
 fi
 
 cd "$PROD_DIR"
-git fetch --tags
+git fetch --tags || echo "Warning: network fetch failed, proceeding with local tags only"
 TOP_TAG=$(git tag -l --sort=-v:refname | head -n 1 2>/dev/null || true)
 if [ -n "$TOP_TAG" ]; then
     echo "Checking out latest tag: $TOP_TAG"
@@ -107,7 +106,7 @@ fi
 if [ -f "$PROD_DIR/.env" ]; then
     echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
     if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-        update_env_key "$PROD_DIR/.env" "$LOCAL_API_KEY"
+        update_env_key "$PROD_DIR/.env"
         echo "Updated LOCAL_API_KEY in existing .env."
     else
         # Ensure trailing newline before appending
@@ -124,12 +123,12 @@ else
 
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-            update_env_key "$PROD_DIR/.env" "$LOCAL_API_KEY"
+            echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
             chmod 600 "$PROD_DIR/.env"
             if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-                update_env_key "$PROD_DIR/.env" "$LOCAL_API_KEY"
+                update_env_key "$PROD_DIR/.env"
             else
                 # Ensure trailing newline before appending
                 if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
