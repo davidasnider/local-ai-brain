@@ -18,7 +18,21 @@ command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1;
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    python3 "$REPO_ROOT/scripts/install_helpers.py" update_env_key "$env_file" "$LOCAL_API_KEY_VALUE"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c '
+import sys, re, os
+env_file = sys.argv[1]
+key = os.environ["LOCAL_API_KEY_VALUE"].replace("\\", "\\\\").replace("\"", "\\\"")
+with open(env_file, "r", encoding="utf-8") as f:
+    content = f.read()
+new_content = re.sub(
+    r"^([ \t]*(?:export[ \t]+)?)LOCAL_API_KEY[ \t]*=.*",
+    lambda m: m.group(1) + "LOCAL_API_KEY=\"" + key + "\"",
+    content,
+    flags=re.MULTILINE
+)
+with open(env_file, "w", encoding="utf-8") as f:
+    f.write(new_content)
+' "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -31,7 +45,24 @@ _write_env_key() {
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
-        LOCAL_API_KEY="$(python3 "$REPO_ROOT/scripts/install_helpers.py" read_env_key "$ENV_FILE")"
+        LOCAL_API_KEY="$(python3 -c '
+import sys, re
+with open(sys.argv[1], encoding="utf-8") as f:
+    for line in f:
+        m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
+        if m:
+            val = m.group(1).strip()
+            if val.startswith("\""):
+                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
+                if q: val = q.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
+            elif val.startswith("\x27"):
+                q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
+                if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
+            else:
+                val = re.sub(r"\s+#.*", "", val)
+            print(val)
+            break
+' "$ENV_FILE")"
     fi
 fi
 
@@ -82,7 +113,24 @@ echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
 # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
 if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
-    LOCAL_API_KEY="$(python3 "$REPO_ROOT/scripts/install_helpers.py" read_env_key "$PROD_DIR/.env")"
+    LOCAL_API_KEY="$(python3 -c '
+import sys, re
+with open(sys.argv[1], encoding="utf-8") as f:
+    for line in f:
+        m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
+        if m:
+            val = m.group(1).strip()
+            if val.startswith("\""):
+                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
+                if q: val = q.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
+            elif val.startswith("\x27"):
+                q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
+                if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
+            else:
+                val = re.sub(r"\s+#.*", "", val)
+            print(val)
+            break
+' "$PROD_DIR/.env")"
 fi
 
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -93,8 +141,8 @@ fi
 # Copy the .env file or create one if it doesn't exist
 if [ -f "$PROD_DIR/.env" ]; then
     echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
-    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=" "$PROD_DIR/.env"; then
-        LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" update_env_key "$PROD_DIR/.env"
+    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+        update_env_key "$PROD_DIR/.env"
         echo "Updated LOCAL_API_KEY in existing .env."
     else
         # Ensure trailing newline before appending
@@ -111,8 +159,8 @@ else
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
             echo "ENV_FILE is the same file as PROD_DIR/.env — updating or appending LOCAL_API_KEY in place."
-            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=" "$PROD_DIR/.env"; then
-                LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" update_env_key "$PROD_DIR/.env"
+            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+                update_env_key "$PROD_DIR/.env"
             else
                 # Ensure trailing newline before appending
                 if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
@@ -122,8 +170,8 @@ else
             fi
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
-            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=" "$PROD_DIR/.env"; then
-                LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" update_env_key "$PROD_DIR/.env"
+            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+                update_env_key "$PROD_DIR/.env"
             else
                 # Ensure trailing newline before appending
                 if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
@@ -141,7 +189,7 @@ chmod 600 "$PROD_DIR/.env"
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
-python3 -c "import sys, xml.sax.saxutils; p = sys.argv[1]; c = open(p, encoding='utf-8').read().replace('__HOME__', xml.sax.saxutils.escape(sys.argv[2])); open(p, 'w', encoding='utf-8').write(c)" "$PLIST_PATH" "$HOME"
+python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding='utf-8').read().replace('__HOME__', sys.argv[2]); open(p, 'w', encoding='utf-8').write(c)" "$PLIST_PATH" "$HOME"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
