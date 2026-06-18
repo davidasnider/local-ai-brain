@@ -132,19 +132,12 @@ def test_write_env_key_escaping(tmp_path):
     func_start = content.find("_write_env_key() {")
     assert func_start != -1, "_write_env_key() not found in install_prod.sh"
 
-    # Find the closing brace by counting depth
-    brace_depth = 0
-    in_body = False
-    func_end = func_start
-    for i in range(func_start, len(content)):
-        if content[i] == "{":
-            brace_depth += 1
-            in_body = True
-        elif content[i] == "}":
-            brace_depth -= 1
-            if in_body and brace_depth == 0:
-                func_end = i + 1
-                break
+    # Find the closing brace that comes after the printf line
+    printf_idx = content.find("printf", func_start)
+    assert printf_idx != -1, "printf not found in _write_env_key"
+    closing_brace_idx = content.find("}", printf_idx)
+    assert closing_brace_idx != -1, "closing brace not found after printf in _write_env_key"
+    func_end = closing_brace_idx + 1
 
     func_body = content[func_start:func_end]
 
@@ -169,9 +162,7 @@ def test_write_env_key_escaping(tmp_path):
         )
         assert result.returncode == 0, f"bash _write_env_key failed: {result.stderr}"
         assert result.stdout == expected, (
-            f"for key={input_key!r}:\n"
-            f"  expected: {expected!r}\n"
-            f"  got:      {result.stdout!r}"
+            f"for key={input_key!r}:\n  expected: {expected!r}\n  got:      {result.stdout!r}"
         )
 
 

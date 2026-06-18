@@ -111,6 +111,28 @@ uv sync --frozen --no-dev
 PLIST_PATH="$HOME/Library/LaunchAgents/com.localbrain.api.plist"
 echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
+# Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
+if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
+    LOCAL_API_KEY="$(python3 -c '
+import sys, re
+with open(sys.argv[1], encoding="utf-8") as f:
+    for line in f:
+        m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
+        if m:
+            val = m.group(1).strip()
+            if val.startswith("\""):
+                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
+                if q: val = q.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
+            elif val.startswith("\x27"):
+                q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
+                if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
+            else:
+                val = re.sub(r"\s+#.*", "", val)
+            print(val)
+            break
+' "$PROD_DIR/.env")"
+fi
+
 if [ -z "$LOCAL_API_KEY" ]; then
     echo "Error: LOCAL_API_KEY environment variable is not set. It is required for the production service." >&2
     exit 1
