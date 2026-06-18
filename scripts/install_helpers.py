@@ -4,6 +4,7 @@ Used both directly by the shell installer script (via CLI dispatcher) and by
 unit tests (as a regular Python import).
 """
 
+import os
 import re
 import sys
 from collections.abc import Callable
@@ -29,6 +30,7 @@ def update_env_key(env_file: str, key: str) -> None:
         new_content = content.rstrip("\n") + f'\nLOCAL_API_KEY="{escaped_key}"\n'
     with open(env_file, "w", encoding="utf-8") as f:
         f.write(new_content)
+    os.chmod(env_file, 0o600)
 
 
 def read_env_key(env_file: str) -> str | None:

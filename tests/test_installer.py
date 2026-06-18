@@ -55,10 +55,12 @@ def test_update_env_key():
 
         with (
             patch("builtins.open", m_open),
+            patch("os.chmod") as mock_chmod,
             patch("sys.argv", ["python3", "dummy_env_file"]),
             patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": key_val}),
         ):
             update_env_key("dummy_env_file", key_val)
+            mock_chmod.assert_called_once_with("dummy_env_file", 0o600)
 
             # Reconstruct the written data from all calls to write()
             written_data = "".join(call.args[0] for call in m_open().write.call_args_list)
