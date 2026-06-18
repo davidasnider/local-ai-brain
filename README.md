@@ -90,10 +90,11 @@ The repository includes several agent skills in the `.agents/skills` directory t
 - **`bump-version`**: Bumps the project version in `pyproject.toml` and updates `uv.lock`.
 - **`restart-dev`**: Forcefully kills and restarts the local development server on port `8888`.
 - **`run-dev`**: Launches the API in development mode on port `8888` with hot-reload enabled.
+- **`start-backends`**: Starts the LLM, STT, and TTS backend microservices individually without the production API Gateway (for use with `run-dev`).
 - **`tail-logs`**: Tails the dev server logs in real-time in a new terminal window.
-- **`vllm-update`**: Updates the `vllm-mlx` dependency to the latest commit and checks for Hugging Face model updates.
+- **`vllm-update`**: Updates `llama-cpp-python` to the latest version and checks for Hugging Face model updates on the models in use (Qwen, Whisper, Kokoro).
 
-Note: The development server skills above use port 8888 to avoid conflicting with a production instance. When running the gateway in production via `local-brain serve`, it defaults to port 8000 which is used in the API examples below. Additionally, the `run-dev` and `restart-dev` skills only start the API Gateway proxy and do not start the backend microservices (LLM on port 8001, STT on port 8002, TTS on port 8003). For inference endpoints to work, the backend services must be running independently via `local-brain serve`.
+Note: The development server skills above use port 8888 to avoid conflicting with a production instance. When running the gateway in production via `local-brain serve`, it defaults to port 8000 which is used in the API examples below. Additionally, the `run-dev` and `restart-dev` skills only start the API Gateway proxy and do not start the backend microservices (LLM on port 8001, STT on port 8002, TTS on port 8003). For inference to work, the backend services must be running independently. Use the `start-backends` skill to launch only the backend services without the production gateway; alternatively, `local-brain serve` starts all services including the production gateway on port 8000.
 
 ## API Usage & Examples
 
