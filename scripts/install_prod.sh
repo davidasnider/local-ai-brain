@@ -21,7 +21,7 @@ update_env_key() {
     LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c '
 import sys, re, os
 env_file = sys.argv[1]
-key = os.environ["LOCAL_API_KEY_VALUE"].replace("\"", "\\\"")
+key = os.environ["LOCAL_API_KEY_VALUE"].replace("\\\"", "\"").replace("\"", "\\\"")
 with open(env_file, "r") as f:
     content = f.read()
 new_content = re.sub(
@@ -47,7 +47,7 @@ with open(sys.argv[1]) as f:
             val = m.group(1).strip()
             if val.startswith("\""):
                 q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
-                if q: val = q.group(1)
+                if q: val = q.group(1).replace("\\\"", "\"")
             elif val.startswith("\x27"):
                 q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
                 if q: val = q.group(1)
@@ -70,7 +70,7 @@ fi
 
 cd "$PROD_DIR"
 git fetch --tags || echo "Warning: network fetch failed, proceeding with local tags only"
-TOP_TAG=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v '-[a-zA-Z]*[0-9]' | head -n 1 2>/dev/null || true)
+TOP_TAG=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v '-' | head -n 1 2>/dev/null || true)
 if [ -n "$TOP_TAG" ]; then
     echo "Checking out latest tag: $TOP_TAG"
     git checkout --force "$TOP_TAG"
@@ -82,13 +82,13 @@ else
 fi
 
 # Install uv if not present
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 if ! command -v uv &> /dev/null; then
     if command -v brew &> /dev/null; then
         brew install uv
     else
         echo "brew not found, attempting to install uv via standalone installer..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
     fi
 fi
 
@@ -114,7 +114,7 @@ if [ -f "$PROD_DIR/.env" ]; then
         if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
             echo >> "$PROD_DIR/.env"
         fi
-        echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+        printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" >> "$PROD_DIR/.env"
         echo "Appended LOCAL_API_KEY to existing .env."
     fi
 else
@@ -124,7 +124,7 @@ else
 
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-            echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+            printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" > "$PROD_DIR/.env"
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
             chmod 600 "$PROD_DIR/.env"
@@ -135,12 +135,12 @@ else
                 if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
                     echo >> "$PROD_DIR/.env"
                 fi
-                echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+                printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" >> "$PROD_DIR/.env"
                 chmod 600 "$PROD_DIR/.env"
             fi
         fi
     else
-        echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+        printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" > "$PROD_DIR/.env"
     fi
 fi
 chmod 600 "$PROD_DIR/.env"
