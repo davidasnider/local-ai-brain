@@ -41,6 +41,9 @@ echo "🔍 Checking for model updates on Hugging Face..."
 check_model() {
   local name=$1
   local url=$2
+  if [ -z "$url" ]; then
+    return
+  fi
   echo -n "Checking $name... "
   # Skip git check for local filesystem paths
   url="${url/#\~/$HOME}"
@@ -48,9 +51,11 @@ check_model() {
     echo "Local path — skipping remote check"
     return
   fi
-  # If it looks like a local filesystem path (starts with / or .),
-  # but does not exist yet, skip git check
-  if [[ "$url" == /* ]] || [[ "$url" == .* ]]; then
+  # If it looks like a local filesystem path (starts with / or ., or contains a slash
+  # where the first component is an existing directory), but does not exist yet, skip git check.
+  # Note: Local relative paths should start with ./ or ../ to be unambiguously recognized
+  # if their parent directories do not exist yet.
+  if [[ "$url" == /* ]] || [[ "$url" == .* ]] || { [[ "$url" == */* ]] && [ -d "${url%%/*}" ]; }; then
     echo "Local path does not exist yet -- skipping remote check"
     return
   fi
@@ -59,7 +64,7 @@ check_model() {
   if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
     url="https://huggingface.co/$url"
   fi
-  if COMMIT=$(git ls-remote "$url" HEAD 2>/dev/null | cut -f1); then
+  if COMMIT=$(git ls-remote -- "$url" HEAD 2>/dev/null | cut -f1); then
     echo "Latest remote commit: $COMMIT"
   else
     echo "WARNING: Could not reach $url (network issue or rate limit)"

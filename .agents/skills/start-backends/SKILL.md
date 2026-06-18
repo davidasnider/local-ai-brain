@@ -90,7 +90,7 @@ for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
 done
 
 # LLM Server
-uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
+uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > /tmp/localbrain-llm.log 2>&1 &
 LLM_PID=$!
 for _i in $(seq 30); do
   if PORT="$LLM_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
@@ -108,7 +108,7 @@ fi
 
 
 # STT Server
-uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
+uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > /tmp/localbrain-stt.log 2>&1 &
 STT_PID=$!
 for _i in $(seq 30); do
   if PORT="$STT_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
@@ -126,7 +126,7 @@ fi
 
 
 # TTS Server
-uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
+uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > /tmp/localbrain-tts.log 2>&1 &
 TTS_PID=$!
 for _i in $(seq 30); do
   if PORT="$TTS_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
