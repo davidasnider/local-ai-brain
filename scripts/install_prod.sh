@@ -46,10 +46,10 @@ with open(sys.argv[1]) as f:
         if m:
             val = m.group(1).strip()
             if val.startswith("\""):
-                q = re.match(r"^\"([^\"]*)\"(.*)", val)
+                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
                 if q: val = q.group(1)
             elif val.startswith("\x27"):
-                q = re.match(r"^\x27([^\x27]*)\x27(.*)", val)
+                q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
                 if q: val = q.group(1)
             else:
                 val = re.sub(r"\s*#.*", "", val)
@@ -63,6 +63,7 @@ PROD_DIR="$HOME/.local/share/local-ai-brain-prod"
 REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
 echo "Installing Local AI Brain Production to $PROD_DIR"
+mkdir -p "$(dirname "$PROD_DIR")"
 if [ ! -d "$PROD_DIR" ]; then
     git clone "$REPO_URL" "$PROD_DIR"
 fi
@@ -72,7 +73,7 @@ git fetch --tags
 TOP_TAG=$(git tag -l --sort=-v:refname | head -n 1 2>/dev/null || true)
 if [ -n "$TOP_TAG" ]; then
     echo "Checking out latest tag: $TOP_TAG"
-    git checkout "$TOP_TAG"
+    git checkout --force "$TOP_TAG"
 else
     echo "Warning: No git tags found or git command failed. Proceeding with default branch."
     # Ensure we are on the main branch before pulling, to avoid detached HEAD issues
@@ -122,17 +123,21 @@ else
     chmod 600 "$PROD_DIR/.env"
 
     if [ -f "$ENV_FILE" ]; then
-        cp "$ENV_FILE" "$PROD_DIR/.env"
-        chmod 600 "$PROD_DIR/.env"
-        if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+        if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
             update_env_key "$PROD_DIR/.env" "$LOCAL_API_KEY"
         else
-            # Ensure trailing newline before appending
-            if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
-                echo >> "$PROD_DIR/.env"
-            fi
-            echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+            cp "$ENV_FILE" "$PROD_DIR/.env"
             chmod 600 "$PROD_DIR/.env"
+            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+                update_env_key "$PROD_DIR/.env" "$LOCAL_API_KEY"
+            else
+                # Ensure trailing newline before appending
+                if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
+                    echo >> "$PROD_DIR/.env"
+                fi
+                echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+                chmod 600 "$PROD_DIR/.env"
+            fi
         fi
     else
         echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
