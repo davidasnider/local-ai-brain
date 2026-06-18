@@ -71,7 +71,7 @@ REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
 echo "Installing Local AI Brain Production to $PROD_DIR"
 mkdir -p "$(dirname "$PROD_DIR")"
-if [ ! -d "$PROD_DIR" ]; then
+if [ ! -d "$PROD_DIR/.git" ]; then
     git clone "$REPO_URL" "$PROD_DIR"
 fi
 
@@ -131,7 +131,16 @@ else
 
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-            _write_env_key > "$PROD_DIR/.env"
+            echo "ENV_FILE is the same file as PROD_DIR/.env — updating or appending LOCAL_API_KEY in place."
+            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+                update_env_key "$PROD_DIR/.env"
+            else
+                # Ensure trailing newline before appending
+                if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
+                    echo >> "$PROD_DIR/.env"
+                fi
+                _write_env_key >> "$PROD_DIR/.env"
+            fi
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
             chmod 600 "$PROD_DIR/.env"
