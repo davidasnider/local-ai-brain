@@ -127,7 +127,11 @@ def _cli_update_env_key() -> None:
     except KeyError:
         print("Error: LOCAL_API_KEY_VALUE environment variable is not set.", file=sys.stderr)
         sys.exit(1)
-    update_env_key(env_file, api_key)
+    try:
+        update_env_key(env_file, api_key)
+    except FileNotFoundError:
+        print(f"Error: Environment file '{env_file}' not found.", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cli_read_env_key() -> None:

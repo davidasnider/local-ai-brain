@@ -7,6 +7,13 @@ ORIGINAL_PWD="$(pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
+
+# Expand ~ to $HOME in ENV_FILE paths since bash does not expand tilde
+# inside variable assignments when quoted
+if [[ "$ENV_FILE" == ~* ]]; then
+    ENV_FILE="${ENV_FILE/#\~/$HOME}"
+fi
+
 case "$ENV_FILE" in
     /*) ;;
     *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
@@ -40,22 +47,22 @@ _upsert_api_key() {
 }
 
 
+# Execution guard: only run main body if executed directly (not sourced)
+# This allows tests to source the script and access helper functions directly.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+
 # Copy install_helpers.py to a temp path so it survives git checkout (which may
 # delete or overwrite the file when switching between tag versions in $PROD_DIR)
 # Uses mktemp -d to avoid the macOS mktemp template-suffix issue:
 # BSD mktemp only randomizes XXXXXX when it appears at the very end of the template,
 # so appending .py after the subshell would leak the original file created by mktemp.
+# The temp dir and helpers are only needed during direct execution, not when sourced.
 INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
 INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
 cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 
-# Register cleanup outside the execution guard so it also fires when the
-# script is sourced (e.g. during tests), preventing temp file leaks.
+# Register cleanup to prevent temp file leaks
 trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
-
-# Execution guard: only run main body if executed directly (not sourced)
-# This allows tests to source the script and access helper functions directly.
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
 # Verify python3 is installed before any python3 calls
 command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
