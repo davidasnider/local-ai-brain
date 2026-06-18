@@ -19,6 +19,8 @@ if [ -z "$LOCAL_API_KEY" ]; then
                 /^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=/ {
                     value = $0
                     sub(/^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=[[:space:]]*/, "", value)
+                    sub(/[[:space:]]*#.*/, "", value)
+                    sub(/[[:space:]]+$/, "", value)
                     print value
                     exit
                 }
@@ -48,7 +50,7 @@ fi
 
 cd "$PROD_DIR"
 git fetch --tags
-TAG_COMMIT=$(git rev-list --tags --max-count=1 2>/dev/null || true)
+TAG_COMMIT=$(git tag -l --sort=-v:refname | head -1 2>/dev/null || true)
 if [ -n "$TAG_COMMIT" ]; then
     LATEST_TAG=$(git describe --tags "$TAG_COMMIT" 2>/dev/null || echo "")
     if [ -z "$LATEST_TAG" ]; then
@@ -107,7 +109,9 @@ else
             echo ".env already exists at destination; skipping copy."
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
-            if ! grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+            if grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+                sed -i '' -E "s|^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=.*|LOCAL_API_KEY=\"$LOCAL_API_KEY\"|" "$PROD_DIR/.env"
+            else
                 echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
             fi
         fi

@@ -93,9 +93,7 @@ The repository includes several agent skills in the `.agents/skills` directory t
 - **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the dev server logs in real-time.
 - **`vllm-update`**: Updates the `vllm-mlx` dependency to the latest commit and checks for Hugging Face model updates.
 
-These dev skills only start the development API Gateway on port `8888`. To run the model backends, you must start them separately (LLM on port `8001`, STT on `8002`, TTS on `8003`). Running `uv run local-brain serve` in another terminal starts all four services—the three model backends and the production API Gateway on port `8000`. Therefore, when using the dev skills, the production gateway (port `8000`) will run concurrently with the dev gateway (port `8888`).
-
-Note: The development server uses port `8888`. For production or when not using the dev skills, the default port is `8000` (as used in the examples below). Adjust the port in API calls accordingly.
+Note that dev skills start the gateway on port 8888, and `uv run local-brain serve` starts backends + production gateway on 8000 concurrently.
 
 ## API Usage & Examples
 
