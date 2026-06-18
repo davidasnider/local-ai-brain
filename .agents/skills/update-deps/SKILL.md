@@ -67,12 +67,13 @@ check_model() {
       return
     fi
 
-    # If the parent directory (first path component) exists on disk, treat it as a local path
-    # even without ./ or ../ prefix. HF repo IDs like "org/repo" have a first component that
-    # is NOT a local directory, so this won't interfere with legitimate remote checks.
-    local _parent="${url%%/*}"
-    if [ -n "$_parent" ] && [ -d "$_parent" ] 2>/dev/null; then
-      echo "Local path (directory $_parent exists) — skipping remote check"
+    # Check if the complete $url exists as a local file or directory on disk.
+    # Using -e (exists) is more precise than checking only the parent directory,
+    # which could match an HF org name (e.g., mlx-community) if a developer
+    # happens to create a local folder with that name, incorrectly skipping
+    # the remote update check for that HF repository.
+    if [ -e "$url" ] 2>/dev/null; then
+      echo "Local path ($url exists) — skipping remote check"
       return
     fi
 
