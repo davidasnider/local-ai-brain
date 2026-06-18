@@ -43,10 +43,24 @@ check_model() {
   fi
 }
 
-check_model "Qwen (active)" "$(get_model_url qwen-27b-4bit)"
-check_model "Qwen (fallback)" "$(get_model_url qwen-35b-4bit)"
-check_model "Whisper" "https://huggingface.co/mlx-community/whisper-large-v3-mlx"
-check_model "Kokoro" "https://huggingface.co/fastrtc/kokoro-onnx"
+QWEN_27B=$(get_model_url "qwen-27b-4bit" 2>/dev/null || echo "")
+if [ -n "$QWEN_27B" ]; then
+  check_model "Qwen (active)" "$QWEN_27B"
+else
+  echo "Warning: qwen-27b-4bit not found in llm_config.yaml -- skipping"
+fi
+
+QWEN_35B=$(get_model_url "qwen-35b-4bit" 2>/dev/null || echo "")
+if [ -n "$QWEN_35B" ]; then
+  check_model "Qwen (fallback)" "$QWEN_35B"
+else
+  echo "Warning: qwen-35b-4bit not found in llm_config.yaml -- skipping"
+fi
+
+WHISPER_URL="${WHISPER_MODEL_PATH:-https://huggingface.co/mlx-community/whisper-large-v3-mlx}"
+KOKORO_URL="${KOKORO_HF_REPO:-https://huggingface.co/fastrtc/kokoro-onnx}"
+check_model "Whisper" "$WHISPER_URL"
+check_model "Kokoro" "$KOKORO_URL"
 
 echo "✅ Update check complete."
 ```

@@ -30,6 +30,7 @@ TTS_PID=""
 
 # Trap Ctrl+C and clean up
 cleanup() {
+  local exit_code="${1:-0}"
   echo ""
   echo "🛑 Shutting down backend services..."
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
@@ -37,7 +38,7 @@ cleanup() {
   done
   wait
   echo "✅ All backend services stopped."
-  exit 0
+  exit "$exit_code"
 }
 trap cleanup INT TERM
 
@@ -88,12 +89,6 @@ echo ""
 # Monitor backend processes until one fails or all exit
 while true; do
   sleep 3
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-      echo "❌ Backend process $pid has stopped unexpectedly!"
-      cleanup
-    fi
-  done
   # Check if all PIDs have exited (processes finished cleanly)
   all_done=true
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
@@ -103,6 +98,14 @@ while true; do
     fi
   done
   $all_done && break
+
+  # Check for unexpected stops
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+      echo "❌ Backend process $pid has stopped unexpectedly!"
+      cleanup 1
+    fi
+  done
 done
 ```
 
