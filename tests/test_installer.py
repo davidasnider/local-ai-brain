@@ -146,18 +146,18 @@ def test_no_redundant_chmod():
 
 def test_cli_dispatch(capsys):
     # 1. Valid update_env_key
-    m_open = mock_open(read_data="LOCAL_API_KEY=old")
+    m_open = mock_open(read_data="LOCAL_API_KEY=old")  # pragma: allowlist secret
     with (
         patch("sys.argv", ["prog", "update_env_key", "dummy.env"]),
-        patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "new_val"}),
+        patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "new_val"}),  # pragma: allowlist secret
         patch("builtins.open", m_open),
         patch("install_helpers.update_env_key") as mock_update,
     ):
         _cli_dispatch()
-        mock_update.assert_called_once_with("dummy.env", "new_val")
+        mock_update.assert_called_once_with("dummy.env", "new_val")  # pragma: allowlist secret
 
     # 2. Valid read_env_key
-    m_open = mock_open(read_data="LOCAL_API_KEY=test_val\n")
+    m_open = mock_open(read_data="LOCAL_API_KEY=test_val\n")  # pragma: allowlist secret
     with (
         patch("sys.argv", ["prog", "read_env_key", "dummy.env"]),
         patch("builtins.open", m_open),
@@ -205,28 +205,28 @@ def test_shell_upsert_api_key(tmp_path):
     run_upsert("key_a")
     content = env_file.read_text()
     assert "OTHER_VAR=value\n" in content
-    assert 'LOCAL_API_KEY="key_a"\n' in content
+    assert 'LOCAL_API_KEY="key_a"\n' in content  # pragma: allowlist secret
 
     # b) File with LOCAL_API_KEY gets the key updated with a new value.
-    env_file.write_text('OTHER_VAR=val\nLOCAL_API_KEY="old_key"\n')
+    env_file.write_text('OTHER_VAR=val\nLOCAL_API_KEY="old_key"\n')  # pragma: allowlist secret
     run_upsert("new_key")
     content = env_file.read_text()
     assert "OTHER_VAR=val\n" in content
-    assert 'LOCAL_API_KEY="new_key"\n' in content
+    assert 'LOCAL_API_KEY="new_key"\n' in content  # pragma: allowlist secret
     assert "old_key" not in content
 
     # c) Empty file gets the key appended correctly.
     env_file.write_text("")
     run_upsert("key_c")
     content = env_file.read_text()
-    assert content == 'LOCAL_API_KEY="key_c"\n'
+    assert content == 'LOCAL_API_KEY="key_c"\n'  # pragma: allowlist secret
 
     # d) Missing file: the function should create the file with the key.
     if env_file.exists():
         env_file.unlink()
     run_upsert("key_d")
     content = env_file.read_text()
-    assert content == 'LOCAL_API_KEY="key_d"\n'
+    assert content == 'LOCAL_API_KEY="key_d"\n'  # pragma: allowlist secret
 
 
 def test_read_env_key_not_found():
@@ -375,7 +375,7 @@ def test_cli_update_env_key_file_not_found(capsys):
     """Verify _cli_update_env_key exits with FileNotFoundError when file doesn't exist."""
     with (
         patch("sys.argv", ["prog", "update_env_key", "non_existent.env"]),
-        patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "some_val"}),
+        patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "some_val"}),  # pragma: allowlist secret
         pytest.raises(SystemExit) as excinfo,
     ):
         _cli_dispatch()

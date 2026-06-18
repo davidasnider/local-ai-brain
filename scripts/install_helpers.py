@@ -69,7 +69,12 @@ def read_env_key(env_file: str) -> str | None:
     return None
 
 
-def write_plist(template_file: str, target_file: str, home_dir: str) -> None:
+def write_plist(
+    template_file: str,
+    target_file: str,
+    home_dir: str,
+    api_key: str | None = None,
+) -> None:
     """Read plist template, replace '~/' with home_dir path, and write to target_file."""
     if not os.path.exists(template_file):
         raise FileNotFoundError(f"Template file not found: '{template_file}'")
@@ -78,6 +83,8 @@ def write_plist(template_file: str, target_file: str, home_dir: str) -> None:
     # Normalize home_dir to ensure it ends with '/' when substituting '~/'
     replacement = home_dir.rstrip("/") + "/"
     new_content = content.replace("~/", replacement)
+    if api_key is not None:
+        new_content = new_content.replace("__REPLACE_WITH_LOCAL_API_KEY__", api_key)
     with open(target_file, "w", encoding="utf-8") as f:
         f.write(new_content)
 
@@ -135,15 +142,17 @@ def _cli_read_env_key() -> None:
 def _cli_write_plist() -> None:
     if len(sys.argv) < 5:
         print(
-            "Usage: install_helpers.py write_plist <template_file> <target_file> <home_dir>",
+            "Usage: install_helpers.py write_plist "
+            "<template_file> <target_file> <home_dir> [api_key]",
             file=sys.stderr,
         )
         sys.exit(1)
     template_file = sys.argv[2]
     target_file = sys.argv[3]
     home_dir = sys.argv[4]
+    api_key = sys.argv[5] if len(sys.argv) >= 6 else None
     try:
-        write_plist(template_file, target_file, home_dir)
+        write_plist(template_file, target_file, home_dir, api_key)
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

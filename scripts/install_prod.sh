@@ -54,8 +54,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 # Copy install_helpers.py to a temp path so it survives git checkout (which may
 # delete or overwrite the file when switching between tag versions in $PROD_DIR)
 INSTALL_HELPERS=$($PYTHON -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
-cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 trap 'rm -f "$INSTALL_HELPERS"' EXIT
+cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -149,7 +149,7 @@ chmod 600 "$PROD_DIR/.env"
 
 # Copy the LaunchAgent plist to the LaunchAgents directory, resolving tildes to absolute paths
 mkdir -p "$HOME/Library/LaunchAgents"
-$PYTHON "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME"
+$PYTHON "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME" "$LOCAL_API_KEY"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
