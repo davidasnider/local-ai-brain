@@ -32,7 +32,7 @@ import shlex
 import re
 from dotenv import dotenv_values
 for k, v in dotenv_values(".env").items():
-    if re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
+    if v is not None and re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
         print(f"export {k}={shlex.quote(v)}")
 PYEOF
 )"
@@ -67,14 +67,14 @@ check_model() {
       return
     fi
 
-    # Prepend https://huggingface.co/ if it's a simple repo identifier
-    # Relative paths without leading ./ or ../ can be mistaken for HF repo IDs
+    # Warn about ambiguous single-slash paths, but don't early-return — the URL
+    # may still be a valid HF repo ID (org/repo format). Let the subsequent
+    # checks (multi-slash, extension, exists) handle it, and if none match
+    # the URL gets https://huggingface.co/ prepended below.
     if [[ "$url" == *"/"* ]] && [[ "$url" != "./"* ]] && [[ "$url" != "../"* ]] && [[ "$url" != "/"* ]] && [ ! -e "$url" ]; then
         local _slash_count="${url//[^\/]/}"
         if [ ${#_slash_count} -eq 1 ]; then
-            echo "Warning: \"$url\" looks like a local path with one slash but lacks ./ or ../ prefix. HF repo IDs use org/repo format — ambiguous." >&2
-            echo "Skipping remote check — prefix with ./ or ../ for local paths, or use org/repo for HF repos." >&2
-            return
+            echo "Warning: \"$url\" looks like a local path with one slash but lacks ./ or ../ prefix. If this is a HF repo ID it will be checked; if it's a local path, prefix with ./ or ../ to silence this warning." >&2
         fi
     fi
 
