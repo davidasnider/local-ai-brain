@@ -34,29 +34,19 @@ echo ""
 # whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
   eval "$(python3 << 'PYEOF'
-import re, shlex
-with open('.env') as f:
-    for line in f:
-        line = re.sub(r'#.*$', '', line).strip()
-        if not line or '=' not in line:
-            continue
-        k, _, v = line.partition('=')
-        k = k.strip()
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k): continue
-        v = v.strip()
-        if v.startswith('"') and v.endswith('"'):
-            v = v[1:-1]
-        elif v.startswith("'") and v.endswith("'"):
-            v = v[1:-1]
-        print(f'export {k}={shlex.quote(v)}')
+import shlex
+from dotenv import dotenv_values
+for k, v in dotenv_values(".env").items():
+    print(f"export {k}={shlex.quote(v)}")
 PYEOF
 )"
 fi
 
 _check_port() {
   local _port="$1"
+  local _host="${2:-127.0.0.1}"
   [[ "$_port" =~ ^[0-9]+$ ]] || return 1
-  python3 -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((\"127.0.0.1\", int(sys.argv[1]))); s.close()" "$_port" 2>/dev/null
+  python3 -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect(('$_host', int(sys.argv[1]))); s.close()" "$_port" 2>/dev/null
 }
 
 # Fail fast if LOCAL_API_KEY is not set (required for config module)

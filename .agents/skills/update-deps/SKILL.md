@@ -28,21 +28,10 @@ cd "$PROJECT_ROOT"
 # whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
   eval "$(python3 << 'PYEOF'
-import re, shlex
-with open('.env') as f:
-    for line in f:
-        line = re.sub(r'#.*$', '', line).strip()
-        if not line or '=' not in line:
-            continue
-        k, _, v = line.partition('=')
-        k = k.strip()
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k): continue
-        v = v.strip()
-        if v.startswith('"') and v.endswith('"'):
-            v = v[1:-1]
-        elif v.startswith("'") and v.endswith("'"):
-            v = v[1:-1]
-        print(f'export {k}={shlex.quote(v)}')
+import shlex
+from dotenv import dotenv_values
+for k, v in dotenv_values(".env").items():
+    print(f"export {k}={shlex.quote(v)}")
 PYEOF
 )"
 fi
@@ -94,22 +83,6 @@ check_model() {
     if [ -e "$url" ] 2>/dev/null; then
       echo "Local path ($url exists) — skipping remote check"
       return
-    fi
-
-    # If the URL looks like a local filesystem path (starts with /, ./, ../),
-    # check if its first component exists as a directory on disk.
-    # Don't apply this check to bare repo IDs like "org/repo" since their
-    # first component could match a local directory name by coincidence.
-    if [[ "$url" == /* ]] || [[ "$url" == ./* ]] || [[ "$url" == ../* ]]; then
-      if [[ "$url" == */* ]]; then
-        # Strip leading / to handle absolute paths (e.g., /foo/bar -> foo/bar -> foo)
-        local trimmed="${url#/}"
-        local first_component="${trimmed%%/*}"
-        if [ -n "$first_component" ] && [ -d "$first_component" ]; then
-          echo "Local path ($name) does not exist yet (but parent directory $first_component exists) -- skipping remote check"
-          return
-        fi
-      fi
     fi
 
     if [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
