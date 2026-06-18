@@ -8,6 +8,8 @@ description: Updates development dependencies (llama-cpp-python) and checks for 
 3. Checks Hugging Face for new commits on the models in use.
 
 ```bash
+set -euo pipefail
+
 # Update llama-cpp-python
 echo "🔄 Checking for llama-cpp-python updates..."
 uv sync --upgrade-package llama-cpp-python

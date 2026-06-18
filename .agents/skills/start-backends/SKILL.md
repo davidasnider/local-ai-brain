@@ -21,17 +21,42 @@ if [ -f .env ]; then
   set -a && source .env && set +a
 fi
 
+export PYTHONPATH=src
+
+# Initialize PID variables to avoid unbound variable errors in cleanup trap
+LLM_PID=""
+STT_PID=""
+TTS_PID=""
+
 # LLM Server (port 8001)
-PYTHONPATH=src uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
+uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
 LLM_PID=$!
+sleep 1
+if ! kill -0 $LLM_PID 2>/dev/null; then
+  echo "❌ LLM Server failed to start!"
+  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
+  exit 1
+fi
 
 # STT Server (port 8002)
-PYTHONPATH=src uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port 8002 &
+uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port 8002 &
 STT_PID=$!
+sleep 1
+if ! kill -0 $STT_PID 2>/dev/null; then
+  echo "❌ STT Server failed to start!"
+  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
+  exit 1
+fi
 
 # TTS Server (port 8003)
-PYTHONPATH=src uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port 8003 &
+uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port 8003 &
 TTS_PID=$!
+sleep 1
+if ! kill -0 $TTS_PID 2>/dev/null; then
+  echo "❌ TTS Server failed to start!"
+  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
+  exit 1
+fi
 
 echo "✅ LLM Server (pid $LLM_PID) on 127.0.0.1:8001"
 echo "✅ STT Server (pid $STT_PID) on 127.0.0.1:8002"
