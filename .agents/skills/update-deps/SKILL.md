@@ -27,7 +27,7 @@ cd "$PROJECT_ROOT"
 # Use Python to parse .env safely — handles inline comments and
 # whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
-  eval "$(python3 << 'PYEOF'
+  eval "$(uv run python << 'PYEOF'
 import shlex
 from dotenv import dotenv_values
 for k, v in dotenv_values(".env").items():

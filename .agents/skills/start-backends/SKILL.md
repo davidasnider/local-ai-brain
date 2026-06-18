@@ -33,7 +33,7 @@ echo ""
 # Use Python to parse .env safely — handles inline comments and
 # whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
-  eval "$(python3 << 'PYEOF'
+  eval "$(uv run python << 'PYEOF'
 import shlex
 from dotenv import dotenv_values
 for k, v in dotenv_values(".env").items():
@@ -46,7 +46,7 @@ _check_port() {
   local _port="$1"
   local _host="${2:-127.0.0.1}"
   [[ "$_port" =~ ^[0-9]+$ ]] || return 1
-  python3 -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect(('$_host', int(sys.argv[1]))); s.close()" "$_port" 2>/dev/null
+  uv run python -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((sys.argv[1], int(sys.argv[2]))); s.close()" "$_host" "$_port" 2>/dev/null
 }
 
 # Fail fast if LOCAL_API_KEY is not set (required for config module)
