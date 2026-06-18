@@ -14,12 +14,12 @@ Agy reported 3 issues in the review at commit `82cd648`. Here is the evaluation:
 
 **Analysis:** This is a general improvement suggestion, not a specific bug. The skills are embedded workflow scripts used inside the user's dev environment. Adding ShellCheck and integration tests would be valuable but is out of scope for this PR — the same gap exists across the entire `.agents/skills/` directory and would be better addressed as a separate infrastructure task.
 
-### Finding 3 (Low — /dev/tcp portability) → SKIP
+### Finding 3 (Low — /dev/tcp portability) → RESOLVED
 
 **Claim:** `/dev/tcp` is bash-specific and will fail under POSIX shells like `sh` or `dash`.
 
-**Analysis:** The script explicitly uses `#!/usr/bin/env bash` as its shebang and the code block header also specifies `bash`. Using bash-specific features like `/dev/tcp` is appropriate and intentional. Requiring bash is a valid design choice — the script uses other bashisms (arrays, `[[ ]]`, `=~`) throughout. This is not a bug.
+**Analysis:** Although the script uses `bash`, `/dev/tcp` is not supported in some environments (like some versions of Debian/Ubuntu where `sh` points to `dash` or `/dev/tcp` support is disabled in Bash). To ensure maximum portability across target environments, the socket health checks were rewritten to use a Python-based `_check_port` helper via `python3 -c "import socket; s=socket.socket(...)"`.
 
 ## Summary
 
-Finding 1 was **resolved** (commit `b418c5c` replaced double quotes with single quotes in the f-string for clarity and reliability). Finding 2 and 3 remain as general improvement suggestions outside the scope of this fix round.
+Finding 1 and 3 were **resolved** (Finding 1: commit `b418c5c` replaced double quotes with single quotes in the f-string; Finding 3: replaced `/dev/tcp` with a Python-based socket check helper `_check_port` to avoid portability issues). Finding 2 remains as a general improvement suggestion outside the scope of this fix round.

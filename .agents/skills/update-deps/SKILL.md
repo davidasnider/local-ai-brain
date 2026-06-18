@@ -77,6 +77,15 @@ check_model() {
       return
     fi
 
+    # If the URL contains a slash (pathspec), check if its first component exists as a directory on disk.
+    if [[ "$url" == */* ]]; then
+      local first_component="${url%%/*}"
+      if [ -n "$first_component" ] && [ -d "$first_component" ]; then
+        echo "Local path ($name) does not exist yet (but parent directory $first_component exists) -- skipping remote check"
+        return
+      fi
+    fi
+
     if [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
       url="https://huggingface.co/$url"
     else

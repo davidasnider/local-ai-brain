@@ -172,17 +172,6 @@ echo ""
 # Monitor backend processes until one fails or all exit
 while true; do
   sleep 3
-  # Check if all PIDs have exited (processes finished cleanly)
-  all_done=true
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      all_done=false
-      break
-    fi
-  done
-  if [ "$all_done" = true ]; then
-    break
-  fi
 
   # Check for unexpected stops — use wait to get exit code and
   # differentiate clean exit from crash (finding #1)
@@ -200,6 +189,18 @@ while true; do
       fi
     fi
   done
+
+  # Check if all PIDs have exited (processes finished cleanly)
+  all_done=true
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      all_done=false
+      break
+    fi
+  done
+  if [ "$all_done" = true ]; then
+    break
+  fi
 done
 ```
 
