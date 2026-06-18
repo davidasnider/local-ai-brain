@@ -91,39 +91,43 @@ def test_read_env_key_comment_stripping():
             )
 
 
-def test_write_env_key_escaping(tmp_path):
-    import warnings
-    warnings.filterwarnings("ignore", category=SyntaxWarning)
+def test_write_env_key_escaping():
     """Verify that _write_env_key correctly escapes backslashes and double quotes
     by sourcing the install_prod.sh script (execution guard prevents main body
     from running when sourced."""
-    P1 = 'LOCAL_API_'
-    P2 = 'KEY='
+    import warnings
+
+    warnings.filterwarnings("ignore", category=SyntaxWarning)
+    P1 = "LOCAL_API_"
+    P2 = "KEY="
     Q = '"'
 
     def _exp(inp):
-        esc = inp.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))
+        esc = inp.replace(chr(92), chr(92) * 2).replace(chr(34), chr(92) + chr(34))
         return P1 + P2 + Q + esc + Q + chr(10)
 
     test_keys = [
-        'simplekey',
-        'key\with\backslashes',
+        "simplekey",
+        r"key\with\backslashes",
         'key"with"quotes',
-        'key\with"both',
-        'key\\double\\backslashes',
+        r'key\with"both',
+        "key\\double\\backslashes",
     ]
 
     for inp in test_keys:
         expected = _exp(inp)
         result = subprocess.run(
-            ['bash', '-c', f'source "{SCRIPT_PATH}"; _write_env_key'],
-            env={**os.environ, 'LOCAL_API_KEY': inp},
-            capture_output=True, text=True,
+            ["bash", "-c", f'source "{SCRIPT_PATH}"; _write_env_key'],
+            env={**os.environ, "LOCAL_API_KEY": inp},
+            capture_output=True,
+            text=True,
         )
-        assert result.returncode == 0, f'bash _write_env_key failed: {result.stderr}'
+        assert result.returncode == 0, f"bash _write_env_key failed: {result.stderr}"
         assert result.stdout == expected, (
-            f'for key={inp!r}:\n  expected: {expected!r}\n  got:      {result.stdout!r}'
+            f"for key={inp!r}:\n  expected: {expected!r}\n  got:      {result.stdout!r}"
         )
+
+
 def test_no_redundant_chmod():
     """Verify that redundant chmod calls on the .env file have been removed
     to prevent regressions."""
