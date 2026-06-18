@@ -42,9 +42,10 @@ fi
 export PYTHONPATH=src
 
 # Ports match the defaults in local_ai_brain.config.Settings (llm_config.yaml does not store ports)
-LLM_PORT=8001
-STT_PORT=8002
-TTS_PORT=8003
+# Respect env overrides so users can customize via .env or export (finding #3)
+LLM_PORT="${LLM_PORT:-8001}"
+STT_PORT="${STT_PORT:-8002}"
+TTS_PORT="${TTS_PORT:-8003}"
 
 # Initialize PID variables to avoid unbound variable errors in cleanup trap
 LLM_PID=""
@@ -75,6 +76,16 @@ cleanup() {
 }
 trap "cleanup 130" INT
 trap "cleanup 143" TERM
+# Also clean up on shell exit (SIGHUP, window close, set -e) so background
+# servers aren't orphaned if the terminal closes unexpectedly (finding #4)
+trap cleanup EXIT
+
+# Pre-check port occupancy before starting services (finding #5)
+for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
+  if uv run python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', $_port))" 2>/dev/null; then
+    echo "⚠ Port $_port is already in use. Check for conflicting services."
+  fi
+done
 
 # LLM Server
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
@@ -150,11 +161,19 @@ while true; do
     break
   fi
 
-  # Check for unexpected stops
+  # Check for unexpected stops — use wait to get exit code and
+  # differentiate clean exit from crash (finding #1)
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
     if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-      echo "❌ Backend process $pid has stopped unexpectedly!"
-      cleanup 1
+      # Get the exit status to differentiate clean exit from crash
+      wait "$pid" 2>/dev/null
+      exit_code=$?
+      if [ "$exit_code" = 0 ]; then
+        echo "⚠ Backend process $pid exited cleanly (code 0). Continuing with remaining services."
+      else
+        echo "❌ Backend process $pid stopped unexpectedly (exit code $exit_code)!"
+        cleanup 1
+      fi
     fi
   done
 done

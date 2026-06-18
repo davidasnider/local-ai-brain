@@ -76,8 +76,12 @@ for parent in [cfg_path] + list(cfg_path.parents):
         break
 else:
     cfg_path = cfg_path / 'llm_config.yaml'
-with open(cfg_path) as f:
-    cfg = yaml.safe_load(f) or {}
+if cfg_path.exists():
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f) or {}
+else:
+    print(f'WARNING: llm_config.yaml not found, skipping model checks')
+    cfg = {}
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []
 for m in models:
