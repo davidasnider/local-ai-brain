@@ -17,7 +17,7 @@ dependencies = [
     "pydantic-settings>=2.14.0",
     "soundfile>=0.13.1",
     "uvicorn>=0.46.0",
-    "llama-cpp-python[server]",
+    "llama-cpp-python[server]>=0.3.30",
     "httpx>=0.28.1",
     "python-multipart>=0.0.31",
     "pyyaml>=6.0.1",

@@ -91,7 +91,7 @@ cleanup() {
     for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
       [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
     done
-    for _i in $(seq 10); do
+    for ((_i=0; _i<10; _i++)); do
       if { [ -z "$LLM_PID" ] || ! kill -0 "$LLM_PID" 2>/dev/null; } && \
          { [ -z "$STT_PID" ] || ! kill -0 "$STT_PID" 2>/dev/null; } && \
          { [ -z "$TTS_PID" ] || ! kill -0 "$TTS_PID" 2>/dev/null; }; then

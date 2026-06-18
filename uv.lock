@@ -794,7 +794,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.136.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "kokoro-onnx", specifier = ">=0.5.0" },
-    { name = "llama-cpp-python", extras = ["server"] },
+    { name = "llama-cpp-python", extras = ["server"], specifier = ">=0.3.30" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mlx-whisper", specifier = ">=0.4.3" },
     { name = "opentelemetry-api", specifier = ">=1.41.1" },

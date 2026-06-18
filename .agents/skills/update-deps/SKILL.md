@@ -68,6 +68,14 @@ check_model() {
     fi
 
     # Prepend https://huggingface.co/ if it's a simple repo identifier
+    # Relative paths without leading ./ or ../ can be mistaken for HF repo IDs
+    if [[ "$url" == *"/"* ]] && [[ "$url" != "./"* ]] && [[ "$url" != "../"* ]] && [[ "$url" != "/"* ]] && [ ! -e "$url" ]; then
+        local _slash_count="${url//[^\/]/}"
+        if [ ${#_slash_count} -eq 1 ]; then
+            echo "Warning: \"$url\" looks like a local path with one slash but lacks ./ or ../ prefix. HF repo IDs use org/repo format — ambiguous." >&2
+        fi
+    fi
+
     # First, detect local relative paths that don't exist on disk yet but look like filesystem paths.
     # HuggingFace repo IDs are always org/repo (exactly one "/"), so multi-component paths
     # (more than one "/") are unambiguously local filesystem paths.
@@ -143,6 +151,8 @@ else:
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []
 for m in models:
+    if not isinstance(m, dict):
+        continue
     name = m.get('name', 'unknown')
     label = name
     if name == active:
