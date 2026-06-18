@@ -48,10 +48,7 @@ LLM_PID=$!
 sleep 1
 if ! kill -0 "$LLM_PID" 2>/dev/null; then
   echo "❌ LLM Server failed to start!"
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-  done
-  exit 1
+  cleanup 1
 fi
 
 # STT Server (port 8002)
@@ -60,10 +57,7 @@ STT_PID=$!
 sleep 1
 if ! kill -0 "$STT_PID" 2>/dev/null; then
   echo "❌ STT Server failed to start!"
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-  done
-  exit 1
+  cleanup 1
 fi
 
 # TTS Server (port 8003)
@@ -72,10 +66,7 @@ TTS_PID=$!
 sleep 1
 if ! kill -0 "$TTS_PID" 2>/dev/null; then
   echo "❌ TTS Server failed to start!"
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-  done
-  exit 1
+  cleanup 1
 fi
 
 echo "✅ LLM Server (pid $LLM_PID) on 127.0.0.1:8001"

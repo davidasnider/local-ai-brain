@@ -10,6 +10,11 @@ description: Updates development dependencies (llama-cpp-python) and checks for 
 ```bash
 set -euo pipefail
 
+# Source environment variables from .env (if present)
+if [ -f .env ]; then
+  set -a && source .env && set +a
+fi
+
 # Update llama-cpp-python
 echo "🔄 Checking for llama-cpp-python updates..."
 uv sync --upgrade-package llama-cpp-python
@@ -24,18 +29,30 @@ get_model_url() {
 import yaml, sys
 with open('llm_config.yaml') as f:
     cfg = yaml.safe_load(f)
+model_name = sys.argv[1]
 for m in cfg.get('models', []):
-    if m.get('name') == '$model_name':
-        print(f'https://huggingface.co/{m[\"hf_model_repo_id\"]}')
-        sys.exit(0)
+    if m.get('name') == model_name:
+        repo_id = m.get('hf_model_repo_id')
+        if repo_id:
+            print(f'https://huggingface.co/{repo_id}')
+            sys.exit(0)
 sys.exit(1)
-"
+" "$model_name"
 }
 
 check_model() {
   local name=$1
   local url=$2
   echo -n "Checking $name... "
+  # Skip git check for local filesystem paths
+  if [ -d "$url" ] || [ -f "$url" ]; then
+    echo "Local path — skipping remote check"
+    return
+  fi
+  # Prepend https://huggingface.co/ if it's a simple repo identifier
+  if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
+    url="https://huggingface.co/$url"
+  fi
   if COMMIT=$(git ls-remote "$url" HEAD 2>/dev/null | cut -f1); then
     echo "Latest remote commit: $COMMIT"
   else
