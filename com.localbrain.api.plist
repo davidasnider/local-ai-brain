@@ -24,6 +24,9 @@
     <!-- Standard output goes to /dev/null because the application handles log -->
     <!-- writing and rotation internally using loguru. Standard error is       -->
     <!-- captured to a diagnostic log for debugging launchd startup failures.  -->
+    <!-- Note: launchd does not natively resolve tilde (~) paths. The helper   -->
+    <!-- script resolves ~/ to the absolute home directory path during         -->
+    <!-- installation.                                                         -->
     <key>StandardOutPath</key>
     <string>/dev/null</string>
     <key>StandardErrorPath</key>

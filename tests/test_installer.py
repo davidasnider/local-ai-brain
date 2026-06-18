@@ -23,7 +23,7 @@ SCRIPT_PATH = os.path.abspath(
 )
 
 
-def test_update_env_key():
+def test_update_env_key(tmp_path):
     """Verify that update_env_key correctly replaces LOCAL_API_KEY in a .env file."""
     # Test cases: (original_content, api_key_value, expected_new_content)
     test_cases = [
@@ -50,23 +50,20 @@ def test_update_env_key():
         ),
     ]
 
-    for original, key_val, expected in test_cases:
-        m_open = mock_open(read_data=original)
+    for idx, (original, key_val, expected) in enumerate(test_cases):
+        env_file = tmp_path / f"test_{idx}.env"
+        env_file.write_text(original, encoding="utf-8")
 
-        with (
-            patch("builtins.open", m_open),
-            patch("os.chmod") as mock_chmod,
-            patch("sys.argv", ["python3", "dummy_env_file"]),
-            patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": key_val}),
-        ):
-            update_env_key("dummy_env_file", key_val)
-            mock_chmod.assert_called_once_with("dummy_env_file", 0o600)
+        update_env_key(str(env_file), key_val)
 
-            # Reconstruct the written data from all calls to write()
-            written_data = "".join(call.args[0] for call in m_open().write.call_args_list)
-            assert written_data == expected, (
-                f"for key={key_val!r}:\n  expected: {expected!r}\n  got:      {written_data!r}"
-            )
+        # Check permissions
+        assert (env_file.stat().st_mode & 0o777) == 0o600
+
+        # Check content
+        written_data = env_file.read_text(encoding="utf-8")
+        assert written_data == expected, (
+            f"for key={key_val!r}:\n  expected: {expected!r}\n  got:      {written_data!r}"
+        )
 
 
 def test_read_env_key_comment_stripping():
@@ -285,3 +282,31 @@ def test_cli_write_plist_file_not_found_exits(tmp_path):
     written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
     assert "Error:" in written
     assert "not found" in written
+
+
+def test_update_env_key_exception_handling(tmp_path):
+    """Verify that update_env_key cleans up the temp file if an exception occurs."""
+    env_file = tmp_path / "test.env"
+    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+
+    # Patch os.replace to raise an error
+    with patch("os.replace", side_effect=RuntimeError("simulated error")):
+        with pytest.raises(RuntimeError, match="simulated error"):
+            update_env_key(str(env_file), "newkey")
+
+    # The temp file should have been cleaned up.
+    remaining_files = list(tmp_path.glob(".env.tmp-*"))
+    assert len(remaining_files) == 0
+
+
+def test_update_env_key_exception_handling_remove_fails(tmp_path):
+    """Verify that update_env_key propagates the original exception even if os.remove fails."""
+    env_file = tmp_path / "test.env"
+    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+
+    with (
+        patch("os.replace", side_effect=RuntimeError("simulated error")),
+        patch("os.remove", side_effect=OSError("simulated remove error")),
+    ):
+        with pytest.raises(RuntimeError, match="simulated error"):
+            update_env_key(str(env_file), "newkey")

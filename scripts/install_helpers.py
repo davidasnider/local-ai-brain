@@ -7,6 +7,7 @@ unit tests (as a regular Python import).
 import os
 import re
 import sys
+import tempfile
 from collections.abc import Callable
 
 
@@ -28,9 +29,22 @@ def update_env_key(env_file: str, key: str) -> None:
     )
     if new_content == content:
         new_content = content.rstrip("\n") + "\n" + "LOCAL_API_KEY=" + '"' + escaped_key + '"\n'
-    with open(env_file, "w", encoding="utf-8") as f:
-        f.write(new_content)
-    os.chmod(env_file, 0o600)
+
+    dir_name = os.path.dirname(os.path.abspath(env_file))
+    fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix=".env.tmp-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(new_content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, env_file)
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
 
 
 def read_env_key(env_file: str) -> str | None:
