@@ -154,14 +154,19 @@ chmod 600 "$PROD_DIR/.env"
 mkdir -p "$HOME/Library/LaunchAgents"
 ${PYTHON:-python3} "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME"
 
-# Check if GUI session is available before registering the service
+# Check if GUI session or user session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
     # Unload existing instance if present
     launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
     # Load the fresh agent
     launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+elif launchctl print "user/$(id -u)" &>/dev/null; then
+    # Unload existing instance if present
+    launchctl bootout "user/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
+    # Load the fresh agent
+    launchctl bootstrap "user/$(id -u)" "$PLIST_PATH"
 else
-    echo "Warning: GUI session not available for user $(id -u). LaunchAgent was not registered."
+    echo "Warning: Neither GUI nor user session available for user $(id -u). LaunchAgent was not registered."
 fi
 
 echo "Installation and persistent background registration complete."

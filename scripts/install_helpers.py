@@ -25,6 +25,8 @@ def update_env_key(env_file: str, key: str) -> None:
         content,
         flags=re.MULTILINE,
     )
+    if new_content == content:
+        new_content = content.rstrip("\n") + f'\nLOCAL_API_KEY="{escaped_key}"\n'
     with open(env_file, "w", encoding="utf-8") as f:
         f.write(new_content)
 

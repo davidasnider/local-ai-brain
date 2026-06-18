@@ -46,7 +46,7 @@ def test_update_env_key():
         (
             "OTHER_VAR=value\nANOTHER=foo",
             "newkey",
-            "OTHER_VAR=value\nANOTHER=foo",
+            'OTHER_VAR=value\nANOTHER=foo\nLOCAL_API_KEY="newkey"\n',  # pragma: allowlist secret
         ),
     ]
 
