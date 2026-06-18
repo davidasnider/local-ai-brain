@@ -218,13 +218,13 @@ while true; do
       wait "$_pid" 2>/dev/null || _exit_code=$?
       if [ "$_exit_code" = 0 ]; then
         echo "⚠ Backend process $_pid ($_var) exited cleanly (code 0). Continuing with remaining services."
-        printf -v "$_var" ''
+        eval "$_var="
       elif [ "$_exit_code" = 127 ]; then
         # wait returns 127 when the process has already been reaped by the
         # shell (race condition between kill -0 and wait). Since kill -0
         # confirmed the process is dead, treat 127 as a clean exit.
         echo "⚠ Backend process $_pid ($_var) already reaped (race), assuming clean exit."
-        printf -v "$_var" ''
+        eval "$_var="
       else
         echo "❌ Backend process $_pid ($_var) stopped unexpectedly (exit code $_exit_code)!"
         cleanup 1
