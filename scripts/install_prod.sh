@@ -96,6 +96,10 @@ fi
 if [ -f "$PROD_DIR/.env" ]; then
     echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
     if ! grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+        # Ensure trailing newline before appending
+        if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
+            echo >> "$PROD_DIR/.env"
+        fi
         echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
         echo "Appended LOCAL_API_KEY to existing .env."
     fi
@@ -124,6 +128,10 @@ with open(env_file, "w") as f:
     f.write(new_content)
 ' "$PROD_DIR/.env" "$LOCAL_API_KEY"
         else
+            # Ensure trailing newline before appending
+            if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
+                echo >> "$PROD_DIR/.env"
+            fi
             echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
             chmod 600 "$PROD_DIR/.env"
         fi
@@ -136,12 +144,11 @@ chmod 600 "$PROD_DIR/.env"
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
 mkdir -p "$HOME/Library/LaunchAgents"
 cp com.localbrain.api.plist "$PLIST_PATH"
-plutil -remove EnvironmentVariables.LOCAL_API_KEY "$PLIST_PATH" 2>/dev/null || true
 
 # Unload existing instance if present
 launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
 # Load the fresh agent
-launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH" || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
 
 
 echo "Installation and persistent background registration complete."
