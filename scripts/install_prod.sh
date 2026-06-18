@@ -71,10 +71,11 @@ REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
 echo "Installing Local AI Brain Production to $PROD_DIR"
 mkdir -p "$(dirname "$PROD_DIR")"
-# If PROD_DIR exists but is not a git repository, remove it first so git clone can succeed
+# If PROD_DIR exists but is not a git repository, error out to prevent data loss
 if [ -d "$PROD_DIR" ] && [ ! -d "$PROD_DIR/.git" ]; then
-    echo "Removing existing non-git directory $PROD_DIR before cloning..."
-    rm -rf "$PROD_DIR"
+    echo "Error: $PROD_DIR exists but is not a git repository." >&2
+    echo "Please remove it manually and re-run the installer: rm -rf '$PROD_DIR'" >&2
+    exit 1
 fi
 if [ ! -d "$PROD_DIR/.git" ]; then
     git clone "$REPO_URL" "$PROD_DIR"
