@@ -141,20 +141,23 @@ python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding='utf-8').read().re
 NEWSYSLOG_SRC="$PROD_DIR/com.localbrain.api.newsyslog.conf"
 if [ -f "$NEWSYSLOG_SRC" ]; then
     NEWSYSLOG_DIR="/etc/newsyslog.d"
+    NEWSYSLOG_PROCESSED="$PROD_DIR/com.localbrain.api.newsyslog.conf.processed"
+    cp "$NEWSYSLOG_SRC" "$NEWSYSLOG_PROCESSED"
+    python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding='utf-8').read().replace('__HOME__', sys.argv[2]).replace('__UID__:__GID__', sys.argv[3] + ':' + sys.argv[4]); open(p, 'w', encoding='utf-8').write(c)" "$NEWSYSLOG_PROCESSED" "$HOME" "$(id -u)" "$(id -g)"
+
     if [ -d "$NEWSYSLOG_DIR" ]; then
-        if cp "$NEWSYSLOG_SRC" "$NEWSYSLOG_DIR/com.localbrain.api.conf" 2>/dev/null; then
+        if cp "$NEWSYSLOG_PROCESSED" "$NEWSYSLOG_DIR/com.localbrain.api.conf" 2>/dev/null; then
             chmod 644 "$NEWSYSLOG_DIR/com.localbrain.api.conf"
-            python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding=\x27utf-8\x27).read().replace(\x27__HOME__\x27, sys.argv[2]).replace(\x27__UID__:__GID__\x27, sys.argv[3] + \x27:\x27 + sys.argv[4]); open(p, \x27w\x27, encoding=\x27utf-8\x27).write(c)" "$NEWSYSLOG_DIR/com.localbrain.api.conf" "$HOME" "$(id -u)" "$(id -g)"
             echo "Installed log rotation config to $NEWSYSLOG_DIR/com.localbrain.api.conf"
         else
             echo "Note: Could not install log rotation config (requires admin privileges)."
             echo "To enable log rotation manually:"
-            echo "  sudo cp '$NEWSYSLOG_SRC' $NEWSYSLOG_DIR/com.localbrain.api.conf && sudo chmod 644 $NEWSYSLOG_DIR/com.localbrain.api.conf"
+            echo "  sudo cp '$NEWSYSLOG_PROCESSED' $NEWSYSLOG_DIR/com.localbrain.api.conf && sudo chmod 644 $NEWSYSLOG_DIR/com.localbrain.api.conf"
         fi
     else
         echo "Note: $NEWSYSLOG_DIR does not exist. Log rotation not configured."
         echo "To enable log rotation manually after creating the directory:"
-        echo "  sudo mkdir -p $NEWSYSLOG_DIR && sudo cp '$NEWSYSLOG_SRC' $NEWSYSLOG_DIR/com.localbrain.api.conf"
+        echo "  sudo mkdir -p $NEWSYSLOG_DIR && sudo cp '$NEWSYSLOG_PROCESSED' $NEWSYSLOG_DIR/com.localbrain.api.conf && sudo chmod 644 $NEWSYSLOG_DIR/com.localbrain.api.conf"
     fi
 fi
 

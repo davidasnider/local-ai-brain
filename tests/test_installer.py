@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 from unittest.mock import mock_open, patch
@@ -99,17 +100,10 @@ def test_write_env_key_escaping(tmp_path):
     with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
-    func_start = content.find("_write_env_key() {")
-    assert func_start != -1, "_write_env_key() not found in install_prod.sh"
-
-    # Find the closing brace that comes after the printf line
-    printf_idx = content.find("printf", func_start)
-    assert printf_idx != -1, "printf not found in _write_env_key"
-    closing_brace_idx = content.find("}", printf_idx)
-    assert closing_brace_idx != -1, "closing brace not found after printf in _write_env_key"
-    func_end = closing_brace_idx + 1
-
-    func_body = content[func_start:func_end]
+    # Match _write_env_key function block robustly using regex
+    match = re.search(r"^\s*_write_env_key\s*\(\)\s*\{[\s\S]*?\n\}", content, re.MULTILINE)
+    assert match is not None, "_write_env_key() function block not found in install_prod.sh"
+    func_body = match.group(0)
 
     # Write the extracted function to a temp file for sourcing
     func_file = tmp_path / "_write_env_key.sh"
@@ -151,3 +145,89 @@ def test_no_redundant_chmod():
     # Find all occurrences of chmod 600 targeting the .env file
     chmod_calls = __import__("re").findall(r"chmod\s+600\s+.*\.env", content)
     assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"
+
+
+def test_cli_dispatch_insufficient_args(capsys):
+    import pytest
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py"]):
+        with pytest.raises(SystemExit) as excinfo:
+            _cli_dispatch()
+        assert excinfo.value.code == 1
+        captured = capsys.readouterr()
+        assert "Usage: install_helpers.py <command> [args]" in captured.err
+
+
+def test_cli_dispatch_unknown_command(capsys):
+    import pytest
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py", "invalid_cmd"]):
+        with pytest.raises(SystemExit) as excinfo:
+            _cli_dispatch()
+        assert excinfo.value.code == 1
+        captured = capsys.readouterr()
+        assert "Unknown command: invalid_cmd" in captured.err
+
+
+def test_cli_update_env_key_insufficient_args(capsys):
+    import pytest
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py", "update_env_key"]):
+        with pytest.raises(SystemExit) as excinfo:
+            _cli_dispatch()
+        assert excinfo.value.code == 1
+        captured = capsys.readouterr()
+        assert "Usage: install_helpers.py update_env_key <env_file>" in captured.err
+
+
+def test_cli_update_env_key_missing_env_var(capsys):
+    import pytest
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py", "update_env_key", "dummy_file"]):
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(SystemExit) as excinfo:
+                _cli_dispatch()
+            assert excinfo.value.code == 1
+            captured = capsys.readouterr()
+            assert "Error: LOCAL_API_KEY_VALUE environment variable not set" in captured.err
+
+
+def test_cli_update_env_key_success():
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py", "update_env_key", "dummy_file"]):
+        with patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "mykey"}):  # pragma: allowlist secret
+            with patch("install_helpers.update_env_key") as mock_update:
+                _cli_dispatch()
+                mock_update.assert_called_once_with(
+                    "dummy_file", "mykey"
+                )  # pragma: allowlist secret
+
+
+def test_cli_read_env_key_insufficient_args(capsys):
+    import pytest
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py", "read_env_key"]):
+        with pytest.raises(SystemExit) as excinfo:
+            _cli_dispatch()
+        assert excinfo.value.code == 1
+        captured = capsys.readouterr()
+        assert "Usage: install_helpers.py read_env_key <env_file>" in captured.err
+
+
+def test_cli_read_env_key_success(capsys):
+    from install_helpers import _cli_dispatch
+
+    with patch("sys.argv", ["install_helpers.py", "read_env_key", "dummy_file"]):
+        with patch(
+            "install_helpers.read_env_key", return_value="mykey"
+        ) as mock_read:  # pragma: allowlist secret
+            _cli_dispatch()
+            captured = capsys.readouterr()
+            assert mock_read.called
+            assert captured.out == "mykey\n"  # pragma: allowlist secret
