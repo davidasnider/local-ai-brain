@@ -16,6 +16,8 @@ if [ -f .env ]; then
   set -a && source .env && set +a
 fi
 
+export PYTHONPATH=src
+
 # Update llama-cpp-python
 echo "🔄 Checking for llama-cpp-python updates..."
 uv sync --upgrade-package llama-cpp-python
@@ -29,6 +31,7 @@ check_model() {
   local url=$2
   echo -n "Checking $name... "
   # Skip git check for local filesystem paths
+  url="${url/#\~/$HOME}"
   if [ -d "$url" ] || [ -f "$url" ]; then
     echo "Local path — skipping remote check"
     return
@@ -62,7 +65,7 @@ for m in models:
         print(f'MODEL_CHECK:{label}|{url}')
     else:
         print(f'Skipping {name}: no hf_model_repo_id')
-" 2>/dev/null | while IFS='|' read -r label url; do
+" | while IFS='|' read -r label url; do
   if [ "$label" = "${label#MODEL_CHECK:}" ]; then
     echo "$label"
   else
@@ -71,8 +74,8 @@ for m in models:
   fi
 done
 
-WHISPER_URL="${WHISPER_MODEL_PATH:-https://huggingface.co/mlx-community/whisper-large-v3-mlx}"
-KOKORO_URL="${KOKORO_HF_REPO:-https://huggingface.co/fastrtc/kokoro-onnx}"
+WHISPER_URL="${WHISPER_MODEL_PATH:-$(uv run python -c "from local_ai_brain.config import settings; print(settings.WHISPER_MODEL_PATH)" 2>/dev/null || echo "https://huggingface.co/mlx-community/whisper-large-v3-mlx")}"
+KOKORO_URL="${KOKORO_HF_REPO:-$(uv run python -c "from local_ai_brain.config import settings; print(settings.KOKORO_HF_REPO)" 2>/dev/null || echo "https://huggingface.co/fastrtc/kokoro-onnx")}"
 check_model "Whisper" "$WHISPER_URL"
 check_model "Kokoro" "$KOKORO_URL"
 

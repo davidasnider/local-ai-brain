@@ -24,9 +24,7 @@ fi
 export PYTHONPATH=src
 
 # Extract backend ports from config so servers match the gateway's expectations
-LLM_PORT=$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(urlparse(settings.VLLM_URL).port or 8001)" 2>/dev/null || echo "8001")
-STT_PORT=$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(urlparse(settings.STT_URL).port or 8002)" 2>/dev/null || echo "8002")
-TTS_PORT=$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(urlparse(settings.TTS_URL).port or 8003)" 2>/dev/null || echo "8003")
+read LLM_PORT STT_PORT TTS_PORT <<<$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(f\"{urlparse(settings.VLLM_URL).port or 8001} {urlparse(settings.STT_URL).port or 8002} {urlparse(settings.TTS_URL).port or 8003}\")" 2>/dev/null || echo "8001 8002 8003")
 
 # Initialize PID variables to avoid unbound variable errors in cleanup trap
 LLM_PID=""
