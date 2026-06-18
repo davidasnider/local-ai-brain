@@ -49,7 +49,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Secret Scanning:** To ensure the local API key is never committed.
   * **Auto-formatting & Linting:** Running `ruff`.
   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
-* **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, and `vllm-update` to streamline local development workflows. Note that these dev skills only start the FastAPI gateway — users must also run the model backends (LLM on port 8001, STT on 8002, TTS on 8003) separately, e.g. by running `uv run local-brain serve` in another terminal.
+* **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, and `vllm-update` to streamline local development workflows. Note that these dev skills only start the development API Gateway on port `8888`. To run the model backends, developers must run them separately (LLM on port `8001`, STT on `8002`, TTS on `8003`). Running `uv run local-brain serve` in another terminal starts all four services—the three model backends and the production API Gateway on port `8000`—resulting in the production gateway running concurrently alongside the development gateway on port `8888`.
 
 
 ## 6. Interactive CLI

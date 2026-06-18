@@ -51,7 +51,11 @@ git fetch --tags
 TAG_COMMIT=$(git rev-list --tags --max-count=1 2>/dev/null || true)
 if [ -n "$TAG_COMMIT" ]; then
     LATEST_TAG=$(git describe --tags "$TAG_COMMIT" 2>/dev/null || echo "")
+    if [ -z "$LATEST_TAG" ]; then
+        echo "Warning: Tag resolution fell back. Proceeding with default branch."
+    fi
 else
+    echo "Warning: No git tags found or git command failed. Proceeding with default branch."
     LATEST_TAG=""
 fi
 
