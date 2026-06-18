@@ -22,8 +22,8 @@
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>/tmp/com.localbrain.api.out.log</string>
+    <string>__HOME__/Library/Logs/com.localbrain.api.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/com.localbrain.api.err.log</string>
+    <string>__HOME__/Library/Logs/com.localbrain.api.err.log</string>
 </dict>
 </plist>

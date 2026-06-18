@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+umask 077
 
 # Get the directory of the script and repo root
 ORIGINAL_PWD="$(pwd)"
@@ -146,7 +147,8 @@ chmod 600 "$PROD_DIR/.env"
 
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-cp "$REPO_ROOT/com.localbrain.api.plist" "$PLIST_PATH"
+cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
+sed -i "" "s|__HOME__|$HOME|g" "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
