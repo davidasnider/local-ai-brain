@@ -93,6 +93,10 @@ The repository includes several agent skills in the `.agents/skills` directory t
 - **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the dev server logs in real-time.
 - **`vllm-update`**: Updates the `vllm-mlx` dependency to the latest commit and checks for Hugging Face model updates.
 
+These dev skills only start the FastAPI gateway — users must also run the model backends (LLM on port 8001, STT on 8002, TTS on 8003) separately, e.g. by running `uv run local-brain serve` in another terminal.
+
+Note: The development server uses port 8888. For production or when not using the dev skills, the default port is 8000 (as used in the examples below). Adjust the port in API calls accordingly.
+
 ## API Usage & Examples
 
 All requests must include the `Authorization: Bearer <LOCAL_API_KEY>` header.

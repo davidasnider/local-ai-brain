@@ -48,7 +48,12 @@ fi
 
 cd "$PROD_DIR"
 git fetch --tags
-LATEST_TAG=$(git describe --tags "$(git rev-list --tags --max-count=1)" 2>/dev/null || echo "")
+TAG_COMMIT=$(git rev-list --tags --max-count=1 2>/dev/null || true)
+if [ -n "$TAG_COMMIT" ]; then
+    LATEST_TAG=$(git describe --tags "$TAG_COMMIT" 2>/dev/null || echo "")
+else
+    LATEST_TAG=""
+fi
 
 if [ -n "$LATEST_TAG" ]; then
     echo "Checking out latest tag: $LATEST_TAG"
