@@ -76,6 +76,7 @@ def test_read_env_key_comment_stripping():
         ("  LOCAL_API_KEY  =  another_key  ", "another_key"),  # pragma: allowlist secret
         ('LOCAL_API_KEY="key_with_\\"_quotes"', 'key_with_"_quotes'),  # pragma: allowlist secret
         ("LOCAL_API_KEY='key_with_\\'_quotes'", "key_with_'_quotes"),  # pragma: allowlist secret
+        ("LOCAL_API_KEY=firstkey\nLOCAL_API_KEY=lastkey", "lastkey"),  # pragma: allowlist secret
     ]
 
     for file_content, expected_key in test_cases:
@@ -108,9 +109,9 @@ def test_write_env_key_escaping(tmp_path):
 
     test_keys = [
         "simplekey",
-        "key\with\backslashes",
+        r"key\with\backslashes",
         'key"with"quotes',
-        'key\with"both',
+        r'key\with"both',
         "key\\double\\backslashes",
     ]
 

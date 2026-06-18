@@ -12,15 +12,6 @@ case "$ENV_FILE" in
     *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
 esac
 
-# Verify python3 is installed before any python3 calls
-command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
-
-# Copy install_helpers.py to a temp path so it survives git checkout (which may
-# delete or overwrite the file when switching between tag versions in $PROD_DIR)
-INSTALL_HELPERS=$(mktemp /tmp/install_helpers.XXXXXX.py)
-cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
-trap 'rm -f "$INSTALL_HELPERS"' EXIT
-
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
@@ -52,6 +43,15 @@ _upsert_api_key() {
 # Execution guard: only run main body if executed directly (not sourced)
 # This allows tests to source the script and access helper functions directly.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+
+# Verify python3 is installed before any python3 calls
+command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
+
+# Copy install_helpers.py to a temp path so it survives git checkout (which may
+# delete or overwrite the file when switching between tag versions in $PROD_DIR)
+INSTALL_HELPERS=$(mktemp /tmp/install_helpers.XXXXXX.py)
+cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+trap 'rm -f "$INSTALL_HELPERS"' EXIT
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -145,7 +145,7 @@ chmod 600 "$PROD_DIR/.env"
 
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
+sed "s|~|$HOME|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then

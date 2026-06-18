@@ -38,6 +38,7 @@ def read_env_key(env_file: str) -> str | None:
     Returns:
         The unescaped key value, or ``None`` if not found.
     """
+    last_match = None
     with open(env_file, encoding="utf-8") as f:
         for line in f:
             m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
@@ -54,8 +55,8 @@ def read_env_key(env_file: str) -> str | None:
                     _r = q.group(1).replace("\\'", "'").replace("\\\\", "\\")
             else:
                 _r = re.sub(r"\s+#.*", "", _r)
-            return _r
-    return None
+            last_match = _r
+    return last_match
 
 
 def _cli_dispatch() -> None:
