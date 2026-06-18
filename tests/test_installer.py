@@ -1,13 +1,20 @@
 import os
-import pytest
 import subprocess
 import sys
 from unittest.mock import mock_open, patch
 
+import pytest
+
 # Add scripts directory to path so we can import install_helpers
 SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
 sys.path.insert(0, SCRIPTS_DIR)
-from install_helpers import read_env_key, update_env_key, _cli_dispatch  # noqa: E402
+from install_helpers import (  # noqa: E402
+    _cli_dispatch,
+    _cli_read_env_key,
+    _cli_update_env_key,
+    read_env_key,
+    update_env_key,
+)
 
 # Locate the installation script relative to this test file
 SCRIPT_PATH = os.path.abspath(
@@ -221,3 +228,54 @@ def test_shell_upsert_api_key(tmp_path):
     content = env_file.read_text()
     assert content == 'LOCAL_API_KEY="key_d"\n'
 
+
+def test_read_env_key_not_found():
+    """Verify that read_env_key returns None when LOCAL_API_KEY is absent,
+    and correctly skips non-matching lines (coverage for lines 44-45, 58)."""
+    cases = [
+        "OTHER_VAR=value\n",
+        "ANOTHER=foo\n# comment only\n",
+        "",
+    ]
+    for content in cases:
+        m_open = mock_open(read_data=content)
+        with patch("builtins.open", m_open):
+            result = read_env_key("dummy.env")
+        assert result is None, f"for content={content!r}: expected None, got {result!r}"
+
+
+def test_cli_update_env_key_missing_args():
+    """Verify that _cli_update_env_key exits with error when no env_file arg is given."""
+    with (
+        patch("sys.argv", ["prog", "update_env_key"]),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_update_env_key()
+    assert excinfo.value.code == 1
+
+
+def test_cli_read_env_key_missing_args():
+    """Verify that _cli_read_env_key exits with error when no env_file arg is given."""
+    with (
+        patch("sys.argv", ["prog", "read_env_key"]),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_read_env_key()
+    assert excinfo.value.code == 1
+
+
+def test_no_hardcoded_python3_in_install_script():
+    """Verify that the install script uses $PYTHON consistently instead of hardcoded python3
+    (regression guard for the bug on line 119 found during review)."""
+    with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # The only allowed `python3` reference is the fallback default for $PYTHON
+    # All other invocations should use $PYTHON
+    lines = content.split("\n")
+    hardcoded_python3 = [
+        i + 1 for i, line in enumerate(lines) if "python3" in line and "PYTHON" not in line
+    ]
+    assert hardcoded_python3 == [], (
+        f"Found hardcoded python3 calls (not via $PYTHON) on lines: {hardcoded_python3}"
+    )

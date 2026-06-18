@@ -15,7 +15,7 @@ esac
 # Determine which python to use (configurable via LOCALBRAIN_PYTHON env var)
 PYTHON="${LOCALBRAIN_PYTHON:-python3}"
 
-# Verify python3 is installed before any python3 calls
+# Verify the configured Python interpreter is available before making any calls
 command -v "$PYTHON" &>/dev/null || { echo "Error: $PYTHON not found" >&2; exit 1; }
 
 # Copy install_helpers.py to a temp path so it survives git checkout (which may
@@ -116,7 +116,7 @@ echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
 # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
 if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
-    LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
+    LOCAL_API_KEY="$($PYTHON "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
 fi
 
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -148,7 +148,9 @@ chmod 600 "$PROD_DIR/.env"
 
 # Copy the LaunchAgent plist to the LaunchAgents directory, resolving tildes to absolute paths
 mkdir -p "$HOME/Library/LaunchAgents"
-sed "s|~/|$HOME/|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
+# Escape $HOME to prevent sed from interpreting special characters like & in it
+_HOME_ESCAPED="${HOME//&/\\&}"
+sed "s|~/|$_HOME_ESCAPED/|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
