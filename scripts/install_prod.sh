@@ -143,9 +143,9 @@ else
 fi
 chmod 600 "$PROD_DIR/.env"
 
-# Copy the LaunchAgent plist to the LaunchAgents directory, resolving ~/ to $HOME/
+# Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-python3 "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME"
+sed "s|~|$HOME|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
