@@ -21,11 +21,12 @@
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
-    <!-- Standard output and error are redirected to /dev/null because the
-         application handles log writing and rotation internally using loguru. -->
+    <!-- Standard output goes to /dev/null because the application handles log -->
+    <!-- writing and rotation internally using loguru. Standard error is       -->
+    <!-- captured to a diagnostic log for debugging launchd startup failures.  -->
     <key>StandardOutPath</key>
     <string>/dev/null</string>
     <key>StandardErrorPath</key>
-    <string>/dev/null</string>
+    <string>~/Library/Logs/com.localbrain.api.err.log</string>
 </dict>
 </plist>

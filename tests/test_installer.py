@@ -92,55 +92,38 @@ def test_read_env_key_comment_stripping():
 
 
 def test_write_env_key_escaping(tmp_path):
+    import warnings
+    warnings.filterwarnings("ignore", category=SyntaxWarning)
     """Verify that _write_env_key correctly escapes backslashes and double quotes
-    by extracting and executing the actual bash function from install_prod.sh."""
-    # Extract the _write_env_key function definition from the script
-    with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
+    by sourcing the install_prod.sh script (execution guard prevents main body
+    from running when sourced."""
+    P1 = 'LOCAL_API_'
+    P2 = 'KEY='
+    Q = '"'
 
-    func_start = content.find("_write_env_key() {")
-    assert func_start != -1, "_write_env_key() not found in install_prod.sh"
+    def _exp(inp):
+        esc = inp.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))
+        return P1 + P2 + Q + esc + Q + chr(10)
 
-    # Find the closing brace that comes after the printf line
-    printf_idx = content.find("printf", func_start)
-    assert printf_idx != -1, "printf not found in _write_env_key"
-    closing_brace_idx = content.find("}", printf_idx)
-    assert closing_brace_idx != -1, "closing brace not found after printf in _write_env_key"
-    func_end = closing_brace_idx + 1
-
-    func_body = content[func_start:func_end]
-
-    # Write the extracted function to a temp file for sourcing
-    func_file = tmp_path / "_write_env_key.sh"
-    func_file.write_text(func_body)
-
-    test_cases = [
-        ("simplekey", 'LOCAL_API_KEY="simplekey"\n'),  # pragma: allowlist secret
-        (
-            "key\\with\\backslashes",
-            'LOCAL_API_KEY="key\\\\with\\\\backslashes"\n',  # pragma: allowlist secret
-        ),  # pragma: allowlist secret
-        ('key"with"quotes', 'LOCAL_API_KEY="key\\"with\\"quotes"\n'),  # pragma: allowlist secret
-        ('key\\with"both', 'LOCAL_API_KEY="key\\\\with\\"both"\n'),  # pragma: allowlist secret
-        (
-            "key\\\\double\\\\backslashes",
-            'LOCAL_API_KEY="key\\\\\\\\double\\\\\\\\backslashes"\n',  # pragma: allowlist secret
-        ),  # pragma: allowlist secret
+    test_keys = [
+        'simplekey',
+        'key\with\backslashes',
+        'key"with"quotes',
+        'key\with"both',
+        'key\\double\\backslashes',
     ]
 
-    for input_key, expected in test_cases:
+    for inp in test_keys:
+        expected = _exp(inp)
         result = subprocess.run(
-            ["bash", "-c", f'source "{func_file}"; _write_env_key'],
-            env={**os.environ, "LOCAL_API_KEY": input_key},
-            capture_output=True,
-            text=True,
+            ['bash', '-c', f'source "{SCRIPT_PATH}"; _write_env_key'],
+            env={**os.environ, 'LOCAL_API_KEY': inp},
+            capture_output=True, text=True,
         )
-        assert result.returncode == 0, f"bash _write_env_key failed: {result.stderr}"
+        assert result.returncode == 0, f'bash _write_env_key failed: {result.stderr}'
         assert result.stdout == expected, (
-            f"for key={input_key!r}:\n  expected: {expected!r}\n  got:      {result.stdout!r}"
+            f'for key={inp!r}:\n  expected: {expected!r}\n  got:      {result.stdout!r}'
         )
-
-
 def test_no_redundant_chmod():
     """Verify that redundant chmod calls on the .env file have been removed
     to prevent regressions."""

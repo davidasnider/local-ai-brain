@@ -15,10 +15,16 @@ esac
 # Verify python3 is installed before any python3 calls
 command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
 
+# Copy install_helpers.py to a temp path so it survives git checkout (which may
+# delete or overwrite the file when switching between tag versions in $PROD_DIR)
+INSTALL_HELPERS=$(mktemp /tmp/install_helpers.XXXXXX.py)
+cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+trap 'rm -f "$INSTALL_HELPERS"' EXIT
+
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 "$SCRIPT_DIR/install_helpers.py" update_env_key "$env_file"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 "$INSTALL_HELPERS" update_env_key "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -42,10 +48,15 @@ _upsert_api_key() {
     fi
 }
 
+
+# Execution guard: only run main body if executed directly (not sourced)
+# This allows tests to source the script and access helper functions directly.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
-        LOCAL_API_KEY="$(python3 "$SCRIPT_DIR/install_helpers.py" read_env_key "$ENV_FILE")"
+        LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
     fi
 fi
 
@@ -102,7 +113,7 @@ echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
 # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
 if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
-    LOCAL_API_KEY="$(python3 "$SCRIPT_DIR/install_helpers.py" read_env_key "$PROD_DIR/.env")"
+    LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
 fi
 
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -147,3 +158,4 @@ else
 fi
 
 echo "Installation and persistent background registration complete."
+fi
