@@ -69,7 +69,7 @@ fi
 
 cd "$PROD_DIR"
 git fetch --tags || echo "Warning: network fetch failed, proceeding with local tags only"
-TOP_TAG=$(git tag -l --sort=-v:refname | head -n 1 2>/dev/null || true)
+TOP_TAG=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v '-[a-zA-Z]*[0-9]' | head -n 1 2>/dev/null || true)
 if [ -n "$TOP_TAG" ]; then
     echo "Checking out latest tag: $TOP_TAG"
     git checkout --force "$TOP_TAG"
@@ -144,9 +144,9 @@ else
 fi
 chmod 600 "$PROD_DIR/.env"
 
-# Write the LaunchAgent plist without the LOCAL_API_KEY entry
+# Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-cp com.localbrain.api.plist "$PLIST_PATH"
+cp "$REPO_ROOT/com.localbrain.api.plist" "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
