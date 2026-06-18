@@ -90,8 +90,10 @@ The repository includes several agent skills in the `.agents/skills` directory t
 - **`bump-version`**: Bumps the project version in `pyproject.toml` and updates `uv.lock`.
 - **`restart-dev`**: Forcefully kills and restarts the local development server on port `8888`.
 - **`run-dev`**: Launches the API in development mode on port `8888` with hot-reload enabled.
-- **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the dev server logs in real-time.
+- **`tail-logs`**: Tails the dev server logs in real-time in a new terminal window.
 - **`vllm-update`**: Updates the `vllm-mlx` dependency to the latest commit and checks for Hugging Face model updates.
+
+Note: The development server skills above use port 8888 to avoid conflicting with a production instance. When running the gateway in production via `local-brain serve`, it defaults to port 8000 which is used in the API examples below. Additionally, the `run-dev` and `restart-dev` skills only start the API Gateway proxy and do not start the backend microservices (LLM on port 8001, STT on port 8002, TTS on port 8003). For inference endpoints to work, the backend services must be running independently via `local-brain serve`.
 
 ## API Usage & Examples
 
