@@ -94,7 +94,7 @@ done
 LOG_PATH="$PROJECT_ROOT/.logs/localbrain-llm.log"
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > "$LOG_PATH" 2>&1 &
 LLM_PID=$!
-for _i in $(seq 30); do
+for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
   if (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
     break
   fi
@@ -117,7 +117,7 @@ fi
 LOG_PATH="$PROJECT_ROOT/.logs/localbrain-stt.log"
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > "$LOG_PATH" 2>&1 &
 STT_PID=$!
-for _i in $(seq 30); do
+for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
   if (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
     break
   fi
@@ -140,7 +140,7 @@ fi
 LOG_PATH="$PROJECT_ROOT/.logs/localbrain-tts.log"
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > "$LOG_PATH" 2>&1 &
 TTS_PID=$!
-for _i in $(seq 30); do
+for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
   if (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
     break
   fi
@@ -191,7 +191,7 @@ while true; do
       wait "$_pid" 2>/dev/null || _exit_code=$?
       if [ "$_exit_code" = 0 ]; then
         echo "⚠ Backend process $_pid ($_var) exited cleanly (code 0). Continuing with remaining services."
-        eval "$_var="
+        printf -v "$_var" ''
       else
         echo "❌ Backend process $_pid ($_var) stopped unexpectedly (exit code $_exit_code)!"
         cleanup 1

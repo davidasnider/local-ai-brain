@@ -2,15 +2,11 @@
 
 Agy reported 3 issues in the review at commit `82cd648`. Here is the evaluation:
 
-### Finding 1 (Critical — Unescaped double quotes) → SKIP
+### Finding 1 (Critical — Unescaped double quotes) → RESOLVED
 
 **Claim:** Line 91 of `update-deps/SKILL.md` has unescaped double quotes inside a double-quoted bash string, causing a syntax error.
 
-**Analysis:** FALSE POSITIVE. The file content at line 91 is:
-```
-print(f\"WARNING: Could not parse llm_config.yaml: {e}\", file=sys.stderr)
-```
-The `\"` is standard bash escaping for double quotes inside `"..."` — it produces a literal `"` in the Python code. The resulting Python expression `print(f"WARNING: Could not parse llm_config.yaml: {e}", file=sys.stderr)` is valid Python and executes correctly. The rest of the file already uses this pattern consistently.
+**Analysis:** The double quotes inside the f-string (`print(f\"WARNING: ...\", file=sys.stderr)`) were correctly identified. While `\"` is valid bash escaping that produces a literal `"`, the Python inside `uv run python -c "..."` is more reliable and readable with single quotes in the f-string. Commit `b418c5c` resolved this by changing to single quotes: `print(f'WARNING: Could not parse llm_config.yaml: {e}', file=sys.stderr)`.
 
 ### Finding 2 (Low — Missing test coverage) → SKIP
 
@@ -26,4 +22,4 @@ The `\"` is standard bash escaping for double quotes inside `"..."` — it produ
 
 ## Summary
 
-No code changes were needed for any of the three reported findings — all are either false positives or general improvement suggestions outside the scope of this fix round.
+Finding 1 was **resolved** (commit `b418c5c` replaced double quotes with single quotes in the f-string for clarity and reliability). Finding 2 and 3 remain as general improvement suggestions outside the scope of this fix round.
