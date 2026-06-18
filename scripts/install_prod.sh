@@ -64,8 +64,8 @@ if [ -n "$LATEST_TAG" ]; then
     git checkout "$LATEST_TAG"
 else
     # Ensure we are on the main branch before pulling, to avoid detached HEAD issues
-    git checkout main
-    git pull
+    git checkout --force main
+    git pull || echo "Warning: git pull failed, continuing anyway."
 fi
 
 # Install uv if not present
@@ -93,6 +93,10 @@ fi
 # Copy the .env file or create one if it doesn't exist
 if [ -f "$PROD_DIR/.env" ]; then
     echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
+    if ! grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+        echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+        echo "Appended LOCAL_API_KEY to existing .env."
+    fi
 else
     # Pre-create the file with secure permissions to prevent permission race condition
     touch "$PROD_DIR/.env"
@@ -103,7 +107,7 @@ else
             echo ".env already exists at destination; skipping copy."
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
-            if ! grep -q "LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+            if ! grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
                 echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
             fi
         fi
@@ -119,8 +123,9 @@ cp com.localbrain.api.plist "$PLIST_PATH"
 plutil -remove EnvironmentVariables.LOCAL_API_KEY "$PLIST_PATH" 2>/dev/null || true
 
 # Unload existing instance if present
-launchctl unload "$PLIST_PATH" 2>/dev/null || true
+launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
 # Load the fresh agent
-launchctl load "$PLIST_PATH"
+launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+
 
 echo "Installation and persistent background registration complete."
