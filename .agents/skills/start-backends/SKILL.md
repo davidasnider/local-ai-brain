@@ -30,8 +30,26 @@ echo "Press Ctrl+C to stop all services."
 echo ""
 
 # Source environment variables from .env (if present)
+# Use Python to parse .env safely — handles inline comments and
+# whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
-  set -a && source .env && set +a
+  eval "$(python3 << 'PYEOF'
+import re, shlex
+with open('.env') as f:
+    for line in f:
+        line = re.sub(r'#.*$', '', line).strip()
+        if not line or '=' not in line:
+            continue
+        k, _, v = line.partition('=')
+        k = k.strip()
+        v = v.strip()
+        if v.startswith('"') and v.endswith('"'):
+            v = v[1:-1]
+        elif v.startswith("'") and v.endswith("'"):
+            v = v[1:-1]
+        print(f'export {k}={shlex.quote(v)}')
+PYEOF
+)"
 fi
 
 _check_port() { python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((\"127.0.0.1\", $1)); s.close()" 2>/dev/null; }
@@ -49,6 +67,13 @@ export PYTHONPATH=src
 LLM_PORT="${LLM_PORT:-8001}"
 STT_PORT="${STT_PORT:-8002}"
 TTS_PORT="${TTS_PORT:-8003}"
+
+# Export matching URL variables so the API Gateway connects to the right ports.
+# If a user overrides LLM_PORT but not VLLM_URL, this keeps them in sync.
+# Explicit VLLM_URL/STT_URL/TTS_URL env overrides are respected as-is.
+export VLLM_URL="${VLLM_URL:-http://127.0.0.1:$LLM_PORT}"
+export STT_URL="${STT_URL:-http://127.0.0.1:$STT_PORT}"
+export TTS_URL="${TTS_URL:-http://127.0.0.1:$TTS_PORT}"
 
 # Initialize PID variables to avoid unbound variable errors in cleanup trap
 LLM_PID=""

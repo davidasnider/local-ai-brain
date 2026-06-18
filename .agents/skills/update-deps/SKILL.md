@@ -24,8 +24,26 @@ if [ -z "$PROJECT_ROOT" ]; then echo "ERROR: Could not find project root" >&2; e
 cd "$PROJECT_ROOT"
 
 # Source environment variables from .env (if present)
+# Use Python to parse .env safely — handles inline comments and
+# whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
-  set -a && source .env && set +a
+  eval "$(python3 << 'PYEOF'
+import re, shlex
+with open('.env') as f:
+    for line in f:
+        line = re.sub(r'#.*$', '', line).strip()
+        if not line or '=' not in line:
+            continue
+        k, _, v = line.partition('=')
+        k = k.strip()
+        v = v.strip()
+        if v.startswith('"') and v.endswith('"'):
+            v = v[1:-1]
+        elif v.startswith("'") and v.endswith("'"):
+            v = v[1:-1]
+        print(f'export {k}={shlex.quote(v)}')
+PYEOF
+)"
 fi
 
 export PYTHONPATH=src
@@ -77,12 +95,17 @@ check_model() {
       return
     fi
 
-    # If the URL contains a slash (pathspec), check if its first component exists as a directory on disk.
-    if [[ "$url" == */* ]]; then
-      local first_component="${url%%/*}"
-      if [ -n "$first_component" ] && [ -d "$first_component" ]; then
-        echo "Local path ($name) does not exist yet (but parent directory $first_component exists) -- skipping remote check"
-        return
+    # If the URL looks like a local filesystem path (starts with /, ./, ../),
+    # check if its first component exists as a directory on disk.
+    # Don't apply this check to bare repo IDs like "org/repo" since their
+    # first component could match a local directory name by coincidence.
+    if [[ "$url" == /* ]] || [[ "$url" == ./* ]] || [[ "$url" == ../* ]]; then
+      if [[ "$url" == */* ]]; then
+        local first_component="${url%%/*}"
+        if [ -n "$first_component" ] && [ -d "$first_component" ]; then
+          echo "Local path ($name) does not exist yet (but parent directory $first_component exists) -- skipping remote check"
+          return
+        fi
       fi
     fi
 
