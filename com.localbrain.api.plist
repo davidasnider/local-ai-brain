@@ -21,12 +21,11 @@
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
-    <!-- WARNING: macOS launchd does not rotate these log files automatically.
-         Monitor file sizes or configure newsyslog(8) for rotation.
-         The application also uses loguru with built-in rotation. -->
+    <!-- Standard output and error are redirected to /dev/null because the
+         application handles log writing and rotation internally using loguru. -->
     <key>StandardOutPath</key>
-    <string>__HOME__/Library/Logs/com.localbrain.api.out.log</string>
+    <string>/dev/null</string>
     <key>StandardErrorPath</key>
-    <string>__HOME__/Library/Logs/com.localbrain.api.err.log</string>
+    <string>/dev/null</string>
 </dict>
 </plist>

@@ -135,27 +135,6 @@ chmod 600 "$PROD_DIR/.env"
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
-python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding='utf-8').read().replace('__HOME__', sys.argv[2]); open(p, 'w', encoding='utf-8').write(c)" "$PLIST_PATH" "$HOME"
-
-# Install log rotation config if newsyslog directory exists
-NEWSYSLOG_SRC="$PROD_DIR/com.localbrain.api.newsyslog.conf"
-if [ -f "$NEWSYSLOG_SRC" ]; then
-    NEWSYSLOG_DIR="/etc/newsyslog.d"
-    if [ -d "$NEWSYSLOG_DIR" ]; then
-        if cp "$NEWSYSLOG_SRC" "$NEWSYSLOG_DIR/com.localbrain.api.conf" 2>/dev/null; then
-            chmod 644 "$NEWSYSLOG_DIR/com.localbrain.api.conf"
-            echo "Installed log rotation config to $NEWSYSLOG_DIR/com.localbrain.api.conf"
-        else
-            echo "Note: Could not install log rotation config (requires admin privileges)."
-            echo "To enable log rotation manually:"
-            echo "  sudo cp '$NEWSYSLOG_SRC' $NEWSYSLOG_DIR/com.localbrain.api.conf && sudo chmod 644 $NEWSYSLOG_DIR/com.localbrain.api.conf"
-        fi
-    else
-        echo "Note: $NEWSYSLOG_DIR does not exist. Log rotation not configured."
-        echo "To enable log rotation manually after creating the directory:"
-        echo "  sudo mkdir -p $NEWSYSLOG_DIR && sudo cp '$NEWSYSLOG_SRC' $NEWSYSLOG_DIR/com.localbrain.api.conf"
-    fi
-fi
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
