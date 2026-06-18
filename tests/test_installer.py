@@ -91,13 +91,13 @@ def test_read_env_key_comment_stripping():
             )
 
 
-def test_write_env_key_escaping():
-    """Verify that _write_env_key correctly escapes backslashes and double quotes
-    by sourcing the install_prod.sh script (execution guard prevents main body
-    from running when sourced."""
+def test_write_env_key_escaping(tmp_path):
     import warnings
 
     warnings.filterwarnings("ignore", category=SyntaxWarning)
+    """Verify that _write_env_key correctly escapes backslashes and double quotes
+    by sourcing the install_prod.sh script (execution guard prevents main body
+    from running when sourced."""
     P1 = "LOCAL_API_"
     P2 = "KEY="
     Q = '"'
@@ -108,9 +108,9 @@ def test_write_env_key_escaping():
 
     test_keys = [
         "simplekey",
-        r"key\with\backslashes",
+        "key\with\backslashes",
         'key"with"quotes',
-        r'key\with"both',
+        'key\with"both',
         "key\\double\\backslashes",
     ]
 

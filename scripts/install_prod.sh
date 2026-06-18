@@ -53,33 +53,6 @@ _upsert_api_key() {
 # This allows tests to source the script and access helper functions directly.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
-# Self-copy to a temp location and re-execute to prevent self-overwriting during git checkout.
-if [ -z "$LOCAL_AI_BRAIN_REEXEC" ]; then
-    # Resolve script path to absolute path
-    REAL_SCRIPT_PATH="$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")"
-    # Create a unique temporary directory
-    TEMP_DIR=$(mktemp -d /tmp/local_ai_brain_installer.XXXXXX)
-    # Copy the installer script and its helper script
-    cp "$REAL_SCRIPT_PATH" "$TEMP_DIR/install_prod.sh"
-    if [ -f "$SCRIPT_DIR/install_helpers.py" ]; then
-        cp "$SCRIPT_DIR/install_helpers.py" "$TEMP_DIR/install_helpers.py"
-    fi
-    # Clean up the temp INSTALL_HELPERS created in the initial pass of this process
-    if [ -n "$INSTALL_HELPERS" ] && [ -f "$INSTALL_HELPERS" ]; then
-        rm -f "$INSTALL_HELPERS"
-    fi
-    export LOCAL_AI_BRAIN_REEXEC=1
-    export ENV_FILE="$ENV_FILE"
-    exec bash "$TEMP_DIR/install_prod.sh" "$@"
-fi
-
-if [ -n "$LOCAL_AI_BRAIN_REEXEC" ]; then
-    # We are in the re-executed subprocess. Re-register the trap to clean up both the
-    # INSTALL_HELPERS temp file and the TEMP_DIR temporary directory.
-    # SCRIPT_DIR is the temp directory.
-    trap 'rm -f "$INSTALL_HELPERS"; rm -rf "$SCRIPT_DIR"' EXIT
-fi
-
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
@@ -170,9 +143,9 @@ else
 fi
 chmod 600 "$PROD_DIR/.env"
 
-# Copy the LaunchAgent plist to the LaunchAgents directory, resolving ~ to absolute $HOME path
+# Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-sed "s|~/|$HOME/|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
+cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
