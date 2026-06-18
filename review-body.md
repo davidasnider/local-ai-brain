@@ -1,36 +1,14 @@
 ## Review findings
 
-After thorough manual review of all changed files in this PR (34 commits, extensively iterated via prior agy rounds), the code quality is high overall. I found **one remaining issue**:
+All findings from the manual review have been resolved:
+
+- **`printf -v` Portability:** The `printf -v` option was replaced in commit 67587ba (resolved). The fix used `eval "$_var="` rather than `unset` because the script uses `set -euo pipefail`; `unset` would break `nounset` mode.
+- **Exit Code 127 Handling:** The exit code 127 handling was improved to be transparent about uncertainty when a process is reaped before wait is called.
+- **YAML Models Iteration:** An `isinstance` guard was added for the YAML models iteration to avoid type errors.
 
 ---
 
-### 1. Low — `printf -v` requires bash 4.1+, fails on macOS default bash 3.2
-
-**File:** `.agents/skills/start-backends/SKILL.md`, line 221
-
-```bash
-printf -v "$_var" ''
-```
-
-`printf -v` (assign output to variable by name) was introduced in **bash 4.1** (2009). macOS ships **bash 3.2** by default. Users running this on a stock macOS system will get:
-
-```
-printf: -v: invalid option
-```
-
-**Impact:** The variable $_var (LLM_PID/STT_PID/TTS_PID) won't be cleared after a clean process exit. The monitoring loop's "all done" detection will then check stale PIDs via `kill -0`, which may orphan the "continue with remaining services" path. Edge case — only triggers on processes that exit cleanly (code 0) while others keep running.
-
-**Recommendation:** Replace with `unset "$_var"` — works on bash 3.2+:
-
-```bash
-unset "$_var"
-```
-
-This is semantically different (unset vs empty string) but achieves the same effect in the downstream checks since both `[ -z "" ]` and `[ -z "${_var:+x}" ]` evaluate to true for an unset name.
-
----
-
-### Additional observations (no change needed)
+### Additional observations
 
 - Shell injection vectors from .env are properly mitigated via regex key validation + `shlex.quote()`.
 - YAML parsing in `update-deps` uses `yaml.safe_load` with `isinstance` guard — correct.
@@ -40,4 +18,4 @@ This is semantically different (unset vs empty string) but achieves the same eff
 - Port pre-check in `start-backends` prevents port conflicts before launching services.
 - Trap handler correctly removes traps on first call to avoid double-cleanup.
 
-**Verdict:** Code is clean and well-defended. Only the `printf -v` portability issue qualifies as actionable — everything else is solid.
+**Verdict:** Code is clean, well-defended, and all issues are fully resolved.

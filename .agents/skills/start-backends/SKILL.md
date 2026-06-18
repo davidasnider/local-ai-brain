@@ -221,9 +221,11 @@ while true; do
         eval "$_var="
       elif [ "$_exit_code" = 127 ]; then
         # wait returns 127 when the process has already been reaped by the
-        # shell (race condition between kill -0 and wait). Since kill -0
-        # confirmed the process is dead, treat 127 as a clean exit.
-        echo "⚠ Backend process $_pid ($_var) already reaped (race), assuming clean exit."
+        # shell (race condition between kill -0 and wait). We know the
+        # process is dead (kill -0 confirmed it) but the exit code is
+        # unrecoverable — it may have been a crash or a clean exit. Log
+        # transparently and continue with remaining services.
+        echo "⚠ Backend process $_pid ($_var) died — exit code unknown (reaped before wait, code 127). Continuing with remaining services."
         eval "$_var="
       else
         echo "❌ Backend process $_pid ($_var) stopped unexpectedly (exit code $_exit_code)!"

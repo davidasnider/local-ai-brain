@@ -152,6 +152,8 @@ else:
     cfg = {}
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []
+if not isinstance(models, list):
+    models = []
 for m in models:
     if not isinstance(m, dict):
         continue
