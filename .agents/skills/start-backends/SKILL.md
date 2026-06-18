@@ -28,13 +28,24 @@ LLM_PID=""
 STT_PID=""
 TTS_PID=""
 
+# Trap Ctrl+C and clean up
+cleanup() {
+  echo ""
+  echo "🛑 Shutting down backend services..."
+  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
+  wait
+  echo "✅ All backend services stopped."
+  exit 0
+}
+trap cleanup INT TERM
+
 # LLM Server (port 8001)
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
 LLM_PID=$!
 sleep 1
 if ! kill -0 $LLM_PID 2>/dev/null; then
   echo "❌ LLM Server failed to start!"
-  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
+  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
   exit 1
 fi
 
@@ -44,7 +55,7 @@ STT_PID=$!
 sleep 1
 if ! kill -0 $STT_PID 2>/dev/null; then
   echo "❌ STT Server failed to start!"
-  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
+  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
   exit 1
 fi
 
@@ -54,7 +65,7 @@ TTS_PID=$!
 sleep 1
 if ! kill -0 $TTS_PID 2>/dev/null; then
   echo "❌ TTS Server failed to start!"
-  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
+  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
   exit 1
 fi
 
@@ -66,17 +77,7 @@ echo "Backend services are running. Start the dev gateway with:"
 echo "  PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload"
 echo ""
 
-# Trap Ctrl+C and clean up
-cleanup() {
-  echo ""
-  echo "🛑 Shutting down backend services..."
-  kill $LLM_PID $STT_PID $TTS_PID 2>/dev/null || true
-  wait
-  echo "✅ All backend services stopped."
-  exit 0
-}
-trap cleanup INT TERM
-
 # Wait for all background processes to exit
 wait
 ```
+

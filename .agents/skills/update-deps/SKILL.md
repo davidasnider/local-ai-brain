@@ -22,10 +22,15 @@ check_model() {
   local name=$1
   local url=$2
   echo -n "Checking $name... "
-  COMMIT=$(git ls-remote $url HEAD | cut -f1)
-  echo "Latest remote commit: $COMMIT"
+  if COMMIT=$(git ls-remote "$url" HEAD 2>/dev/null | cut -f1); then
+    echo "Latest remote commit: $COMMIT"
+  else
+    echo "WARNING: Could not reach $url (network issue or rate limit)"
+  fi
 }
 
+# NOTE: The Hugging Face repository URLs below must be kept in sync with the
+# model configurations and paths defined in llm_config.yaml.
 check_model "Qwen (active)" "https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF"
 check_model "Qwen (fallback)" "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
 check_model "Whisper" "https://huggingface.co/mlx-community/whisper-large-v3-mlx"
