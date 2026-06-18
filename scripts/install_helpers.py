@@ -73,11 +73,15 @@ def read_env_key(env_file: str) -> str | None:
             elif _r.startswith("'"):
                 # Shell does not support backslash-escaping inside single quotes.
                 # Find the first closing quote.
-                m = re.match(r"^'([^']*)'(.*)", _r)
-                if m:
-                    _r = m.group(1)
+                q = re.match(r"^'((?:[^'\\]|\\.)*)'(.*)", _r)
+                if q:
+                    _r = q.group(1).replace("\\'", "'").replace("\\\\", "\\")
                 else:
-                    _r = _r.lstrip("'")
+                    m = re.match(r"^'([^']*)'(.*)", _r)
+                    if m:
+                        _r = m.group(1)
+                    else:
+                        _r = _r.lstrip("'")
             else:
                 _r = re.sub(r"\s+#.*", "", _r)
             last_match = _r
@@ -139,12 +143,13 @@ def _cli_update_env_key() -> None:
         sys.exit(1)
     env_file = sys.argv[2]
     try:
-        api_key = os.environ["LOCAL_API_KEY_VALUE"]
+        if os.getenv("LOCAL_API_KEY_VALUE") is None:
+            raise KeyError
     except KeyError:
         print("Error: LOCAL_API_KEY_VALUE environment variable is not set.", file=sys.stderr)
         sys.exit(1)
     try:
-        update_env_key(env_file, api_key)
+        update_env_key(env_file, os.environ["LOCAL_API_KEY_VALUE"])
     except FileNotFoundError:
         print(f"Error: Environment file '{env_file}' not found.", file=sys.stderr)
         sys.exit(1)
