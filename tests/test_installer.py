@@ -1,13 +1,13 @@
 import os
 import subprocess
 import sys
+from unittest.mock import mock_open, patch
 
 # Add scripts directory to path so we can import install_helpers
 SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
 sys.path.insert(0, SCRIPTS_DIR)
 
-from install_helpers import update_env_key, read_env_key
-from unittest.mock import mock_open, patch
+from install_helpers import read_env_key, update_env_key  # noqa: E402
 
 # Locate the installation script relative to this test file
 SCRIPT_PATH = os.path.abspath(
@@ -49,7 +49,6 @@ def test_update_env_key():
             patch("sys.argv", ["python3", "dummy_env_file"]),
             patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": key_val}),
         ):
-            import builtins
             update_env_key("dummy_env_file", key_val)
 
             # Reconstruct the written data from all calls to write()
@@ -87,7 +86,9 @@ def test_read_env_key_comment_stripping():
         ):
             result = read_env_key("dummy_env_file")
             assert result == expected_key, (
-                f"for content={file_content!r}:\n  expected: {expected_key!r}\n  got:      {result!r}"
+                f"for content={file_content!r}:\n"
+                f"  expected: {expected_key!r}\n"
+                f"  got:      {result!r}"
             )
 
 
@@ -148,5 +149,5 @@ def test_no_redundant_chmod():
         content = f.read()
 
     # Find all occurrences of chmod 600 targeting the .env file
-    chmod_calls = __import__('re').findall(r"chmod\s+600\s+.*\.env", content)
+    chmod_calls = __import__("re").findall(r"chmod\s+600\s+.*\.env", content)
     assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"

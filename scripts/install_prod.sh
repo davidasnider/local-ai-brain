@@ -144,6 +144,7 @@ if [ -f "$NEWSYSLOG_SRC" ]; then
     if [ -d "$NEWSYSLOG_DIR" ]; then
         if cp "$NEWSYSLOG_SRC" "$NEWSYSLOG_DIR/com.localbrain.api.conf" 2>/dev/null; then
             chmod 644 "$NEWSYSLOG_DIR/com.localbrain.api.conf"
+            python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding=\x27utf-8\x27).read().replace(\x27__HOME__\x27, sys.argv[2]).replace(\x27__UID__:__GID__\x27, sys.argv[3] + \x27:\x27 + sys.argv[4]); open(p, \x27w\x27, encoding=\x27utf-8\x27).write(c)" "$NEWSYSLOG_DIR/com.localbrain.api.conf" "$HOME" "$(id -u)" "$(id -g)"
             echo "Installed log rotation config to $NEWSYSLOG_DIR/com.localbrain.api.conf"
         else
             echo "Note: Could not install log rotation config (requires admin privileges)."
