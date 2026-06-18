@@ -85,6 +85,18 @@ check_model() {
       return
     fi
 
+    # Detect local file paths by extension — a path like "models/whisper.gguf"
+    # has exactly one "/" and starts with neither "/" nor ".", so it would
+    # bypass the slash-count and absolute-path checks and incorrectly get
+    # https://huggingface.co/ prepended.  Explicitly match known model file
+    # extensions to treat them as local paths (finding #2).
+    case "$url" in
+      *.gguf|*.bin|*.onnx|*.pt|*.safetensors|*.pth|*.ckpt)
+        echo "Local path ($name, detected by extension) — skipping remote check"
+        return
+        ;;
+    esac
+
     if [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
       url="https://huggingface.co/$url"
     else

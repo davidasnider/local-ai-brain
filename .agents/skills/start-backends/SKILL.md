@@ -46,7 +46,10 @@ _check_port() {
   local _port="$1"
   local _host="${2:-127.0.0.1}"
   [[ "$_port" =~ ^[0-9]+$ ]] || return 1
-  uv run python -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((sys.argv[1], int(sys.argv[2]))); s.close()" "$_host" "$_port" 2>/dev/null
+  # Use python3 directly (not uv run) for port check — only stdlib is needed,
+  # so uv's lockfile-validation overhead is unnecessary. In tight startup
+  # loops this runs up to 90 times; the overhead of uv run is significant.
+  python3 -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((sys.argv[1], int(sys.argv[2]))); s.close()" "$_host" "$_port" 2>/dev/null
 }
 
 # Fail fast if LOCAL_API_KEY is not set (required for config module)
