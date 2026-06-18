@@ -16,16 +16,21 @@ echo "These will run alongside the dev gateway on port 8888."
 echo "Press Ctrl+C to stop all services."
 echo ""
 
+# Source environment variables from .env (if present)
+if [ -f .env ]; then
+  set -a && source .env && set +a
+fi
+
 # LLM Server (port 8001)
-uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
+PYTHONPATH=src uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
 LLM_PID=$!
 
 # STT Server (port 8002)
-uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port 8002 &
+PYTHONPATH=src uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port 8002 &
 STT_PID=$!
 
 # TTS Server (port 8003)
-uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port 8003 &
+PYTHONPATH=src uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port 8003 &
 TTS_PID=$!
 
 echo "✅ LLM Server (pid $LLM_PID) on 127.0.0.1:8001"
@@ -33,7 +38,7 @@ echo "✅ STT Server (pid $STT_PID) on 127.0.0.1:8002"
 echo "✅ TTS Server (pid $TTS_PID) on 127.0.0.1:8003"
 echo ""
 echo "Backend services are running. Start the dev gateway with:"
-echo "  uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload"
+echo "  PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload"
 echo ""
 
 # Trap Ctrl+C and clean up
@@ -47,6 +52,6 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# Wait for any child to exit
+# Wait for all background processes to exit
 wait
 ```

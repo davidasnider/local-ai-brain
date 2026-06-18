@@ -1,6 +1,6 @@
 ---
-name: vllm-update
-description: Updates llama-cpp-python to the latest version and checks for Hugging Face model updates.
+name: update-deps
+description: Updates development dependencies (llama-cpp-python) and checks for Hugging Face model updates.
 ---
 
 1. Upgrades `llama-cpp-python` to the latest available version via `uv`.
@@ -24,7 +24,8 @@ check_model() {
   echo "Latest remote commit: $COMMIT"
 }
 
-check_model "Qwen" "https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-8bit"
+check_model "Qwen (active)" "https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF"
+check_model "Qwen (fallback)" "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
 check_model "Whisper" "https://huggingface.co/mlx-community/whisper-large-v3-mlx"
 check_model "Kokoro" "https://huggingface.co/fastrtc/kokoro-onnx"
 

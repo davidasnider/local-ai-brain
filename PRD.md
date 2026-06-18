@@ -49,7 +49,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Secret Scanning:** To ensure the local API key is never committed.
   * **Auto-formatting & Linting:** Running `ruff`.
   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
-* **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `start-backends`, `tail-logs`, and `vllm-update` to streamline local development workflows.
+* **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `start-backends`, `tail-logs`, and `update-deps` to streamline local development workflows.
   * *Note:* The development server skills (`run-dev`, `restart-dev`) run on port `8888` to avoid conflicting with the production port `8000`. These development skills only start the API Gateway proxy and do not start the downstream backend microservices (LLM on port `8001`, STT on port `8002`, TTS on port `8003`). For inference to work, these backend services must be running independently. Use the `start-backends` skill to launch only the backend services (LLM, STT, TTS) without the production gateway; alternatively, `local-brain serve` starts all services including the production gateway on port `8000`.
   * *Note:* The `tail-logs` skill tails the dev server logs in real-time in a new terminal window.
 
