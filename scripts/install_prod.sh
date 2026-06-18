@@ -17,7 +17,7 @@ command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1;
 
 # Copy install_helpers.py to a temp path so it survives git checkout (which may
 # delete or overwrite the file when switching between tag versions in $PROD_DIR)
-INSTALL_HELPERS=$(mktemp /tmp/install_helpers.XXXXXX.py)
+INSTALL_HELPERS=$(python3 -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
 cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 trap 'rm -f "$INSTALL_HELPERS"' EXIT
 
@@ -37,7 +37,7 @@ _write_env_key() {
 # Upsert LOCAL_API_KEY in a .env file: update if present, append if missing
 _upsert_api_key() {
     local env_file="$1"
-    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$env_file"; then
+    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=" "$env_file"; then
         update_env_key "$env_file"
     else
         # Ensure trailing newline before appending
@@ -143,9 +143,9 @@ else
 fi
 chmod 600 "$PROD_DIR/.env"
 
-# Copy the LaunchAgent plist to the LaunchAgents directory
+# Copy the LaunchAgent plist to the LaunchAgents directory, resolving tildes to absolute paths
 mkdir -p "$HOME/Library/LaunchAgents"
-cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
+sed "s|~/|$HOME/|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
