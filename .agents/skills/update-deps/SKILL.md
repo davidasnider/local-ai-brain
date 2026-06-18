@@ -24,23 +24,6 @@ echo "✅ llama-cpp-python updated (or already at latest)."
 # Check Models
 echo "🔍 Checking for model updates on Hugging Face..."
 
-get_model_url() {
-  local model_name=$1
-  uv run python -c "
-import yaml, sys
-with open('llm_config.yaml') as f:
-    cfg = yaml.safe_load(f)
-model_name = sys.argv[1]
-for m in cfg.get('models', []):
-    if m.get('name') == model_name:
-        repo_id = m.get('hf_model_repo_id')
-        if repo_id:
-            print(f'https://huggingface.co/{repo_id}')
-            sys.exit(0)
-sys.exit(1)
-" "$model_name"
-}
-
 check_model() {
   local name=$1
   local url=$2
@@ -65,9 +48,9 @@ echo "Checking models from llm_config.yaml..."
 uv run python -c "
 import yaml, sys, subprocess
 with open('llm_config.yaml') as f:
-    cfg = yaml.safe_load(f)
+    cfg = yaml.safe_load(f) or {}
 active = cfg.get('active_model', '')
-models = cfg.get('models', [])
+models = cfg.get('models') or []
 for m in models:
     name = m.get('name', 'unknown')
     label = name

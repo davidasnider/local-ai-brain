@@ -23,6 +23,11 @@ fi
 
 export PYTHONPATH=src
 
+# Extract backend ports from config so servers match the gateway's expectations
+LLM_PORT=$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(urlparse(settings.VLLM_URL).port or 8001)" 2>/dev/null || echo "8001")
+STT_PORT=$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(urlparse(settings.STT_URL).port or 8002)" 2>/dev/null || echo "8002")
+TTS_PORT=$(uv run python -c "from local_ai_brain.config import settings; from urllib.parse import urlparse; print(urlparse(settings.TTS_URL).port or 8003)" 2>/dev/null || echo "8003")
+
 # Initialize PID variables to avoid unbound variable errors in cleanup trap
 LLM_PID=""
 STT_PID=""
@@ -42,8 +47,8 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# LLM Server (port 8001)
-uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
+# LLM Server
+uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
 LLM_PID=$!
 sleep 1
 if ! kill -0 "$LLM_PID" 2>/dev/null; then
@@ -51,8 +56,8 @@ if ! kill -0 "$LLM_PID" 2>/dev/null; then
   cleanup 1
 fi
 
-# STT Server (port 8002)
-uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port 8002 &
+# STT Server
+uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
 STT_PID=$!
 sleep 1
 if ! kill -0 "$STT_PID" 2>/dev/null; then
@@ -60,8 +65,8 @@ if ! kill -0 "$STT_PID" 2>/dev/null; then
   cleanup 1
 fi
 
-# TTS Server (port 8003)
-uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port 8003 &
+# TTS Server
+uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
 TTS_PID=$!
 sleep 1
 if ! kill -0 "$TTS_PID" 2>/dev/null; then
@@ -69,12 +74,12 @@ if ! kill -0 "$TTS_PID" 2>/dev/null; then
   cleanup 1
 fi
 
-echo "✅ LLM Server (pid $LLM_PID) on 127.0.0.1:8001"
-echo "✅ STT Server (pid $STT_PID) on 127.0.0.1:8002"
-echo "✅ TTS Server (pid $TTS_PID) on 127.0.0.1:8003"
+echo "✅ LLM Server (pid $LLM_PID) on 127.0.0.1:$LLM_PORT"
+echo "✅ STT Server (pid $STT_PID) on 127.0.0.1:$STT_PORT"
+echo "✅ TTS Server (pid $TTS_PID) on 127.0.0.1:$TTS_PORT"
 echo ""
 echo "Backend services are running. Start the dev gateway with:"
-echo "  PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload"
+echo "  PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 127.0.0.1 --port 8888 --reload"
 echo ""
 
 # Monitor backend processes until one fails or all exit
@@ -88,7 +93,9 @@ while true; do
       break
     fi
   done
-  [ "$all_done" = true ] && break
+  if [ "$all_done" = true ]; then
+    break
+  fi
 
   # Check for unexpected stops
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
