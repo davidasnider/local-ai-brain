@@ -27,13 +27,27 @@ cd "$PROJECT_ROOT"
 # Use Python to parse .env safely — handles inline comments and
 # whitespace around '=' that bash sourcing would mangle.
 if [ -f .env ]; then
-  eval "$(uv run python << 'PYEOF'
+  eval "$(python3 << 'PYEOF'
 import shlex
 import re
-from dotenv import dotenv_values
-for k, v in dotenv_values(".env").items():
-    if v is not None and re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
-        print(f"export {k}={shlex.quote(v)}")
+with open(".env") as _f:
+    for _line in _f:
+        _line = _line.strip()
+        if not _line or _line.startswith("#"):
+            continue
+        if "=" not in _line:
+            continue
+        _key, _, _val = _line.partition("=")
+        _key = _key.strip()
+        _val = _val.strip()
+        if len(_val) >= 2 and _val[0] == _val[-1] and _val[0] in ('"', "'"):
+            _val = _val[1:-1]
+        elif "#" in _val:
+            _hash_idx = _val.index("#")
+            if _hash_idx == 0 or _val[_hash_idx - 1] in (" ", "\t"):
+                _val = _val[:_hash_idx].rstrip()
+        if _key and re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", _key):
+            print(f"export {_key}={shlex.quote(_val)}")
 PYEOF
 )"
 fi
