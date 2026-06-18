@@ -15,7 +15,7 @@ esac
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 "$INSTALL_HELPERS" update_env_key "$env_file"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" ${PYTHON:-python3} "$INSTALL_HELPERS" update_env_key "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -42,8 +42,16 @@ _upsert_api_key() {
 
 # Copy install_helpers.py to a temp path so it survives git checkout (which may
 # delete or overwrite the file when switching between tag versions in $PROD_DIR)
-INSTALL_HELPERS=$(mktemp /tmp/install_helpers.XXXXXXXXXX).py
+# Uses mktemp -d to avoid the macOS mktemp template-suffix issue:
+# BSD mktemp only randomizes XXXXXX when it appears at the very end of the template,
+# so appending .py after the subshell would leak the original file created by mktemp.
+INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
+INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
 cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+
+# Register cleanup outside the execution guard so it also fires when the
+# script is sourced (e.g. during tests), preventing temp file leaks.
+trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
 
 # Execution guard: only run main body if executed directly (not sourced)
 # This allows tests to source the script and access helper functions directly.
@@ -52,12 +60,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 # Verify python3 is installed before any python3 calls
 command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
 
-trap 'rm -f "$INSTALL_HELPERS"' EXIT
-
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
-        LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
+        LOCAL_API_KEY="$(${PYTHON:-python3} "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
     fi
 fi
 
@@ -114,7 +120,7 @@ echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
 # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
 if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
-    LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
+    LOCAL_API_KEY="$(${PYTHON:-python3} "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
 fi
 
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -146,7 +152,7 @@ chmod 600 "$PROD_DIR/.env"
 
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-sed "s|~|$HOME|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
+${PYTHON:-python3} "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
