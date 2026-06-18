@@ -46,26 +46,59 @@ def read_env_key(env_file: str) -> str | None:
                 continue
             _r = m.group(1).strip()
             if _r.startswith('"'):
-                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", _r)
+                q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', _r)
                 if q:
                     _r = q.group(1).replace('\\"', '"').replace("\\\\", "\\")
+                else:
+                    # Mismatched/unclosed quote — strip leading quote, keep rest
+                    _r = _r.lstrip('"')
             elif _r.startswith("'"):
-                q = re.match(r"^\'((?:[^\'\\]|\\.)*)\'(.*)", _r)
+                q = re.match(r"^'((?:[^'\\]|\\.)*)'(.*)", _r)
                 if q:
                     _r = q.group(1).replace("\\'", "'").replace("\\\\", "\\")
+                else:
+                    _r = _r.lstrip("'")
             else:
                 _r = re.sub(r"\s+#.*", "", _r)
             last_match = _r
     return last_match
 
 
+def write_plist(template_path: str, output_path: str, home_dir: str) -> None:
+    """Copy a LaunchAgent plist template, resolving ``~/`` to the user's home directory.
+
+    Uses ``str.replace()`` (not regex) to avoid ``sed`` delimiter / escape injection
+    issues when ``$HOME`` contains special characters (``|``, ``&``, etc.).
+
+    Args:
+        template_path: Path to the plist template (may contain ``~/``).
+        output_path:   Destination path for the processed plist.
+        home_dir:      Absolute home directory path (``$HOME``).
+    """
+    with open(template_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    # Only replace ~/ (not bare ~) to avoid mangling unrelated content
+    content = content.replace("~/", home_dir + "/")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
 def _cli_dispatch() -> None:
     """CLI entry point called from ``install_prod.sh``."""
+    if len(sys.argv) < 2:
+        print(
+            "Usage: python install_helpers.py <command> [args...]",
+            file=sys.stderr,
+        )
+        print("Commands: update_env_key, read_env_key, write_plist", file=sys.stderr)
+        sys.exit(1)
+
     command = sys.argv[1]
 
     commands: dict[str, Callable[[], None]] = {
         "update_env_key": _cli_update_env_key,
         "read_env_key": _cli_read_env_key,
+        "write_plist": _cli_write_plist,
     }
 
     handler = commands.get(command)
@@ -78,16 +111,38 @@ def _cli_dispatch() -> None:
 def _cli_update_env_key() -> None:
     import os
 
+    if len(sys.argv) < 3:
+        print(
+            "Usage: python install_helpers.py update_env_key <env_file>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     env_file = sys.argv[2]
     update_env_key(env_file, os.environ["LOCAL_API_KEY_VALUE"])
 
 
 def _cli_read_env_key() -> None:
+    if len(sys.argv) < 3:
+        print(
+            "Usage: python install_helpers.py read_env_key <env_file>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     env_file = sys.argv[2]
     # Assign to variable named differently to bypass CodeQL false positive
     _result = read_env_key(env_file)
     if _result is not None:
         print(_result)
+
+
+def _cli_write_plist() -> None:
+    if len(sys.argv) < 5:
+        print(
+            "Usage: python install_helpers.py write_plist <template> <output> <home_dir>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    write_plist(sys.argv[2], sys.argv[3], sys.argv[4])
 
 
 if __name__ == "__main__":

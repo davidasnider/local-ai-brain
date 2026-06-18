@@ -3,10 +3,19 @@ import subprocess
 import sys
 from unittest.mock import mock_open, patch
 
+import pytest
+
 # Add scripts directory to path so we can import install_helpers
 SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
 sys.path.insert(0, SCRIPTS_DIR)
-from install_helpers import read_env_key, update_env_key  # noqa: E402
+from install_helpers import (  # noqa: E402
+    _cli_dispatch,
+    _cli_read_env_key,
+    _cli_update_env_key,
+    _cli_write_plist,
+    read_env_key,
+    update_env_key,
+)
 
 # Locate the installation script relative to this test file
 SCRIPT_PATH = os.path.abspath(
@@ -138,3 +147,85 @@ def test_no_redundant_chmod():
     # Find all occurrences of chmod 600 targeting the .env file
     chmod_calls = __import__("re").findall(r"chmod\s+600\s+.*\.env", content)
     assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"
+
+
+# ── CLI dispatch tests ──────────────────────────────────────────────────────
+
+
+def test_cli_dispatch_no_args_exits_with_usage():
+    """_cli_dispatch should print usage and exit 1 when no args given."""
+    with (
+        patch("sys.argv", ["install_helpers.py"]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _cli_dispatch()
+    assert exc_info.value.code == 1
+
+
+def test_cli_dispatch_unknown_command_exits():
+    """_cli_dispatch should print error and exit 1 for unknown commands."""
+    with (
+        patch("sys.argv", ["install_helpers.py", "bogus_command"]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _cli_dispatch()
+    assert exc_info.value.code == 1
+
+
+def test_cli_update_env_key_missing_arg_exits():
+    """_cli_update_env_key should exit 1 when env_file argument is missing."""
+    with (
+        patch("sys.argv", ["install_helpers.py", "update_env_key"]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _cli_update_env_key()
+    assert exc_info.value.code == 1
+
+
+def test_cli_read_env_key_missing_arg_exits():
+    """_cli_read_env_key should exit 1 when env_file argument is missing."""
+    with (
+        patch("sys.argv", ["install_helpers.py", "read_env_key"]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _cli_read_env_key()
+    assert exc_info.value.code == 1
+
+
+def test_cli_write_plist_missing_args_exits():
+    """_cli_write_plist should exit 1 when any required argument is missing."""
+    with (
+        patch("sys.argv", ["install_helpers.py", "write_plist", "template"]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        _cli_write_plist()
+    assert exc_info.value.code == 1
+
+
+def test_cli_write_plist_writes_plist(tmp_path):
+    """_cli_write_plist should resolve ~/ to $HOME/ in the plist."""
+    template = tmp_path / "template.plist"
+    output = tmp_path / "output.plist"
+    template.write_text(
+        '<?xml version="1.0"?>\n'
+        "<plist><dict>"
+        "<key>StandardErrorPath</key><string>~/Library/Logs/app.err.log</string>"
+        "</dict></plist>\n"
+    )
+    home = "/Users/testuser"
+    with (
+        patch(
+            "sys.argv",
+            [
+                "install_helpers.py",
+                "write_plist",
+                str(template),
+                str(output),
+                home,
+            ],
+        ),
+    ):
+        _cli_write_plist()
+    result = output.read_text()
+    assert "~/Library/Logs" not in result
+    assert "/Users/testuser/Library/Logs" in result
