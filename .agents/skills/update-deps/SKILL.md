@@ -48,6 +48,12 @@ check_model() {
     echo "Local path — skipping remote check"
     return
   fi
+  # If it looks like a local filesystem path (starts with / or .),
+  # but does not exist yet, skip git check
+  if [[ "$url" == /* ]] || [[ "$url" == .* ]]; then
+    echo "Local path does not exist yet -- skipping remote check"
+    return
+  fi
   # Prepend https://huggingface.co/ if it's a simple repo identifier
   if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
     url="https://huggingface.co/$url"
@@ -71,7 +77,7 @@ for parent in [cfg_path] + list(cfg_path.parents):
 else:
     cfg_path = cfg_path / 'llm_config.yaml'
 with open(cfg_path) as f:
-    cfg = yaml.safe_load(f) or {}"
+    cfg = yaml.safe_load(f) or {}
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []
 for m in models:

@@ -60,7 +60,9 @@ cleanup() {
     [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
   done
   for _i in $(seq 10); do
-    if ! kill -0 "$LLM_PID" 2>/dev/null && ! kill -0 "$STT_PID" 2>/dev/null && ! kill -0 "$TTS_PID" 2>/dev/null; then
+    if { [ -z "$LLM_PID" ] || ! kill -0 "$LLM_PID" 2>/dev/null; } && \
+       { [ -z "$STT_PID" ] || ! kill -0 "$STT_PID" 2>/dev/null; } && \
+       { [ -z "$TTS_PID" ] || ! kill -0 "$TTS_PID" 2>/dev/null; }; then
       break
     fi
     sleep 1
@@ -77,8 +79,8 @@ trap "cleanup 143" TERM
 # LLM Server
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
 LLM_PID=$!
-for _i in $(seq 5); do
-  if python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $LLM_PORT))" 2>/dev/null; then
+for _i in $(seq 30); do
+  if uv run python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $LLM_PORT))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$LLM_PID" 2>/dev/null; then
@@ -94,8 +96,8 @@ fi
 # STT Server
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
 STT_PID=$!
-for _i in $(seq 5); do
-  if python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $STT_PORT))" 2>/dev/null; then
+for _i in $(seq 30); do
+  if uv run python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $STT_PORT))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$STT_PID" 2>/dev/null; then
@@ -111,8 +113,8 @@ fi
 # TTS Server
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
 TTS_PID=$!
-for _i in $(seq 5); do
-  if python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $TTS_PORT))" 2>/dev/null; then
+for _i in $(seq 30); do
+  if uv run python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $TTS_PORT))" 2>/dev/null; then
     break
   fi
   if ! kill -0 "$TTS_PID" 2>/dev/null; then
