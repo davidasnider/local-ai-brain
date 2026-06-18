@@ -279,3 +279,106 @@ def test_no_hardcoded_python3_in_install_script():
     assert hardcoded_python3 == [], (
         f"Found hardcoded python3 calls (not via $PYTHON) on lines: {hardcoded_python3}"
     )
+
+
+def test_read_env_key_malformed_quotes():
+    """Verify that read_env_key returns None when quotes are malformed/unclosed."""
+    cases = [
+        'LOCAL_API_KEY="unclosed_double',
+        "LOCAL_API_KEY='unclosed_single",
+    ]
+    for content in cases:
+        m_open = mock_open(read_data=content)
+        with patch("builtins.open", m_open):
+            result = read_env_key("dummy.env")
+        assert result is None, f"for content={content!r}: expected None, got {result!r}"
+
+
+def test_write_plist(tmp_path):
+    """Verify that write_plist replaces ~/ with home directory and handles missing template."""
+    template = tmp_path / "template.plist"
+    target = tmp_path / "target.plist"
+
+    # Test file missing
+    with pytest.raises(FileNotFoundError):
+        from install_helpers import write_plist
+
+        write_plist(str(template), str(target), "/Users/test")
+
+    template.write_text("Hello ~/World\nAnd ~/Home\n")
+    from install_helpers import write_plist
+
+    write_plist(str(template), str(target), "/Users/test")
+    assert target.read_text() == "Hello /Users/test/World\nAnd /Users/test/Home\n"
+
+    # Test trailing slash normalization
+    write_plist(str(template), str(target), "/Users/test/")
+    assert target.read_text() == "Hello /Users/test/World\nAnd /Users/test/Home\n"
+
+
+def test_cli_update_env_key_missing_env_var(capsys):
+    """Verify that _cli_update_env_key exits when LOCAL_API_KEY_VALUE is not in os.environ."""
+    with (
+        patch("sys.argv", ["prog", "update_env_key", "dummy.env"]),
+        patch.dict(os.environ, {}, clear=True),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_update_env_key()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Error: LOCAL_API_KEY_VALUE environment variable is not set." in captured.err
+
+
+def test_read_env_key_file_not_found():
+    """Verify that read_env_key raises FileNotFoundError when target file does not exist."""
+    with pytest.raises(FileNotFoundError) as excinfo:
+        read_env_key("non_existent.env")
+    assert "Environment file not found: 'non_existent.env'" in str(excinfo.value)
+
+
+def test_cli_write_plist(tmp_path, capsys):
+    """Verify _cli_write_plist CLI wrapper command."""
+    template = tmp_path / "template.plist"
+    target = tmp_path / "target.plist"
+    template.write_text("Hello ~/\n")
+
+    # 1. Missing args
+    with (
+        patch("sys.argv", ["prog", "write_plist", str(template), str(target)]),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_dispatch()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Usage: install_helpers.py write_plist" in captured.err
+
+    # 2. Successful execution
+    with patch("sys.argv", ["prog", "write_plist", str(template), str(target), "/Users/test"]):
+        _cli_dispatch()
+    assert target.read_text() == "Hello /Users/test/\n"
+
+    # 3. File not found path
+    with (
+        patch(
+            "sys.argv",
+            ["prog", "write_plist", "non_existent.plist", str(target), "/Users/test"],
+        ),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_dispatch()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Error: Template file not found: 'non_existent.plist'" in captured.err
+
+
+def test_cli_update_env_key_file_not_found(capsys):
+    """Verify _cli_update_env_key exits with FileNotFoundError when file doesn't exist."""
+    with (
+        patch("sys.argv", ["prog", "update_env_key", "non_existent.env"]),
+        patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "some_val"}),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_dispatch()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Error: Environment file not found: 'non_existent.env'" in captured.err

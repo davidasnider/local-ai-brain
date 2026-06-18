@@ -18,16 +18,11 @@ PYTHON="${LOCALBRAIN_PYTHON:-python3}"
 # Verify the configured Python interpreter is available before making any calls
 command -v "$PYTHON" &>/dev/null || { echo "Error: $PYTHON not found" >&2; exit 1; }
 
-# Copy install_helpers.py to a temp path so it survives git checkout (which may
-# delete or overwrite the file when switching between tag versions in $PROD_DIR)
-INSTALL_HELPERS=$($PYTHON -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
-cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
-trap 'rm -f "$INSTALL_HELPERS"' EXIT
-
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" $PYTHON "$INSTALL_HELPERS" update_env_key "$env_file"
+    local helpers="${INSTALL_HELPERS:-$SCRIPT_DIR/install_helpers.py}"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" $PYTHON "$helpers" update_env_key "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -55,6 +50,12 @@ _upsert_api_key() {
 # Execution guard: only run main body if executed directly (not sourced)
 # This allows tests to source the script and access helper functions directly.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+
+# Copy install_helpers.py to a temp path so it survives git checkout (which may
+# delete or overwrite the file when switching between tag versions in $PROD_DIR)
+INSTALL_HELPERS=$($PYTHON -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
+cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+trap 'rm -f "$INSTALL_HELPERS"' EXIT
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -148,9 +149,7 @@ chmod 600 "$PROD_DIR/.env"
 
 # Copy the LaunchAgent plist to the LaunchAgents directory, resolving tildes to absolute paths
 mkdir -p "$HOME/Library/LaunchAgents"
-# Escape $HOME to prevent sed from interpreting special characters like & in it
-_HOME_ESCAPED="${HOME//&/\\&}"
-sed "s|~/|$_HOME_ESCAPED/|g" "$PROD_DIR/com.localbrain.api.plist" > "$PLIST_PATH"
+$PYTHON "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
