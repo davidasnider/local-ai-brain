@@ -39,8 +39,8 @@ echo "✅ llama-cpp-python updated (or already at latest)."
 echo "🔍 Checking for model updates on Hugging Face..."
 
 check_model() {
-  local name=$1
-  local url=$2
+  local name="$1"
+  local url="$2"
   if [ -z "$url" ]; then
     return
   fi
@@ -53,7 +53,7 @@ check_model() {
     :
   else
     if [ -d "$url" ] || [ -f "$url" ]; then
-      echo "Local path — skipping remote check"
+      echo "Local path ($name) — skipping remote check"
       return
     fi
 
@@ -63,7 +63,7 @@ check_model() {
     # (more than one "/") are unambiguously local filesystem paths.
     local _slash_count="${url//[^\/]/}"
     if [ ${#_slash_count} -gt 1 ]; then
-      echo "Local path (multi-component relative path) — skipping remote check"
+      echo "Local path ($name, multi-component) — skipping remote check"
       return
     fi
 
@@ -83,10 +83,11 @@ check_model() {
       # If it looks like a local filesystem path (starts with / or .), but does not exist yet, skip git check.
       # Note: Local relative paths should start with ./ or ../ to be unambiguously recognized
       # if their parent directories do not exist yet.
-      echo "Local path does not exist yet -- skipping remote check"
+      echo "Local path ($name) does not exist yet -- skipping remote check"
       return
     fi
   fi
+  local COMMIT
   if COMMIT=$(git ls-remote -- "$url" HEAD 2>/dev/null | cut -f1); then
     echo "Latest remote commit: $COMMIT"
   else

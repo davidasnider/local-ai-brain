@@ -34,6 +34,8 @@ if [ -f .env ]; then
   set -a && source .env && set +a
 fi
 
+_check_port() { python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((\"127.0.0.1\", $1)); s.close()" 2>/dev/null; }
+
 # Fail fast if LOCAL_API_KEY is not set (required for config module)
 if [ -z "${LOCAL_API_KEY:-}" ]; then
   echo "❌ LOCAL_API_KEY is not set. Set it in .env or export it before running." >&2
@@ -84,7 +86,7 @@ trap cleanup EXIT
 
 # Pre-check port occupancy before starting services (finding #5)
 for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
-  if (echo >/dev/tcp/127.0.0.1/$_port) &>/dev/null; then
+  if _check_port "$_port"; then
     echo "❌ Port $_port is already in use. Conflicting service detected." >&2
     exit 1
   fi
@@ -95,7 +97,7 @@ LOG_PATH="$PROJECT_ROOT/.logs/localbrain-llm.log"
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > "$LOG_PATH" 2>&1 &
 LLM_PID=$!
 for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
-  if (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
+  if _check_port "$LLM_PORT"; then
     break
   fi
   if ! kill -0 "$LLM_PID" 2>/dev/null; then
@@ -103,7 +105,7 @@ for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
   fi
   sleep 1
 done
-if ! (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
+if ! _check_port "$LLM_PORT"; then
   if kill -0 "$LLM_PID" 2>/dev/null; then
     echo "❌ LLM Server failed to become ready (timeout)!"
   else
@@ -118,7 +120,7 @@ LOG_PATH="$PROJECT_ROOT/.logs/localbrain-stt.log"
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > "$LOG_PATH" 2>&1 &
 STT_PID=$!
 for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
-  if (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
+  if _check_port "$STT_PORT"; then
     break
   fi
   if ! kill -0 "$STT_PID" 2>/dev/null; then
@@ -126,7 +128,7 @@ for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
   fi
   sleep 1
 done
-if ! (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
+if ! _check_port "$STT_PORT"; then
   if kill -0 "$STT_PID" 2>/dev/null; then
     echo "❌ STT Server failed to become ready (timeout)!"
   else
@@ -141,7 +143,7 @@ LOG_PATH="$PROJECT_ROOT/.logs/localbrain-tts.log"
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > "$LOG_PATH" 2>&1 &
 TTS_PID=$!
 for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
-  if (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
+  if _check_port "$TTS_PORT"; then
     break
   fi
   if ! kill -0 "$TTS_PID" 2>/dev/null; then
@@ -149,7 +151,7 @@ for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
   fi
   sleep 1
 done
-if ! (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
+if ! _check_port "$TTS_PORT"; then
   if kill -0 "$TTS_PID" 2>/dev/null; then
     echo "❌ TTS Server failed to become ready (timeout)!"
   else
