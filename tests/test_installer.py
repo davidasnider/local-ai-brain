@@ -1,4 +1,5 @@
 import os
+import pytest
 import subprocess
 import sys
 from unittest.mock import mock_open, patch
@@ -6,7 +7,7 @@ from unittest.mock import mock_open, patch
 # Add scripts directory to path so we can import install_helpers
 SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
 sys.path.insert(0, SCRIPTS_DIR)
-from install_helpers import read_env_key, update_env_key  # noqa: E402
+from install_helpers import read_env_key, update_env_key, _cli_dispatch  # noqa: E402
 
 # Locate the installation script relative to this test file
 SCRIPT_PATH = os.path.abspath(
@@ -91,10 +92,7 @@ def test_read_env_key_comment_stripping():
             )
 
 
-def test_write_env_key_escaping(tmp_path):
-    import warnings
-
-    warnings.filterwarnings("ignore", category=SyntaxWarning)
+def test_write_env_key_escaping():
     """Verify that _write_env_key correctly escapes backslashes and double quotes
     by sourcing the install_prod.sh script (execution guard prevents main body
     from running when sourced."""
@@ -108,9 +106,9 @@ def test_write_env_key_escaping(tmp_path):
 
     test_keys = [
         "simplekey",
-        "key\with\backslashes",
+        r"key\with\backslashes",
         'key"with"quotes',
-        'key\with"both',
+        r'key\with"both',
         "key\\double\\backslashes",
     ]
 
@@ -137,3 +135,89 @@ def test_no_redundant_chmod():
     # Find all occurrences of chmod 600 targeting the .env file
     chmod_calls = __import__("re").findall(r"chmod\s+600\s+.*\.env", content)
     assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"
+
+
+def test_cli_dispatch(capsys):
+    # 1. Valid update_env_key
+    m_open = mock_open(read_data="LOCAL_API_KEY=old")
+    with (
+        patch("sys.argv", ["prog", "update_env_key", "dummy.env"]),
+        patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": "new_val"}),
+        patch("builtins.open", m_open),
+        patch("install_helpers.update_env_key") as mock_update,
+    ):
+        _cli_dispatch()
+        mock_update.assert_called_once_with("dummy.env", "new_val")
+
+    # 2. Valid read_env_key
+    m_open = mock_open(read_data="LOCAL_API_KEY=test_val\n")
+    with (
+        patch("sys.argv", ["prog", "read_env_key", "dummy.env"]),
+        patch("builtins.open", m_open),
+    ):
+        _cli_dispatch()
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "test_val"
+
+    # 3. Unknown command
+    with (
+        patch("sys.argv", ["prog", "unknown_cmd"]),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_dispatch()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Unknown command: unknown_cmd" in captured.err
+
+    # 4. Too few arguments
+    with (
+        patch("sys.argv", ["prog"]),
+        pytest.raises(SystemExit) as excinfo,
+    ):
+        _cli_dispatch()
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Usage" in captured.err
+
+
+def test_shell_upsert_api_key(tmp_path):
+    """Verify that _upsert_api_key correctly updates or appends the key in all scenarios."""
+    env_file = tmp_path / "test.env"
+
+    def run_upsert(key_val):
+        result = subprocess.run(
+            ["bash", "-c", f'source "{SCRIPT_PATH}"; _upsert_api_key "{env_file}"'],
+            env={**os.environ, "LOCAL_API_KEY": key_val, "LOCALBRAIN_PYTHON": sys.executable},
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"bash _upsert_api_key failed: {result.stderr}"
+
+    # a) File without LOCAL_API_KEY gets the key appended.
+    env_file.write_text("OTHER_VAR=value\n")
+    run_upsert("key_a")
+    content = env_file.read_text()
+    assert "OTHER_VAR=value\n" in content
+    assert 'LOCAL_API_KEY="key_a"\n' in content
+
+    # b) File with LOCAL_API_KEY gets the key updated with a new value.
+    env_file.write_text('OTHER_VAR=val\nLOCAL_API_KEY="old_key"\n')
+    run_upsert("new_key")
+    content = env_file.read_text()
+    assert "OTHER_VAR=val\n" in content
+    assert 'LOCAL_API_KEY="new_key"\n' in content
+    assert "old_key" not in content
+
+    # c) Empty file gets the key appended correctly.
+    env_file.write_text("")
+    run_upsert("key_c")
+    content = env_file.read_text()
+    assert content == 'LOCAL_API_KEY="key_c"\n'
+
+    # d) Missing file: the function should create the file with the key.
+    if env_file.exists():
+        env_file.unlink()
+    run_upsert("key_d")
+    content = env_file.read_text()
+    assert content == 'LOCAL_API_KEY="key_d"\n'
+

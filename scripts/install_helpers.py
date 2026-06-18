@@ -60,6 +60,9 @@ def read_env_key(env_file: str) -> str | None:
 
 def _cli_dispatch() -> None:
     """CLI entry point called from ``install_prod.sh``."""
+    if len(sys.argv) < 2:
+        print("Usage: install_helpers.py <command> [args]", file=sys.stderr)
+        sys.exit(1)
     command = sys.argv[1]
 
     commands: dict[str, Callable[[], None]] = {
@@ -77,12 +80,18 @@ def _cli_dispatch() -> None:
 def _cli_update_env_key() -> None:
     import os
 
+    if len(sys.argv) < 3:
+        print("Usage: install_helpers.py update_env_key <env_file>", file=sys.stderr)
+        sys.exit(1)
     env_file = sys.argv[2]
     key = os.environ["LOCAL_API_KEY_VALUE"]
     update_env_key(env_file, key)
 
 
 def _cli_read_env_key() -> None:
+    if len(sys.argv) < 3:
+        print("Usage: install_helpers.py read_env_key <env_file>", file=sys.stderr)
+        sys.exit(1)
     env_file = sys.argv[2]
     val = read_env_key(env_file)
     if val is not None:

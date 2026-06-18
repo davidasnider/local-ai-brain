@@ -12,19 +12,22 @@ case "$ENV_FILE" in
     *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
 esac
 
+# Determine which python to use (configurable via LOCALBRAIN_PYTHON env var)
+PYTHON="${LOCALBRAIN_PYTHON:-python3}"
+
 # Verify python3 is installed before any python3 calls
-command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
+command -v "$PYTHON" &>/dev/null || { echo "Error: $PYTHON not found" >&2; exit 1; }
 
 # Copy install_helpers.py to a temp path so it survives git checkout (which may
 # delete or overwrite the file when switching between tag versions in $PROD_DIR)
-INSTALL_HELPERS=$(python3 -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
+INSTALL_HELPERS=$($PYTHON -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
 cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 trap 'rm -f "$INSTALL_HELPERS"' EXIT
 
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 "$INSTALL_HELPERS" update_env_key "$env_file"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" $PYTHON "$INSTALL_HELPERS" update_env_key "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -56,7 +59,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
-        LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
+        LOCAL_API_KEY="$($PYTHON "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
     fi
 fi
 
