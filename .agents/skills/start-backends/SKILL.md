@@ -83,17 +83,17 @@ trap cleanup EXIT
 
 # Pre-check port occupancy before starting services (finding #5)
 for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
-  if PORT="$_port" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  if (echo >/dev/tcp/127.0.0.1/$_port) &>/dev/null; then
     echo "❌ Port $_port is already in use. Conflicting service detected." >&2
     exit 1
   fi
 done
 
 # LLM Server
-uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > /tmp/localbrain-llm.log 2>&1 &
+uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > /tmp/localbrain-llm-$UID.log 2>&1 &
 LLM_PID=$!
 for _i in $(seq 30); do
-  if PORT="$LLM_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  if (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
     break
   fi
   if ! kill -0 "$LLM_PID" 2>/dev/null; then
@@ -101,17 +101,17 @@ for _i in $(seq 30); do
   fi
   sleep 1
 done
-if ! PORT="$LLM_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+if ! (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
   echo "❌ LLM Server failed to become ready (timeout)!"
   cleanup 1
 fi
 
 
 # STT Server
-uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > /tmp/localbrain-stt.log 2>&1 &
+uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > /tmp/localbrain-stt-$UID.log 2>&1 &
 STT_PID=$!
 for _i in $(seq 30); do
-  if PORT="$STT_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  if (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
     break
   fi
   if ! kill -0 "$STT_PID" 2>/dev/null; then
@@ -119,17 +119,17 @@ for _i in $(seq 30); do
   fi
   sleep 1
 done
-if ! PORT="$STT_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+if ! (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
   echo "❌ STT Server failed to become ready (timeout)!"
   cleanup 1
 fi
 
 
 # TTS Server
-uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > /tmp/localbrain-tts.log 2>&1 &
+uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > /tmp/localbrain-tts-$UID.log 2>&1 &
 TTS_PID=$!
 for _i in $(seq 30); do
-  if PORT="$TTS_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  if (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
     break
   fi
   if ! kill -0 "$TTS_PID" 2>/dev/null; then
@@ -137,7 +137,7 @@ for _i in $(seq 30); do
   fi
   sleep 1
 done
-if ! PORT="$TTS_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+if ! (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
   echo "❌ TTS Server failed to become ready (timeout)!"
   cleanup 1
 fi
