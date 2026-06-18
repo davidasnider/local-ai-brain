@@ -29,9 +29,11 @@ cd "$PROJECT_ROOT"
 if [ -f .env ]; then
   eval "$(uv run python << 'PYEOF'
 import shlex
+import re
 from dotenv import dotenv_values
 for k, v in dotenv_values(".env").items():
-    print(f"export {k}={shlex.quote(v)}")
+    if re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
+        print(f"export {k}={shlex.quote(v)}")
 PYEOF
 )"
 fi
@@ -111,7 +113,7 @@ check_model() {
   if COMMIT=$(git ls-remote -- "$url" HEAD 2>/dev/null | cut -f1); then
     echo "Latest remote commit: $COMMIT"
   else
-    echo "WARNING: Could not reach $url (network issue or rate limit)"
+    echo "WARNING: Could not check $url for remote updates — network issue, rate limit, or invalid repository"
   fi
 }
 

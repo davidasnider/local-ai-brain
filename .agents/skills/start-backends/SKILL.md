@@ -35,9 +35,11 @@ echo ""
 if [ -f .env ]; then
   eval "$(uv run python << 'PYEOF'
 import shlex
+import re
 from dotenv import dotenv_values
 for k, v in dotenv_values(".env").items():
-    print(f"export {k}={shlex.quote(v)}")
+    if re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k):
+        print(f"export {k}={shlex.quote(v)}")
 PYEOF
 )"
 fi
