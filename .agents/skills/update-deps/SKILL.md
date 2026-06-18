@@ -88,7 +88,7 @@ if cfg_path.exists():
         try:
             cfg = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
-            print(f"WARNING: Could not parse llm_config.yaml: {e}", file=sys.stderr)
+            print(f'WARNING: Could not parse llm_config.yaml: {e}', file=sys.stderr)
             cfg = {}
 else:
     print(f'WARNING: llm_config.yaml not found, skipping model checks', file=sys.stderr)
