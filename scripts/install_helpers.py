@@ -71,9 +71,11 @@ def read_env_key(env_file: str) -> str | None:
                     # Mismatched/unclosed quote — strip leading quote, keep rest
                     _r = _r.lstrip('"')
             elif _r.startswith("'"):
-                q = re.match(r"^'((?:[^'\\]|\\.)*)'(.*)", _r)
-                if q:
-                    _r = q.group(1).replace("\\'", "'").replace("\\\\", "\\")
+                # Shell does not support backslash-escaping inside single quotes.
+                # Find the first closing quote.
+                m = re.match(r"^'([^']*)'(.*)", _r)
+                if m:
+                    _r = m.group(1)
                 else:
                     _r = _r.lstrip("'")
             else:

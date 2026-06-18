@@ -8,9 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
 
-# Expand ~ to $HOME in ENV_FILE paths since bash does not expand tilde
-# inside variable assignments when quoted
-if [[ "$ENV_FILE" == ~* ]]; then
+# Expand ~ to $HOME in ENV_FILE paths
+# For named user paths (e.g. ~john), let the shell handle it by not quoting
+# the expanded string if possible, or eval, but simple $HOME is safer.
+if [[ "$ENV_FILE" == ~/* ]]; then
     ENV_FILE="${ENV_FILE/#\~/$HOME}"
 fi
 
@@ -51,21 +52,24 @@ _upsert_api_key() {
 # This allows tests to source the script and access helper functions directly.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
-# Copy install_helpers.py to a temp path so it survives git checkout (which may
-# delete or overwrite the file when switching between tag versions in $PROD_DIR)
-# Uses mktemp -d to avoid the macOS mktemp template-suffix issue:
-# BSD mktemp only randomizes XXXXXX when it appears at the very end of the template,
-# so appending .py after the subshell would leak the original file created by mktemp.
-# The temp dir and helpers are only needed during direct execution, not when sourced.
-INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
-INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
-cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+    if [ "$EUID" -eq 0 ]; then
+        echo "Error: This installer should not be run as root." >&2
+        exit 1
+    fi
+    # Copy install_helpers.py to a temp path so it survives git checkout (which may
+    # delete or overwrite the file when switching between tag versions in $PROD_DIR)
+    # Uses mktemp -d to avoid the macOS mktemp template-suffix issue:
+    # BSD mktemp only randomizes XXXXXX when it appears at the very end of the template,
+    # so appending .py after the subshell would leak the original file created by mktemp.
+    # The temp dir and helpers are only needed during direct execution, not when sourced.
+    INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
+    # Register cleanup to prevent temp file leaks
+    trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
+    INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
+    cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 
-# Register cleanup to prevent temp file leaks
-trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
-
-# Verify python3 is installed before any python3 calls
-command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
+    # Verify python3 is installed before any python3 calls
+    command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
