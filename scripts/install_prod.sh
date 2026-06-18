@@ -63,6 +63,8 @@ if [ -n "$LATEST_TAG" ]; then
     echo "Checking out latest tag: $LATEST_TAG"
     git checkout "$LATEST_TAG"
 else
+    # Ensure we are on the main branch before pulling, to avoid detached HEAD issues
+    git checkout main
     git pull
 fi
 
@@ -104,7 +106,8 @@ fi
 chmod 600 "$PROD_DIR/.env"
 
 # Write the LaunchAgent plist without the LOCAL_API_KEY entry
-perl -0pe 's/<key>LOCAL_API_KEY<\/key>\s*<string>__REPLACE_WITH_LOCAL_API_KEY__<\/string>\s*//gs' com.localbrain.api.plist > "$PLIST_PATH"
+cp com.localbrain.api.plist "$PLIST_PATH"
+plutil -remove EnvironmentVariables.LOCAL_API_KEY "$PLIST_PATH" 2>/dev/null || true
 
 # Unload existing instance if present
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
