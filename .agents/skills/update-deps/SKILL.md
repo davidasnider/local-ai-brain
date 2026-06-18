@@ -110,7 +110,7 @@ check_model() {
     fi
   fi
   local COMMIT
-  if COMMIT=$(git ls-remote -- "$url" HEAD 2>/dev/null | cut -f1); then
+  if COMMIT=$(GIT_TERMINAL_PROMPT=0 git ls-remote -- "$url" HEAD 2>/dev/null | cut -f1); then
     echo "Latest remote commit: $COMMIT"
   else
     echo "WARNING: Could not check $url for remote updates — network issue, rate limit, or invalid repository"
@@ -133,6 +133,7 @@ if cfg_path.exists():
     with open(cfg_path) as f:
         try:
             cfg = yaml.safe_load(f) or {}
+            if not isinstance(cfg, dict): cfg = {}
         except yaml.YAMLError as e:
             print(f'WARNING: Could not parse llm_config.yaml: {e}', file=sys.stderr)
             cfg = {}

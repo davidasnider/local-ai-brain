@@ -124,7 +124,7 @@ done
 LOG_PATH="$PROJECT_ROOT/.logs/localbrain-llm.log"
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > "$LOG_PATH" 2>&1 &
 LLM_PID=$!
-for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
+for ((_i=0; _i<${BACKEND_STARTUP_TIMEOUT:-30}; _i++)); do
   if _check_port "$LLM_PORT"; then
     break
   fi
@@ -147,7 +147,7 @@ fi
 LOG_PATH="$PROJECT_ROOT/.logs/localbrain-stt.log"
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > "$LOG_PATH" 2>&1 &
 STT_PID=$!
-for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
+for ((_i=0; _i<${BACKEND_STARTUP_TIMEOUT:-30}; _i++)); do
   if _check_port "$STT_PORT"; then
     break
   fi
@@ -170,7 +170,7 @@ fi
 LOG_PATH="$PROJECT_ROOT/.logs/localbrain-tts.log"
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > "$LOG_PATH" 2>&1 &
 TTS_PID=$!
-for _i in $(seq ${BACKEND_STARTUP_TIMEOUT:-30}); do
+for ((_i=0; _i<${BACKEND_STARTUP_TIMEOUT:-30}; _i++)); do
   if _check_port "$TTS_PORT"; then
     break
   fi
