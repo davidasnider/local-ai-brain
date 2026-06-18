@@ -36,6 +36,7 @@ with open('.env') as f:
             continue
         k, _, v = line.partition('=')
         k = k.strip()
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k): continue
         v = v.strip()
         if v.startswith('"') and v.endswith('"'):
             v = v[1:-1]
@@ -101,7 +102,9 @@ check_model() {
     # first component could match a local directory name by coincidence.
     if [[ "$url" == /* ]] || [[ "$url" == ./* ]] || [[ "$url" == ../* ]]; then
       if [[ "$url" == */* ]]; then
-        local first_component="${url%%/*}"
+        # Strip leading / to handle absolute paths (e.g., /foo/bar -> foo/bar -> foo)
+        local trimmed="${url#/}"
+        local first_component="${trimmed%%/*}"
         if [ -n "$first_component" ] && [ -d "$first_component" ]; then
           echo "Local path ($name) does not exist yet (but parent directory $first_component exists) -- skipping remote check"
           return

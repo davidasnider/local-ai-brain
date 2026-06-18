@@ -42,6 +42,7 @@ with open('.env') as f:
             continue
         k, _, v = line.partition('=')
         k = k.strip()
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", k): continue
         v = v.strip()
         if v.startswith('"') and v.endswith('"'):
             v = v[1:-1]
@@ -52,7 +53,11 @@ PYEOF
 )"
 fi
 
-_check_port() { python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((\"127.0.0.1\", $1)); s.close()" 2>/dev/null; }
+_check_port() {
+  local _port="$1"
+  [[ "$_port" =~ ^[0-9]+$ ]] || return 1
+  python3 -c "import socket,sys; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect((\"127.0.0.1\", int(sys.argv[1]))); s.close()" "$_port" 2>/dev/null
+}
 
 # Fail fast if LOCAL_API_KEY is not set (required for config module)
 if [ -z "${LOCAL_API_KEY:-}" ]; then
@@ -84,23 +89,26 @@ TTS_PID=""
 cleanup() {
   local exit_code="${1:-$?}"
   trap - EXIT INT TERM
-  echo ""
-  echo "🛑 Shutting down backend services..."
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-  done
-  for _i in $(seq 10); do
-    if { [ -z "$LLM_PID" ] || ! kill -0 "$LLM_PID" 2>/dev/null; } && \
-       { [ -z "$STT_PID" ] || ! kill -0 "$STT_PID" 2>/dev/null; } && \
-       { [ -z "$TTS_PID" ] || ! kill -0 "$TTS_PID" 2>/dev/null; }; then
-      break
-    fi
-    sleep 1
-  done
-  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
-    [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
-  done
-  echo "✅ All backend services stopped."
+  # Check if any services were started at all
+  if [ -n "$LLM_PID" ] || [ -n "$STT_PID" ] || [ -n "$TTS_PID" ]; then
+    echo ""
+    echo "🛑 Shutting down backend services..."
+    for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+      [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+    done
+    for _i in $(seq 10); do
+      if { [ -z "$LLM_PID" ] || ! kill -0 "$LLM_PID" 2>/dev/null; } && \
+         { [ -z "$STT_PID" ] || ! kill -0 "$STT_PID" 2>/dev/null; } && \
+         { [ -z "$TTS_PID" ] || ! kill -0 "$TTS_PID" 2>/dev/null; }; then
+        break
+      fi
+      sleep 1
+    done
+    for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+      [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
+    done
+    echo "✅ All backend services stopped."
+  fi
   exit "$exit_code"
 }
 trap "cleanup 130" INT
