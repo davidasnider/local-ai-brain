@@ -11,6 +11,14 @@ Press `Ctrl+C` to gracefully shut down all backend services.
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Early check for python3 — _check_port uses it directly (not via uv) for
+# performance in tight startup loops.  Fail fast with a clear message rather
+# than silently timing out every cycle.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 is required but not found in PATH. Install Python 3 or check your PATH." >&2
+  exit 1
+fi
+
 PROJECT_ROOT=""
 _dir="$(pwd)"
 while [ "$_dir" != "/" ]; do

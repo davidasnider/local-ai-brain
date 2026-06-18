@@ -73,6 +73,8 @@ check_model() {
         local _slash_count="${url//[^\/]/}"
         if [ ${#_slash_count} -eq 1 ]; then
             echo "Warning: \"$url\" looks like a local path with one slash but lacks ./ or ../ prefix. HF repo IDs use org/repo format — ambiguous." >&2
+            echo "Skipping remote check — prefix with ./ or ../ for local paths, or use org/repo for HF repos." >&2
+            return
         fi
     fi
 
