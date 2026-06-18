@@ -19,7 +19,7 @@ if [ -z "$LOCAL_API_KEY" ]; then
                 /^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=/ {
                     value = $0
                     sub(/^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=[[:space:]]*/, "", value)
-                    sub(/[[:space:]]*#.*/, "", value)
+                    sub(/[[:space:]]+#.*/, "", value)
                     sub(/[[:space:]]+$/, "", value)
                     print value
                     exit
@@ -105,15 +105,27 @@ else
     chmod 600 "$PROD_DIR/.env"
 
     if [ -f "$ENV_FILE" ]; then
-        if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-            echo ".env already exists at destination; skipping copy."
+        cp "$ENV_FILE" "$PROD_DIR/.env"
+        chmod 600 "$PROD_DIR/.env"
+        if grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
+            python3 -c '
+import sys, re
+env_file = sys.argv[1]
+key = sys.argv[2]
+with open(env_file, "r") as f:
+    content = f.read()
+new_content = re.sub(
+    r"^[ \t]*(export[ \t]+)?LOCAL_API_KEY[ \t]*=.*",
+    lambda m: f"LOCAL_API_KEY=\"{key}\"",
+    content,
+    flags=re.MULTILINE
+)
+with open(env_file, "w") as f:
+    f.write(new_content)
+' "$PROD_DIR/.env" "$LOCAL_API_KEY"
         else
-            cp "$ENV_FILE" "$PROD_DIR/.env"
-            if grep -q "^[[:space:]]*LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-                sed -i '' -E "s|^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=.*|LOCAL_API_KEY=\"$LOCAL_API_KEY\"|" "$PROD_DIR/.env"
-            else
-                echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
-            fi
+            echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" >> "$PROD_DIR/.env"
+            chmod 600 "$PROD_DIR/.env"
         fi
     else
         echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
@@ -129,7 +141,7 @@ plutil -remove EnvironmentVariables.LOCAL_API_KEY "$PLIST_PATH" 2>/dev/null || t
 # Unload existing instance if present
 launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
 # Load the fresh agent
-launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH" || true
 
 
 echo "Installation and persistent background registration complete."
