@@ -22,6 +22,7 @@ while [ "$_dir" != "/" ]; do
 done
 if [ -z "$PROJECT_ROOT" ]; then echo "ERROR: Could not find project root" >&2; exit 1; fi
 cd "$PROJECT_ROOT"
+mkdir -p "$PROJECT_ROOT/.logs"
 
 echo "🔄 Starting backend microservices (LLM, STT, TTS)..."
 echo "These will run alongside the dev gateway on port 8888."
@@ -90,7 +91,8 @@ for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
 done
 
 # LLM Server
-uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > /tmp/localbrain-llm-$UID.log 2>&1 &
+LOG_PATH="$PROJECT_ROOT/.logs/localbrain-llm.log"
+uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" > "$LOG_PATH" 2>&1 &
 LLM_PID=$!
 for _i in $(seq 30); do
   if (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
@@ -102,13 +104,18 @@ for _i in $(seq 30); do
   sleep 1
 done
 if ! (echo >/dev/tcp/127.0.0.1/$LLM_PORT) &>/dev/null; then
-  echo "❌ LLM Server failed to become ready (timeout)!"
+  if kill -0 "$LLM_PID" 2>/dev/null; then
+    echo "❌ LLM Server failed to become ready (timeout)!"
+  else
+    echo "❌ LLM Server crashed (log: $LOG_PATH)"
+  fi
   cleanup 1
 fi
 
 
 # STT Server
-uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > /tmp/localbrain-stt-$UID.log 2>&1 &
+LOG_PATH="$PROJECT_ROOT/.logs/localbrain-stt.log"
+uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" > "$LOG_PATH" 2>&1 &
 STT_PID=$!
 for _i in $(seq 30); do
   if (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
@@ -120,13 +127,18 @@ for _i in $(seq 30); do
   sleep 1
 done
 if ! (echo >/dev/tcp/127.0.0.1/$STT_PORT) &>/dev/null; then
-  echo "❌ STT Server failed to become ready (timeout)!"
+  if kill -0 "$STT_PID" 2>/dev/null; then
+    echo "❌ STT Server failed to become ready (timeout)!"
+  else
+    echo "❌ STT Server crashed (log: $LOG_PATH)"
+  fi
   cleanup 1
 fi
 
 
 # TTS Server
-uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > /tmp/localbrain-tts-$UID.log 2>&1 &
+LOG_PATH="$PROJECT_ROOT/.logs/localbrain-tts.log"
+uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" > "$LOG_PATH" 2>&1 &
 TTS_PID=$!
 for _i in $(seq 30); do
   if (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
@@ -138,7 +150,11 @@ for _i in $(seq 30); do
   sleep 1
 done
 if ! (echo >/dev/tcp/127.0.0.1/$TTS_PORT) &>/dev/null; then
-  echo "❌ TTS Server failed to become ready (timeout)!"
+  if kill -0 "$TTS_PID" 2>/dev/null; then
+    echo "❌ TTS Server failed to become ready (timeout)!"
+  else
+    echo "❌ TTS Server crashed (log: $LOG_PATH)"
+  fi
   cleanup 1
 fi
 
