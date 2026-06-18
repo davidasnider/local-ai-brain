@@ -11,6 +11,18 @@ description: Updates development dependencies (llama-cpp-python) and checks for 
 #!/usr/bin/env bash
 set -euo pipefail
 
+PROJECT_ROOT=""
+_dir="$(pwd)"
+while [ "$_dir" != "/" ]; do
+  if [ -f "$_dir/pyproject.toml" ]; then
+    PROJECT_ROOT="$_dir"
+    break
+  fi
+  _dir="$(dirname "$_dir")"
+done
+if [ -z "$PROJECT_ROOT" ]; then echo "ERROR: Could not find project root" >&2; exit 1; fi
+cd "$PROJECT_ROOT"
+
 # Source environment variables from .env (if present)
 if [ -f .env ]; then
   set -a && source .env && set +a
@@ -50,7 +62,8 @@ check_model() {
 echo "Checking models from llm_config.yaml..."
 uv run python -c "
 import yaml, sys, subprocess
-with open('llm_config.yaml') as f:
+from local_ai_brain.config import get_config_path
+with open(get_config_path()) as f:
     cfg = yaml.safe_load(f) or {}
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []

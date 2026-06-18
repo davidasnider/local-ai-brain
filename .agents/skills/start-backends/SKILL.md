@@ -11,6 +11,18 @@ Press `Ctrl+C` to gracefully shut down all backend services.
 #!/usr/bin/env bash
 set -euo pipefail
 
+PROJECT_ROOT=""
+_dir="$(pwd)"
+while [ "$_dir" != "/" ]; do
+  if [ -f "$_dir/pyproject.toml" ]; then
+    PROJECT_ROOT="$_dir"
+    break
+  fi
+  _dir="$(dirname "$_dir")"
+done
+if [ -z "$PROJECT_ROOT" ]; then echo "ERROR: Could not find project root" >&2; exit 1; fi
+cd "$PROJECT_ROOT"
+
 echo "🔄 Starting backend microservices (LLM, STT, TTS)..."
 echo "These will run alongside the dev gateway on port 8888."
 echo "Press Ctrl+C to stop all services."
@@ -39,16 +51,33 @@ cleanup() {
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
     [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
   done
-  wait || true
+  for _i in $(seq 10); do
+    if ! kill -0 "$LLM_PID" 2>/dev/null && ! kill -0 "$STT_PID" 2>/dev/null && ! kill -0 "$TTS_PID" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
+  done
   echo "✅ All backend services stopped."
   exit "$exit_code"
 }
-trap cleanup INT TERM
+trap "cleanup 130" INT
+trap "cleanup 143" TERM
 
 # LLM Server
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port "$LLM_PORT" &
 LLM_PID=$!
-sleep 1
+for _i in $(seq 5); do
+  if timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$LLM_PORT" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$LLM_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
 if ! kill -0 "$LLM_PID" 2>/dev/null; then
   echo "❌ LLM Server failed to start!"
   cleanup 1
@@ -57,7 +86,15 @@ fi
 # STT Server
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port "$STT_PORT" &
 STT_PID=$!
-sleep 1
+for _i in $(seq 5); do
+  if timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$STT_PORT" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$STT_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
 if ! kill -0 "$STT_PID" 2>/dev/null; then
   echo "❌ STT Server failed to start!"
   cleanup 1
@@ -66,7 +103,15 @@ fi
 # TTS Server
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port "$TTS_PORT" &
 TTS_PID=$!
-sleep 1
+for _i in $(seq 5); do
+  if timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$TTS_PORT" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$TTS_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
 if ! kill -0 "$TTS_PID" 2>/dev/null; then
   echo "❌ TTS Server failed to start!"
   cleanup 1
