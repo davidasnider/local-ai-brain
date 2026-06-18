@@ -12,17 +12,19 @@ case "$ENV_FILE" in
     *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
 esac
 
-# Determine which python to use (configurable via LOCALBRAIN_PYTHON env var)
-PYTHON="${LOCALBRAIN_PYTHON:-python3}"
+# Verify python3 is installed before any python3 calls
+command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
 
-# Verify the configured Python interpreter is available before making any calls
-command -v "$PYTHON" &>/dev/null || { echo "Error: $PYTHON not found" >&2; exit 1; }
+# Copy install_helpers.py to a temp path so it survives git checkout (which may
+# delete or overwrite the file when switching between tag versions in $PROD_DIR)
+INSTALL_HELPERS=$(mktemp /tmp/install_helpers.XXXXXX.py)
+cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+trap 'rm -f "$INSTALL_HELPERS"' EXIT
 
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    local helpers="${INSTALL_HELPERS:-$SCRIPT_DIR/install_helpers.py}"
-    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" $PYTHON "$helpers" update_env_key "$env_file"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 "$INSTALL_HELPERS" update_env_key "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -35,7 +37,7 @@ _write_env_key() {
 # Upsert LOCAL_API_KEY in a .env file: update if present, append if missing
 _upsert_api_key() {
     local env_file="$1"
-    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=" "$env_file"; then
+    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$env_file"; then
         update_env_key "$env_file"
     else
         # Ensure trailing newline before appending
@@ -51,16 +53,10 @@ _upsert_api_key() {
 # This allows tests to source the script and access helper functions directly.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
-# Copy install_helpers.py to a temp path so it survives git checkout (which may
-# delete or overwrite the file when switching between tag versions in $PROD_DIR)
-INSTALL_HELPERS=$($PYTHON -c "import tempfile; print(tempfile.NamedTemporaryFile(suffix='.py', delete=False).name)")
-trap 'rm -f "$INSTALL_HELPERS"' EXIT
-cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
-
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
-        LOCAL_API_KEY="$($PYTHON "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
+        LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
     fi
 fi
 
@@ -117,7 +113,7 @@ echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
 # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
 if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
-    LOCAL_API_KEY="$($PYTHON "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
+    LOCAL_API_KEY="$(python3 "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
 fi
 
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -147,9 +143,9 @@ else
 fi
 chmod 600 "$PROD_DIR/.env"
 
-# Copy the LaunchAgent plist to the LaunchAgents directory, resolving tildes to absolute paths
+# Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
-$PYTHON "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME" "$LOCAL_API_KEY"
+cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
