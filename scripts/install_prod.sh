@@ -22,17 +22,24 @@ update_env_key() {
 import sys, re, os
 env_file = sys.argv[1]
 key = os.environ["LOCAL_API_KEY_VALUE"].replace("\\", "\\\\").replace("\"", "\\\"")
-with open(env_file, "r") as f:
+with open(env_file, "r", encoding="utf-8") as f:
     content = f.read()
 new_content = re.sub(
     r"^([ \t]*(?:export[ \t]+)?)LOCAL_API_KEY[ \t]*=.*",
-    "\\1LOCAL_API_KEY=\"" + key + "\"",
+    lambda m: m.group(1) + "LOCAL_API_KEY=\"" + key + "\"",
     content,
     flags=re.MULTILINE
 )
-with open(env_file, "w") as f:
+with open(env_file, "w", encoding="utf-8") as f:
     f.write(new_content)
 ' "$env_file"
+}
+
+# Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
+_write_env_key() {
+    local _ekey="${LOCAL_API_KEY//\\/\\\\}"
+    _ekey="${_ekey//\"/\\\"}"
+    printf 'LOCAL_API_KEY="%s"\n' "$_ekey"
 }
 
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
@@ -40,7 +47,7 @@ if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
         LOCAL_API_KEY="$(python3 -c '
 import sys, re
-with open(sys.argv[1]) as f:
+with open(sys.argv[1], encoding="utf-8") as f:
     for line in f:
         m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
         if m:
@@ -114,7 +121,7 @@ if [ -f "$PROD_DIR/.env" ]; then
         if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
             echo >> "$PROD_DIR/.env"
         fi
-        printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" >> "$PROD_DIR/.env"
+        _write_env_key >> "$PROD_DIR/.env"
         echo "Appended LOCAL_API_KEY to existing .env."
     fi
 else
@@ -124,7 +131,7 @@ else
 
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-            printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" > "$PROD_DIR/.env"
+            _write_env_key > "$PROD_DIR/.env"
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
             chmod 600 "$PROD_DIR/.env"
@@ -135,12 +142,12 @@ else
                 if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
                     echo >> "$PROD_DIR/.env"
                 fi
-                printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" >> "$PROD_DIR/.env"
+                _write_env_key >> "$PROD_DIR/.env"
                 chmod 600 "$PROD_DIR/.env"
             fi
         fi
     else
-        printf 'LOCAL_API_KEY="%s"\n' "$LOCAL_API_KEY" > "$PROD_DIR/.env"
+        _write_env_key > "$PROD_DIR/.env"
     fi
 fi
 chmod 600 "$PROD_DIR/.env"
@@ -148,7 +155,7 @@ chmod 600 "$PROD_DIR/.env"
 # Copy the LaunchAgent plist to the LaunchAgents directory
 mkdir -p "$HOME/Library/LaunchAgents"
 cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
-python3 -c "import sys; p = sys.argv[1]; c = open(p).read().replace('__HOME__', sys.argv[2]); open(p, 'w').write(c)" "$PLIST_PATH" "$HOME"
+python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding='utf-8').read().replace('__HOME__', sys.argv[2]); open(p, 'w', encoding='utf-8').write(c)" "$PLIST_PATH" "$HOME"
 
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
