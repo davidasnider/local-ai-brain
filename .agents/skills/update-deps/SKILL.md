@@ -54,6 +54,19 @@ check_model() {
     echo "Local path does not exist yet -- skipping remote check"
     return
   fi
+  # Check for relative local paths that arent caught by the / or . prefix checks
+  if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" == */* ]]; then
+    local _parent="${url%/*}"
+    local _base="${url##*/}"
+    if [ -d "$PROJECT_ROOT/$_parent" ] 2>/dev/null; then
+      echo "Relative local path does not exist yet -- skipping remote check"
+      return
+    fi
+    if [[ "$_base" == *.* ]]; then
+      echo "Local file pattern detected -- skipping remote check"
+      return
+    fi
+  fi
   # Prepend https://huggingface.co/ if it's a simple repo identifier
   if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
     url="https://huggingface.co/$url"
@@ -67,6 +80,7 @@ check_model() {
 
 echo "Checking models from llm_config.yaml..."
 uv run python -c "
+import sys
 import yaml
 from pathlib import Path
 cfg_path = Path.cwd()
@@ -80,7 +94,7 @@ if cfg_path.exists():
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f) or {}
 else:
-    print(f'WARNING: llm_config.yaml not found, skipping model checks')
+    print(f'WARNING: llm_config.yaml not found, skipping model checks', file=sys.stderr)
     cfg = {}
 active = cfg.get('active_model', '')
 models = cfg.get('models') or []

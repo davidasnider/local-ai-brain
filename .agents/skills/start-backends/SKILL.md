@@ -84,7 +84,8 @@ trap cleanup EXIT
 # Pre-check port occupancy before starting services (finding #5)
 for _port in "$LLM_PORT" "$STT_PORT" "$TTS_PORT"; do
   if PORT="$_port" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
-    echo "⚠ Port $_port is already in use. Check for conflicting services."
+    echo "❌ Port $_port is already in use. Conflicting service detected." >&2
+    exit 1
   fi
 done
 
