@@ -1,6 +1,12 @@
 import os
-import re
 import subprocess
+import sys
+
+# Add scripts directory to path so we can import install_helpers
+SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
+sys.path.insert(0, SCRIPTS_DIR)
+
+from install_helpers import update_env_key, read_env_key
 from unittest.mock import mock_open, patch
 
 # Locate the installation script relative to this test file
@@ -11,22 +17,6 @@ SCRIPT_PATH = os.path.abspath(
 
 def test_update_env_key():
     """Verify that update_env_key correctly replaces LOCAL_API_KEY in a .env file."""
-    with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    # Extract the inline python code for update_env_key
-    # Starts with: LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c '
-    # Ends with: ' "$env_file"
-    start_marker = 'LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c \''
-    start_idx = content.find(start_marker)
-    assert start_idx != -1, "Could not find start of update_env_key Python inline script"
-    code_start = start_idx + len(start_marker)
-
-    end_marker = '\' "$env_file"'
-    end_idx = content.find(end_marker, code_start)
-    assert end_idx != -1, "Could not find end of update_env_key Python inline script"
-    inline_code = content[code_start:end_idx]
-
     # Test cases: (original_content, api_key_value, expected_new_content)
     test_cases = [
         (
@@ -54,41 +44,23 @@ def test_update_env_key():
     for original, key_val, expected in test_cases:
         m_open = mock_open(read_data=original)
 
-        # Patch sys.argv, os.environ, and builtins.open to run the script in isolation
         with (
+            patch("builtins.open", m_open),
             patch("sys.argv", ["python3", "dummy_env_file"]),
             patch.dict(os.environ, {"LOCAL_API_KEY_VALUE": key_val}),
-            patch("builtins.open", m_open),
         ):
-            local_vars = {}
-            exec(inline_code, local_vars)
+            import builtins
+            update_env_key("dummy_env_file", key_val)
 
             # Reconstruct the written data from all calls to write()
             written_data = "".join(call.args[0] for call in m_open().write.call_args_list)
-            assert written_data == expected
+            assert written_data == expected, (
+                f"for key={key_val!r}:\n  expected: {expected!r}\n  got:      {written_data!r}"
+            )
 
 
 def test_read_env_key_comment_stripping():
-    """Verify that the unquoted value comment-stripping regex correctly
-
-    handles keys with '#' in the value vs comments.
-    """
-    with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    # Extract the inline python code for reading LOCAL_API_KEY
-    # Starts with: LOCAL_API_KEY="$(python3 -c '
-    # Ends with: ' "$ENV_FILE")"
-    start_marker = "LOCAL_API_KEY=\"$(python3 -c '"  # pragma: allowlist secret
-    start_idx = content.find(start_marker)
-    assert start_idx != -1, "Could not find start of read_env_key Python inline script"
-    code_start = start_idx + len(start_marker)
-
-    end_marker = '\' "$ENV_FILE")"'
-    end_idx = content.find(end_marker, code_start)
-    assert end_idx != -1, "Could not find end of read_env_key Python inline script"
-    inline_code = content[code_start:end_idx]
-
+    """Verify that read_env_key correctly handles keys with '#' in the value vs comments."""
     # Test cases: (file_content, expected_parsed_key)
     test_cases = [
         ("LOCAL_API_KEY=my#secretkey", "my#secretkey"),  # pragma: allowlist secret
@@ -110,19 +82,13 @@ def test_read_env_key_comment_stripping():
     for file_content, expected_key in test_cases:
         m_open = mock_open(read_data=file_content)
 
-        # Patch sys.argv, builtins.open, and print to run and inspect execution
         with (
-            patch("sys.argv", ["python3", "dummy_env_file"]),
             patch("builtins.open", m_open),
-            patch("builtins.print") as mock_print,
         ):
-            local_vars = {}
-            exec(inline_code, local_vars)
-
-            if expected_key is None:
-                mock_print.assert_not_called()
-            else:
-                mock_print.assert_called_once_with(expected_key)
+            result = read_env_key("dummy_env_file")
+            assert result == expected_key, (
+                f"for content={file_content!r}:\n  expected: {expected_key!r}\n  got:      {result!r}"
+            )
 
 
 def test_write_env_key_escaping(tmp_path):
@@ -177,12 +143,10 @@ def test_write_env_key_escaping(tmp_path):
 
 def test_no_redundant_chmod():
     """Verify that redundant chmod calls on the .env file have been removed
-
-    to prevent regressions.
-    """
+    to prevent regressions."""
     with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Find all occurrences of chmod 600 targeting the .env file
-    chmod_calls = re.findall(r"chmod\s+600\s+.*\.env", content)
+    chmod_calls = __import__('re').findall(r"chmod\s+600\s+.*\.env", content)
     assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"

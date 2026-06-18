@@ -18,21 +18,7 @@ command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1;
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
-    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 -c '
-import sys, re, os
-env_file = sys.argv[1]
-key = os.environ["LOCAL_API_KEY_VALUE"].replace("\\", "\\\\").replace("\"", "\\\"")
-with open(env_file, "r", encoding="utf-8") as f:
-    content = f.read()
-new_content = re.sub(
-    r"^([ \t]*(?:export[ \t]+)?)LOCAL_API_KEY[ \t]*=.*",
-    lambda m: m.group(1) + "LOCAL_API_KEY=\"" + key + "\"",
-    content,
-    flags=re.MULTILINE
-)
-with open(env_file, "w", encoding="utf-8") as f:
-    f.write(new_content)
-' "$env_file"
+    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" python3 "$SCRIPT_DIR/install_helpers.py" update_env_key "$env_file"
 }
 
 # Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
@@ -42,27 +28,24 @@ _write_env_key() {
     printf 'LOCAL_API_KEY="%s"\n' "$_ekey"
 }
 
+# Upsert LOCAL_API_KEY in a .env file: update if present, append if missing
+_upsert_api_key() {
+    local env_file="$1"
+    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$env_file"; then
+        update_env_key "$env_file"
+    else
+        # Ensure trailing newline before appending
+        if [ -s "$env_file" ] && [ "$(tail -c1 "$env_file" | wc -l)" -eq 0 ]; then
+            echo >> "$env_file"
+        fi
+        _write_env_key >> "$env_file"
+    fi
+}
+
 # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
 if [ -z "$LOCAL_API_KEY" ]; then
     if [ -f "$ENV_FILE" ]; then
-        LOCAL_API_KEY="$(python3 -c '
-import sys, re
-with open(sys.argv[1], encoding="utf-8") as f:
-    for line in f:
-        m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
-        if m:
-            val = m.group(1).strip()
-            if val.startswith("\""):
-                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
-                if q: val = q.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
-            elif val.startswith("\x27"):
-                q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
-                if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
-            else:
-                val = re.sub(r"\s+#.*", "", val)
-            print(val)
-            break
-' "$ENV_FILE")"
+        LOCAL_API_KEY="$(python3 "$SCRIPT_DIR/install_helpers.py" read_env_key "$ENV_FILE")"
     fi
 fi
 
@@ -71,6 +54,11 @@ REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
 
 echo "Installing Local AI Brain Production to $PROD_DIR"
 mkdir -p "$(dirname "$PROD_DIR")"
+# If PROD_DIR exists as a regular file, error out
+if [ -f "$PROD_DIR" ]; then
+    echo "Error: $PROD_DIR exists as a regular file. Please remove it: rm -f '$PROD_DIR'" >&2
+    exit 1
+fi
 # If PROD_DIR exists but is not a git repository, error out to prevent data loss
 if [ -d "$PROD_DIR" ] && [ ! -d "$PROD_DIR/.git" ]; then
     echo "Error: $PROD_DIR exists but is not a git repository." >&2
@@ -114,24 +102,7 @@ echo "Registering macOS LaunchAgent to $PLIST_PATH..."
 
 # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
 if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
-    LOCAL_API_KEY="$(python3 -c '
-import sys, re
-with open(sys.argv[1], encoding="utf-8") as f:
-    for line in f:
-        m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
-        if m:
-            val = m.group(1).strip()
-            if val.startswith("\""):
-                q = re.match(r"^\"((?:[^\"\\]|\\.)*)\"(.*)", val)
-                if q: val = q.group(1).replace("\\\"", "\"").replace("\\\\", "\\")
-            elif val.startswith("\x27"):
-                q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
-                if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
-            else:
-                val = re.sub(r"\s+#.*", "", val)
-            print(val)
-            break
-' "$PROD_DIR/.env")"
+    LOCAL_API_KEY="$(python3 "$SCRIPT_DIR/install_helpers.py" read_env_key "$PROD_DIR/.env")"
 fi
 
 if [ -z "$LOCAL_API_KEY" ]; then
@@ -142,44 +113,18 @@ fi
 # Copy the .env file or create one if it doesn't exist
 if [ -f "$PROD_DIR/.env" ]; then
     echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
-    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-        update_env_key "$PROD_DIR/.env"
-        echo "Updated LOCAL_API_KEY in existing .env."
-    else
-        # Ensure trailing newline before appending
-        if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
-            echo >> "$PROD_DIR/.env"
-        fi
-        _write_env_key >> "$PROD_DIR/.env"
-        echo "Appended LOCAL_API_KEY to existing .env."
-    fi
+    _upsert_api_key "$PROD_DIR/.env"
 else
     # Pre-create the file with secure permissions to prevent permission race condition
     touch "$PROD_DIR/.env"
 
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
-            echo "ENV_FILE is the same file as PROD_DIR/.env — updating or appending LOCAL_API_KEY in place."
-            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-                update_env_key "$PROD_DIR/.env"
-            else
-                # Ensure trailing newline before appending
-                if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
-                    echo >> "$PROD_DIR/.env"
-                fi
-                _write_env_key >> "$PROD_DIR/.env"
-            fi
+            echo "ENV_FILE is the same file as PROD_DIR/.env -- updating or appending LOCAL_API_KEY in place."
+            _upsert_api_key "$PROD_DIR/.env"
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
-            if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
-                update_env_key "$PROD_DIR/.env"
-            else
-                # Ensure trailing newline before appending
-                if [ -s "$PROD_DIR/.env" ] && [ "$(tail -c1 "$PROD_DIR/.env" | wc -l)" -eq 0 ]; then
-                    echo >> "$PROD_DIR/.env"
-                fi
-                _write_env_key >> "$PROD_DIR/.env"
-            fi
+            _upsert_api_key "$PROD_DIR/.env"
         fi
     else
         _write_env_key > "$PROD_DIR/.env"
@@ -192,6 +137,26 @@ mkdir -p "$HOME/Library/LaunchAgents"
 cp "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH"
 python3 -c "import sys; p = sys.argv[1]; c = open(p, encoding='utf-8').read().replace('__HOME__', sys.argv[2]); open(p, 'w', encoding='utf-8').write(c)" "$PLIST_PATH" "$HOME"
 
+# Install log rotation config if newsyslog directory exists
+NEWSYSLOG_SRC="$PROD_DIR/com.localbrain.api.newsyslog.conf"
+if [ -f "$NEWSYSLOG_SRC" ]; then
+    NEWSYSLOG_DIR="/etc/newsyslog.d"
+    if [ -d "$NEWSYSLOG_DIR" ]; then
+        if cp "$NEWSYSLOG_SRC" "$NEWSYSLOG_DIR/com.localbrain.api.conf" 2>/dev/null; then
+            chmod 644 "$NEWSYSLOG_DIR/com.localbrain.api.conf"
+            echo "Installed log rotation config to $NEWSYSLOG_DIR/com.localbrain.api.conf"
+        else
+            echo "Note: Could not install log rotation config (requires admin privileges)."
+            echo "To enable log rotation manually:"
+            echo "  sudo cp '$NEWSYSLOG_SRC' $NEWSYSLOG_DIR/com.localbrain.api.conf && sudo chmod 644 $NEWSYSLOG_DIR/com.localbrain.api.conf"
+        fi
+    else
+        echo "Note: $NEWSYSLOG_DIR does not exist. Log rotation not configured."
+        echo "To enable log rotation manually after creating the directory:"
+        echo "  sudo mkdir -p $NEWSYSLOG_DIR && sudo cp '$NEWSYSLOG_SRC' $NEWSYSLOG_DIR/com.localbrain.api.conf"
+    fi
+fi
+
 # Check if GUI session is available before registering the service
 if launchctl print "gui/$(id -u)" &>/dev/null; then
     # Unload existing instance if present
@@ -201,6 +166,5 @@ if launchctl print "gui/$(id -u)" &>/dev/null; then
 else
     echo "Warning: GUI session not available for user $(id -u). LaunchAgent was not registered."
 fi
-
 
 echo "Installation and persistent background registration complete."
