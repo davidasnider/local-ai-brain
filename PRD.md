@@ -49,6 +49,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Secret Scanning:** To ensure the local API key is never committed.
   * **Auto-formatting & Linting:** Running `ruff`.
   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
+* **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, and `vllm-update` to streamline local development workflows.
 
 
 ## 6. Interactive CLI
