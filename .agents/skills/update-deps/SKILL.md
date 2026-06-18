@@ -8,6 +8,7 @@ description: Updates development dependencies (llama-cpp-python) and checks for 
 3. Checks Hugging Face for new commits on the models in use.
 
 ```bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Source environment variables from .env (if present)
@@ -60,19 +61,32 @@ check_model() {
   fi
 }
 
-QWEN_27B=$(get_model_url "qwen-27b-4bit" 2>/dev/null || echo "")
-if [ -n "$QWEN_27B" ]; then
-  check_model "Qwen (active)" "$QWEN_27B"
-else
-  echo "Warning: qwen-27b-4bit not found in llm_config.yaml -- skipping"
-fi
-
-QWEN_35B=$(get_model_url "qwen-35b-4bit" 2>/dev/null || echo "")
-if [ -n "$QWEN_35B" ]; then
-  check_model "Qwen (fallback)" "$QWEN_35B"
-else
-  echo "Warning: qwen-35b-4bit not found in llm_config.yaml -- skipping"
-fi
+echo "Checking models from llm_config.yaml..."
+uv run python -c "
+import yaml, sys, subprocess
+with open('llm_config.yaml') as f:
+    cfg = yaml.safe_load(f)
+active = cfg.get('active_model', '')
+models = cfg.get('models', [])
+for m in models:
+    name = m.get('name', 'unknown')
+    label = name
+    if name == active:
+        label = name + ' (active)'
+    repo_id = m.get('hf_model_repo_id')
+    if repo_id:
+        url = 'https://huggingface.co/' + repo_id
+        print(f'MODEL_CHECK:{label}|{url}')
+    else:
+        print(f'Skipping {name}: no hf_model_repo_id')
+" 2>/dev/null | while IFS='|' read -r label url; do
+  if [ "$label" = "${label#MODEL_CHECK:}" ]; then
+    echo "$label"
+  else
+    label="${label#MODEL_CHECK:}"
+    check_model "$label" "$url"
+  fi
+done
 
 WHISPER_URL="${WHISPER_MODEL_PATH:-https://huggingface.co/mlx-community/whisper-large-v3-mlx}"
 KOKORO_URL="${KOKORO_HF_REPO:-https://huggingface.co/fastrtc/kokoro-onnx}"

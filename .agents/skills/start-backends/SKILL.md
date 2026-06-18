@@ -36,7 +36,7 @@ cleanup() {
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
     [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
   done
-  wait
+  wait || true
   echo "✅ All backend services stopped."
   exit "$exit_code"
 }
@@ -88,7 +88,7 @@ while true; do
       break
     fi
   done
-  $all_done && break
+  [ "$all_done" = true ] && break
 
   # Check for unexpected stops
   for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
