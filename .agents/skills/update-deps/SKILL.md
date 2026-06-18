@@ -62,8 +62,8 @@ check_model() {
       echo "Relative local path does not exist yet -- skipping remote check"
       return
     fi
-    if [[ "$_base" == *.* ]]; then
-      echo "Local file pattern detected -- skipping remote check"
+    if [ -f "$PROJECT_ROOT/$url" ] 2>/dev/null; then
+      echo "Local file detected -- skipping remote check"
       return
     fi
   fi

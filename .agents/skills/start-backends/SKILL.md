@@ -54,7 +54,7 @@ TTS_PID=""
 
 # Trap Ctrl+C and clean up
 cleanup() {
-  local exit_code="${1:-0}"
+  local exit_code="${1:-$?}"
   trap - EXIT INT TERM
   echo ""
   echo "🛑 Shutting down backend services..."
@@ -101,6 +101,10 @@ for _i in $(seq 30); do
   fi
   sleep 1
 done
+if ! PORT="$LLM_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  echo "❌ LLM Server failed to become ready (timeout)!"
+  cleanup 1
+fi
 if ! kill -0 "$LLM_PID" 2>/dev/null; then
   echo "❌ LLM Server failed to start!"
   cleanup 1
@@ -118,6 +122,10 @@ for _i in $(seq 30); do
   fi
   sleep 1
 done
+if ! PORT="$STT_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  echo "❌ STT Server failed to become ready (timeout)!"
+  cleanup 1
+fi
 if ! kill -0 "$STT_PID" 2>/dev/null; then
   echo "❌ STT Server failed to start!"
   cleanup 1
@@ -135,6 +143,10 @@ for _i in $(seq 30); do
   fi
   sleep 1
 done
+if ! PORT="$TTS_PORT" uv run python -c "import os, socket; s=socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', int(os.environ['PORT'])))" 2>/dev/null; then
+  echo "❌ TTS Server failed to become ready (timeout)!"
+  cleanup 1
+fi
 if ! kill -0 "$TTS_PID" 2>/dev/null; then
   echo "❌ TTS Server failed to start!"
   cleanup 1
@@ -168,8 +180,7 @@ while true; do
   for _var in LLM_PID STT_PID TTS_PID; do
     _pid="${!_var}"
     if [ -n "$_pid" ] && ! kill -0 "$_pid" 2>/dev/null; then
-      wait "$_pid" 2>/dev/null
-      _exit_code=$?
+      wait "$_pid" 2>/dev/null || _exit_code=$?
       if [ "$_exit_code" = 0 ]; then
         echo "⚠ Backend process $_pid ($_var) exited cleanly (code 0). Continuing with remaining services."
         eval "$_var="
