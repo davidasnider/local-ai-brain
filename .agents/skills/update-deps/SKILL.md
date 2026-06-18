@@ -47,40 +47,44 @@ check_model() {
   echo -n "Checking $name... "
   # Skip git check for local filesystem paths
   url="${url/#\~/$HOME}"
-  if [ -d "$url" ] || [ -f "$url" ]; then
-    echo "Local path — skipping remote check"
-    return
-  fi
 
-  # Prepend https://huggingface.co/ if it's a simple repo identifier
-  # First, detect local relative paths that don't exist on disk yet but look like filesystem paths.
-  # HuggingFace repo IDs are always org/repo (exactly one "/"), so multi-component paths
-  # (more than one "/") are unambiguously local filesystem paths.
-  local _slash_count="${url//[^\/]/}"
-  if [ ${#_slash_count} -gt 1 ]; then
-    echo "Local path (multi-component relative path) — skipping remote check"
-    return
-  fi
+  if [[ "$url" == http://* ]] || [[ "$url" == https://* ]]; then
+    # Bypass all local-path heuristics for HTTP/HTTPS URLs and go directly to git ls-remote check
+    :
+  else
+    if [ -d "$url" ] || [ -f "$url" ]; then
+      echo "Local path — skipping remote check"
+      return
+    fi
 
-  # If the parent directory (first path component) exists on disk, treat it as a local path
-  # even without ./ or ../ prefix. HF repo IDs like "org/repo" have a first component that
-  # is NOT a local directory, so this won't interfere with legitimate remote checks.
-  local _parent="${url%%/*}"
-  if [ -n "$_parent" ] && [ -d "$_parent" ] 2>/dev/null; then
-    echo "Local path (directory $_parent exists) — skipping remote check"
-    return
-  fi
+    # Prepend https://huggingface.co/ if it's a simple repo identifier
+    # First, detect local relative paths that don't exist on disk yet but look like filesystem paths.
+    # HuggingFace repo IDs are always org/repo (exactly one "/"), so multi-component paths
+    # (more than one "/") are unambiguously local filesystem paths.
+    local _slash_count="${url//[^\/]/}"
+    if [ ${#_slash_count} -gt 1 ]; then
+      echo "Local path (multi-component relative path) — skipping remote check"
+      return
+    fi
 
-  if [[ "$url" != http://* ]] && [[ "$url" != https://* ]] && [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
-    url="https://huggingface.co/$url"
-  fi
+    # If the parent directory (first path component) exists on disk, treat it as a local path
+    # even without ./ or ../ prefix. HF repo IDs like "org/repo" have a first component that
+    # is NOT a local directory, so this won't interfere with legitimate remote checks.
+    local _parent="${url%%/*}"
+    if [ -n "$_parent" ] && [ -d "$_parent" ] 2>/dev/null; then
+      echo "Local path (directory $_parent exists) — skipping remote check"
+      return
+    fi
 
-  # If it looks like a local filesystem path (starts with / or .), but does not exist yet, skip git check.
-  # Note: Local relative paths should start with ./ or ../ to be unambiguously recognized
-  # if their parent directories do not exist yet.
-  if [[ "$url" == /* ]] || [[ "$url" == .* ]]; then
-    echo "Local path does not exist yet -- skipping remote check"
-    return
+    if [[ "$url" != /* ]] && [[ "$url" != .* ]]; then
+      url="https://huggingface.co/$url"
+    else
+      # If it looks like a local filesystem path (starts with / or .), but does not exist yet, skip git check.
+      # Note: Local relative paths should start with ./ or ../ to be unambiguously recognized
+      # if their parent directories do not exist yet.
+      echo "Local path does not exist yet -- skipping remote check"
+      return
+    fi
   fi
   if COMMIT=$(git ls-remote -- "$url" HEAD 2>/dev/null | cut -f1); then
     echo "Latest remote commit: $COMMIT"
