@@ -59,7 +59,7 @@ with open(sys.argv[1], encoding="utf-8") as f:
                 q = re.match(r"^\x27((?:[^\x27\\]|\\.)*)\x27(.*)", val)
                 if q: val = q.group(1).replace("\\\x27", "\x27").replace("\\\\", "\\")
             else:
-                val = re.sub(r"\s*#.*", "", val)
+                val = re.sub(r"\s+#.*", "", val)
             print(val)
             break
 ' "$ENV_FILE")"
@@ -127,7 +127,6 @@ if [ -f "$PROD_DIR/.env" ]; then
 else
     # Pre-create the file with secure permissions to prevent permission race condition
     touch "$PROD_DIR/.env"
-    chmod 600 "$PROD_DIR/.env"
 
     if [ -f "$ENV_FILE" ]; then
         if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
@@ -143,7 +142,6 @@ else
             fi
         else
             cp "$ENV_FILE" "$PROD_DIR/.env"
-            chmod 600 "$PROD_DIR/.env"
             if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$PROD_DIR/.env"; then
                 update_env_key "$PROD_DIR/.env"
             else
@@ -152,7 +150,6 @@ else
                     echo >> "$PROD_DIR/.env"
                 fi
                 _write_env_key >> "$PROD_DIR/.env"
-                chmod 600 "$PROD_DIR/.env"
             fi
         fi
     else
