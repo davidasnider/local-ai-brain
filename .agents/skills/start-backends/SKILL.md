@@ -32,7 +32,9 @@ TTS_PID=""
 cleanup() {
   echo ""
   echo "🛑 Shutting down backend services..."
-  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  done
   wait
   echo "✅ All backend services stopped."
   exit 0
@@ -43,9 +45,11 @@ trap cleanup INT TERM
 uv run python -m local_ai_brain.models.llm_server --host 127.0.0.1 --port 8001 &
 LLM_PID=$!
 sleep 1
-if ! kill -0 $LLM_PID 2>/dev/null; then
+if ! kill -0 "$LLM_PID" 2>/dev/null; then
   echo "❌ LLM Server failed to start!"
-  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  done
   exit 1
 fi
 
@@ -53,9 +57,11 @@ fi
 uv run uvicorn local_ai_brain.models.stt_server:app --host 127.0.0.1 --port 8002 &
 STT_PID=$!
 sleep 1
-if ! kill -0 $STT_PID 2>/dev/null; then
+if ! kill -0 "$STT_PID" 2>/dev/null; then
   echo "❌ STT Server failed to start!"
-  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  done
   exit 1
 fi
 
@@ -63,9 +69,11 @@ fi
 uv run uvicorn local_ai_brain.models.tts_server:app --host 127.0.0.1 --port 8003 &
 TTS_PID=$!
 sleep 1
-if ! kill -0 $TTS_PID 2>/dev/null; then
+if ! kill -0 "$TTS_PID" 2>/dev/null; then
   echo "❌ TTS Server failed to start!"
-  kill "$LLM_PID" "$STT_PID" "$TTS_PID" 2>/dev/null || true
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  done
   exit 1
 fi
 
@@ -77,7 +85,24 @@ echo "Backend services are running. Start the dev gateway with:"
 echo "  PYTHONPATH=src uv run uvicorn local_ai_brain.main:app --host 0.0.0.0 --port 8888 --reload"
 echo ""
 
-# Wait for all background processes to exit
-wait
+# Monitor backend processes until one fails or all exit
+while true; do
+  sleep 3
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+      echo "❌ Backend process $pid has stopped unexpectedly!"
+      cleanup
+    fi
+  done
+  # Check if all PIDs have exited (processes finished cleanly)
+  all_done=true
+  for pid in "$LLM_PID" "$STT_PID" "$TTS_PID"; do
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      all_done=false
+      break
+    fi
+  done
+  $all_done && break
+done
 ```
 

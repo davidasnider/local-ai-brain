@@ -18,6 +18,20 @@ echo "✅ llama-cpp-python updated (or already at latest)."
 # Check Models
 echo "🔍 Checking for model updates on Hugging Face..."
 
+get_model_url() {
+  local model_name=$1
+  uv run python -c "
+import yaml, sys
+with open('llm_config.yaml') as f:
+    cfg = yaml.safe_load(f)
+for m in cfg.get('models', []):
+    if m.get('name') == '$model_name':
+        print(f'https://huggingface.co/{m[\"hf_model_repo_id\"]}')
+        sys.exit(0)
+sys.exit(1)
+"
+}
+
 check_model() {
   local name=$1
   local url=$2
@@ -29,10 +43,8 @@ check_model() {
   fi
 }
 
-# NOTE: The Hugging Face repository URLs below must be kept in sync with the
-# model configurations and paths defined in llm_config.yaml.
-check_model "Qwen (active)" "https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF"
-check_model "Qwen (fallback)" "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+check_model "Qwen (active)" "$(get_model_url qwen-27b-4bit)"
+check_model "Qwen (fallback)" "$(get_model_url qwen-35b-4bit)"
 check_model "Whisper" "https://huggingface.co/mlx-community/whisper-large-v3-mlx"
 check_model "Kokoro" "https://huggingface.co/fastrtc/kokoro-onnx"
 
