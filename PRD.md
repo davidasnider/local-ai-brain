@@ -50,6 +50,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Auto-formatting & Linting:** Running `ruff`.
   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
 
+  * **Agent Skills:** A suite of agent skills is available in `.agents/skills` (`bump-version`, `restart-dev`, `run-dev`, `tail-logs`, `vllm-update`) to streamline local development workflows and automate common tasks via agentic tools.
 
 ## 6. Interactive CLI
 * An interactive CLI tool (`local-brain`) must be provided for directly interacting with and testing the API endpoints.
