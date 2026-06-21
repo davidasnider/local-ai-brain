@@ -18,7 +18,9 @@ def update_env_key(env_file: str, key: str) -> None:
         env_file: Path to the .env file to modify.
         key: The new API key value (will be escaped for shell safety).
     """
-    escaped_key = key.replace("\\", "\\\\").replace('"', '\\"').replace('$', '\\$').replace('`', '\\`')
+    escaped_key = (
+        key.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
+    )
     with open(env_file, "r", encoding="utf-8") as f:
         content = f.read()
     new_content = re.sub(
@@ -68,7 +70,7 @@ def read_env_key(env_file: str) -> str | None:
             if _r.startswith('"'):
                 q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', _r)
                 if q:
-                    _r = q.group(1).replace(r'\"', '"').replace(r'\\', '\\')
+                    _r = q.group(1).replace(r"\"", '"').replace(r"\\", "\\")
                 else:
                     # Mismatched/unclosed quote — strip leading quote, keep rest
                     _r = _r.lstrip('"')
