@@ -32,7 +32,7 @@ def update_env_key(env_file: str, key: str) -> None:
     if new_content == content:
         new_content = content.rstrip("\n") + "\n" + "LOCAL_API_KEY=" + '"' + escaped_key + '"\n'
 
-    dir_name = os.path.dirname(os.path.abspath(env_file))
+    dir_name = os.path.dirname(os.path.realpath(env_file))
     fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix=".env.tmp-")
     replaced = False
     try:
@@ -52,7 +52,9 @@ def update_env_key(env_file: str, key: str) -> None:
                 pass
 
 
-def read_env_key(env_file: str) -> str | None:
+from typing import Optional
+
+def read_env_key(env_file: str) -> Optional[str]:
     """Read the LOCAL_API_KEY value from ``env_file``.
 
     Handles quoted (double and single), unquoted-with-comment, and
@@ -160,6 +162,9 @@ def _cli_update_env_key() -> None:
     except FileNotFoundError:
         print(f"Error: Environment file '{env_file}' not found.", file=sys.stderr)
         sys.exit(1)
+    except PermissionError:
+        print(f"Error: Permission denied accessing '{env_file}'.", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cli_read_env_key() -> None:
@@ -175,6 +180,9 @@ def _cli_read_env_key() -> None:
         _result = read_env_key(env_file)
     except FileNotFoundError:
         print(f"Error: Environment file '{env_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except PermissionError:
+        print(f"Error: Permission denied accessing '{env_file}'.", file=sys.stderr)
         sys.exit(1)
     if _result is not None:
         print(_result)

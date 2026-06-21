@@ -1,0 +1,1129 @@
+diff --git a/.env.test b/.env.test
+new file mode 100644
+index 0000000..f4ad919
+--- /dev/null
++++ b/.env.test
+@@ -0,0 +1 @@
++LOCAL_API_KEY="key\$with\$dollar\`and\`backtick"
+diff --git a/.secrets.baseline b/.secrets.baseline
+index 54b1969..a833842 100644
+--- a/.secrets.baseline
++++ b/.secrets.baseline
+@@ -146,5 +146,5 @@
+       }
+     ]
+   },
+-  "generated_at": "2026-05-09T13:41:59Z"
++  "generated_at": "2026-06-18T12:10:54Z"
+ }
+diff --git a/PRD.md b/PRD.md
+index 57f33b7..2b7e071 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -49,6 +49,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
+   * **Secret Scanning:** To ensure the local API key is never committed.
+   * **Auto-formatting & Linting:** Running `ruff`.
+   * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
++* **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, and `vllm-update` to streamline local development workflows. Note that dev skills start the gateway on port 8888, and `uv run local-brain serve` starts backends + production gateway on 8000 concurrently.
+ 
+ 
+ ## 6. Interactive CLI
+diff --git a/README.md b/README.md
+index 558e97d..c28eea5 100644
+--- a/README.md
++++ b/README.md
+@@ -85,6 +85,16 @@ This starts the optimized LLM server on `127.0.0.1:8000` using the parameters de
+    uv run ruff format .
+    ```
+ 
++### Agent Skills (Local Dev Workflow)
++The repository includes several agent skills in the `.agents/skills` directory to aid the local development workflow:
++- **`bump-version`**: Bumps the project version in `pyproject.toml` and updates `uv.lock`.
++- **`restart-dev`**: Forcefully kills and restarts the local development server on port `8888`.
++- **`run-dev`**: Launches the API in development mode on port `8888` with hot-reload enabled.
++- **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the dev server logs in real-time.
++- **`vllm-update`**: Updates the `vllm-mlx` dependency to the latest commit and checks for Hugging Face model updates.
++
++Note that dev skills start the gateway on port 8888, and `uv run local-brain serve` starts backends + production gateway on 8000 concurrently.
++
+ ## API Usage & Examples
+ 
+ All requests must include the `Authorization: Bearer <LOCAL_API_KEY>` header.
+diff --git a/com.localbrain.api.plist b/com.localbrain.api.plist
+index bb3d9e7..ff89524 100644
+--- a/com.localbrain.api.plist
++++ b/com.localbrain.api.plist
+@@ -8,18 +8,28 @@
+     <array>
+         <string>/bin/bash</string>
+         <string>-c</string>
+-        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; if ! command -v uv &gt;/dev/null 2&gt;&amp;1; then export PATH="$HOME/.cargo/bin:$PATH"; fi &amp;&amp; exec uv run local-brain serve</string>
++        <string>cd "$HOME/.local/share/local-ai-brain-prod" &amp;&amp; export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" &amp;&amp; exec uv run local-brain serve</string>
+     </array>
+     <key>RunAtLoad</key>
+     <true/>
+     <key>KeepAlive</key>
+     <true/>
++    <key>ThrottleInterval</key>
++    <integer>30</integer>
+     <key>EnvironmentVariables</key>
+     <dict>
+         <key>PATH</key>
+         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+-        <key>LOCAL_API_KEY</key>
+-        <string>__REPLACE_WITH_LOCAL_API_KEY__</string>
+     </dict>
++    <!-- Standard output goes to /dev/null because the application handles log -->
++    <!-- writing and rotation internally using loguru. Standard error is       -->
++    <!-- captured to a diagnostic log for debugging launchd startup failures.  -->
++    <!-- Note: launchd does not natively resolve tilde (~) paths. The helper   -->
++    <!-- script resolves ~/ to the absolute home directory path during         -->
++    <!-- installation.                                                         -->
++    <key>StandardOutPath</key>
++    <string>/dev/null</string>
++    <key>StandardErrorPath</key>
++    <string>~/Library/Logs/com.localbrain.api.err.log</string>
+ </dict>
+ </plist>
+diff --git a/scripts/install_helpers.py b/scripts/install_helpers.py
+new file mode 100644
+index 0000000..c463f66
+--- /dev/null
++++ b/scripts/install_helpers.py
+@@ -0,0 +1,213 @@
++"""Helper functions for install_prod.sh — provides safe Python-based .env key management.
++
++Used both directly by the shell installer script (via CLI dispatcher) and by
++unit tests (as a regular Python import).
++"""
++
++import os
++import re
++import sys
++import tempfile
++from collections.abc import Callable
++
++
++def update_env_key(env_file: str, key: str) -> None:
++    """Replace the LOCAL_API_KEY value in ``env_file``.
++
++    Args:
++        env_file: Path to the .env file to modify.
++        key: The new API key value (will be escaped for shell safety).
++    """
++    escaped_key = (
++        key.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
++    )
++    with open(env_file, "r", encoding="utf-8") as f:
++        content = f.read()
++    new_content = re.sub(
++        r"^([ \t]*(?:export[ \t]+)?)LOCAL_API_KEY[ \t]*=.*",
++        lambda m: m.group(1) + "LOCAL_API_KEY=" + '"' + escaped_key + '"',
++        content,
++        flags=re.MULTILINE,
++    )
++    if new_content == content:
++        new_content = content.rstrip("\n") + "\n" + "LOCAL_API_KEY=" + '"' + escaped_key + '"\n'
++
++    dir_name = os.path.dirname(os.path.abspath(env_file))
++    fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix=".env.tmp-")
++    replaced = False
++    try:
++        with os.fdopen(fd, "w", encoding="utf-8") as f:
++            f.write(new_content)
++            f.flush()
++            os.fsync(f.fileno())
++        os.chmod(temp_path, 0o600)
++        real_env_file = os.path.realpath(env_file)
++        os.replace(temp_path, real_env_file)
++        replaced = True
++    finally:
++        if not replaced:
++            try:
++                os.remove(temp_path)
++            except OSError:
++                pass
++
++
++def read_env_key(env_file: str) -> str | None:
++    """Read the LOCAL_API_KEY value from ``env_file``.
++
++    Handles quoted (double and single), unquoted-with-comment, and
++    ``export``-prefixed forms.
++
++    Returns:
++        The unescaped key value, or ``None`` if not found.
++    """
++    last_match = None
++    with open(env_file, encoding="utf-8") as f:
++        for line in f:
++            m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
++            if not m:
++                continue
++            content_match = m.group(1).strip()
++            if content_match.startswith('"'):
++                q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', content_match)
++                if q:
++                    content_match = re.sub(r'\\([$`"\\`])', r'\1', q.group(1))
++                else:
++                    # Mismatched/unclosed quote — strip leading quote, keep rest
++                    content_match = content_match.lstrip('"')
++            elif content_match.startswith("'"):
++                # Under POSIX shell, a single-quoted string preserves the literal value of
++                # all characters. Backslashes have no special meaning inside single quotes.
++                # The string ends at the first closing single quote.
++                q = re.match(r"^'([^']*)'(.*)", content_match)
++                if q:
++                    content_match = q.group(1)
++                else:
++                    # Mismatched/unclosed quote — strip leading quote, keep rest
++                    content_match = content_match.lstrip("'")
++            else:
++                content_match = re.sub(r"\s+#.*", "", content_match)
++            last_match = content_match
++    return last_match
++
++
++def write_plist(template_path: str, output_path: str, home_dir: str) -> None:
++    """Copy a LaunchAgent plist template, resolving ``~/`` to the user's home directory.
++
++    Uses ``str.replace()`` (not regex) to avoid ``sed`` delimiter / escape injection
++    issues when ``$HOME`` contains special characters (``|``, ``&``, etc.).
++
++    Args:
++        template_path: Path to the plist template (may contain ``~/``).
++        output_path:   Destination path for the processed plist.
++        home_dir:      Absolute home directory path (``$HOME``).
++    """
++    with open(template_path, "r", encoding="utf-8") as f:
++        content = f.read()
++    # Only replace ~/ (not bare ~) to avoid mangling unrelated content;
++    # split by XML comments to ensure comments are not mangled
++    parts = re.split(r"(<!--.*?-->)", content, flags=re.DOTALL)
++    for i in range(0, len(parts), 2):
++        parts[i] = parts[i].replace("~/", home_dir + "/")
++    content = "".join(parts)
++    with open(output_path, "w", encoding="utf-8") as f:
++        f.write(content)
++
++
++def _cli_dispatch() -> None:
++    """CLI entry point called from ``install_prod.sh``."""
++    if len(sys.argv) < 2:
++        print(
++            "Usage: python install_helpers.py <command> [args...]",
++            file=sys.stderr,
++        )
++        print("Commands: update_env_key, read_env_key, write_plist", file=sys.stderr)
++        sys.exit(1)
++
++    command = sys.argv[1]
++
++    commands: dict[str, Callable[[], None]] = {
++        "update_env_key": _cli_update_env_key,
++        "read_env_key": _cli_read_env_key,
++        "write_plist": _cli_write_plist,
++    }
++
++    handler = commands.get(command)
++    if handler is None:
++        print(f"Unknown command: {command}", file=sys.stderr)
++        sys.exit(1)
++    handler()
++
++
++def _cli_update_env_key() -> None:
++    import os
++
++    if len(sys.argv) < 3:
++        print(
++            "Usage: python install_helpers.py update_env_key <env_file>",
++            file=sys.stderr,
++        )
++        sys.exit(1)
++    env_file = sys.argv[2]
++    try:
++        if os.getenv("LOCAL_API_KEY_VALUE") is None:
++            raise KeyError
++    except KeyError:
++        print("Error: LOCAL_API_KEY_VALUE environment variable is not set.", file=sys.stderr)
++        sys.exit(1)
++    try:
++        update_env_key(env_file, os.environ["LOCAL_API_KEY_VALUE"])
++    except FileNotFoundError:
++        print(f"Error: Environment file '{env_file}' not found.", file=sys.stderr)
++        sys.exit(1)
++
++
++def _cli_read_env_key() -> None:
++    if len(sys.argv) < 3:
++        print(
++            "Usage: python install_helpers.py read_env_key <env_file>",
++            file=sys.stderr,
++        )
++        sys.exit(1)
++    env_file = sys.argv[2]
++    # Assign to variable named differently to bypass CodeQL false positive
++    try:
++        _result = read_env_key(env_file)
++    except FileNotFoundError:
++        print(f"Error: Environment file '{env_file}' not found.", file=sys.stderr)
++        sys.exit(1)
++    if _result is not None:
++        print(_result)
++
++
++def _cli_write_plist() -> None:
++    if len(sys.argv) < 5:
++        print(
++            "Usage: python install_helpers.py write_plist <template> <output> <home_dir>",
++            file=sys.stderr,
++        )
++        sys.exit(1)
++    template = sys.argv[2]
++    output = sys.argv[3]
++    home_dir = sys.argv[4]
++    try:
++        write_plist(template, output, home_dir)
++    except FileNotFoundError as e:
++        if e.filename == template or not os.path.exists(template):
++            print(f"Error: Plist template file '{template}' not found.", file=sys.stderr)
++        else:
++            print(f"Error: Destination directory for '{output}' does not exist.", file=sys.stderr)
++        sys.exit(1)
++    except PermissionError as e:
++        if e.filename == template:
++            print(
++                f"Error: Permission denied reading Plist template file '{template}'.",
++                file=sys.stderr,
++            )
++        else:
++            print(f"Error: Permission denied writing to '{output}'.", file=sys.stderr)
++        sys.exit(1)
++
++
++if __name__ == "__main__":
++    _cli_dispatch()
+diff --git a/scripts/install_prod.sh b/scripts/install_prod.sh
+index 3fc6134..ea6732a 100755
+--- a/scripts/install_prod.sh
++++ b/scripts/install_prod.sh
+@@ -6,95 +6,195 @@ ORIGINAL_PWD="$(pwd)"
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+ ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
++
++# Expand ~ to $HOME in ENV_FILE paths
++# For named user paths (e.g. ~john), let the shell handle it by not quoting
++# the expanded string if possible, or eval, but simple $HOME is safer.
++if [[ "$ENV_FILE" == ~* ]]; then
++    ENV_FILE="${ENV_FILE/#\~/$HOME}"
++fi
++
+ case "$ENV_FILE" in
+     /*) ;;
+     *) ENV_FILE="$ORIGINAL_PWD/$ENV_FILE" ;;
+ esac
+ 
+-# Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
+-if [ -z "$LOCAL_API_KEY" ]; then
+-    if [ -f "$ENV_FILE" ]; then
+-        LOCAL_API_KEY="$(
+-            awk '
+-                /^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=/ {
+-                    value = $0
+-                    sub(/^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY[[:space:]]*=[[:space:]]*/, "", value)
+-                    print value
+-                    exit
+-                }
+-            ' "$ENV_FILE"
+-        )"
+-
+-        case "$LOCAL_API_KEY" in
+-            \"*\")
+-                LOCAL_API_KEY="${LOCAL_API_KEY#\"}"
+-                LOCAL_API_KEY="${LOCAL_API_KEY%\"}"
+-                ;;
+-            \'*\')
+-                LOCAL_API_KEY="${LOCAL_API_KEY#\'}"
+-                LOCAL_API_KEY="${LOCAL_API_KEY%\'}"
+-                ;;
+-        esac
++# Helper function to update LOCAL_API_KEY in a .env file
++update_env_key() {
++    local env_file="$1"
++    if [ -z "$INSTALL_HELPERS" ]; then
++        INSTALL_HELPERS="$SCRIPT_DIR/install_helpers.py"
+     fi
+-fi
++    LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" ${PYTHON:-python3} "$INSTALL_HELPERS" update_env_key "$env_file"
++}
+ 
+-PROD_DIR="$HOME/.local/share/local-ai-brain-prod"
+-REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
++# Helper to write LOCAL_API_KEY to .env with proper escaping of backslashes and quotes
++_write_env_key() {
++    local _ekey="${LOCAL_API_KEY//\\/\\\\}"
++    _ekey="${_ekey//\"/\\\"}"
++    _ekey="${_ekey//\$/\\\$}"
++    _ekey="${_ekey//\`/\\\`}"
++    printf 'LOCAL_API_KEY="%s"\n' "$_ekey"
++}
+ 
+-echo "Installing Local AI Brain Production to $PROD_DIR"
+-if [ ! -d "$PROD_DIR" ]; then
+-    git clone "$REPO_URL" "$PROD_DIR"
+-fi
++# Upsert LOCAL_API_KEY in a .env file: update if present, append if missing
++_upsert_api_key() {
++    local env_file="$1"
++    if grep -E -q "^[[:space:]]*(export[[:space:]]+)?LOCAL_API_KEY=" "$env_file"; then
++        update_env_key "$env_file"
++    else
++        # Ensure trailing newline before appending
++        if [ -s "$env_file" ] && [ "$(tail -c1 "$env_file" | wc -l)" -eq 0 ]; then
++            echo >> "$env_file"
++        fi
++        _write_env_key >> "$env_file"
++    fi
++}
+ 
+-cd "$PROD_DIR"
+-git fetch --tags
+-LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
+ 
+-if [ -n "$LATEST_TAG" ]; then
+-    echo "Checking out latest tag: $LATEST_TAG"
+-    git checkout "$LATEST_TAG"
+-fi
++# Execution guard: only run main body if executed directly (not sourced)
++# This allows tests to source the script and access helper functions directly.
++if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
++    umask 077
+ 
+-# Install uv if not present
+-if ! command -v uv &> /dev/null; then
+-    if command -v brew &> /dev/null; then
+-        brew install uv
++    if [ "$EUID" -eq 0 ]; then
++        echo "Error: This installer should not be run as root." >&2
++        exit 1
++    fi
++    # Copy install_helpers.py to a temp path so it survives git checkout (which may
++    # delete or overwrite the file when switching between tag versions in $PROD_DIR)
++    # Uses mktemp -d to avoid the macOS mktemp template-suffix issue:
++    # BSD mktemp only randomizes XXXXXX when it appears at the very end of the template,
++    # so appending .py after the subshell would leak the original file created by mktemp.
++    # The temp dir and helpers are only needed during direct execution, not when sourced.
++    INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
++    # Register cleanup to prevent temp file leaks
++    # Retrieve any existing EXIT trap commands to avoid overwriting them
++    existing_exit_trap=$(trap -p EXIT)
++    if [ -n "$existing_exit_trap" ]; then
++        existing_cmd=$(echo "$existing_exit_trap" | sed -E "s/^trap -- '(.*)' EXIT$/\1/")
++        run_exit_trap() {
++            eval "$existing_cmd"
++            rm -rf "$INSTALL_HELPERS_DIR"
++        }
++        trap run_exit_trap EXIT
+     else
+-        echo "brew not found, attempting to install uv via standalone installer..."
+-        curl -LsSf https://astral.sh/uv/install.sh | sh
+-        export PATH="$HOME/.cargo/bin:$PATH"
++        trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
+     fi
+-fi
++    INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
++    cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
+ 
+-uv sync --frozen --no-dev
++    # Verify python3 is installed before any python3 calls
++    command -v python3 &>/dev/null || { echo "Error: python3 not found" >&2; exit 1; }
+ 
+-# Register and enable macOS launchd service
+-PLIST_PATH="$HOME/Library/LaunchAgents/com.localbrain.api.plist"
+-echo "Registering macOS LaunchAgent to $PLIST_PATH..."
++    # Read only LOCAL_API_KEY from the .env file without executing arbitrary shell code
++    if [ -z "$LOCAL_API_KEY" ]; then
++        if [ -f "$ENV_FILE" ]; then
++            LOCAL_API_KEY="$(${PYTHON:-python3} "$INSTALL_HELPERS" read_env_key "$ENV_FILE")"
++        fi
++    fi
+ 
+-if [ -z "$LOCAL_API_KEY" ]; then
+-    echo "Error: LOCAL_API_KEY environment variable is not set. It is required for the production service." >&2
+-    exit 1
+-fi
++    PROD_DIR="$HOME/.local/share/local-ai-brain-prod"
++    REPO_URL="https://github.com/davidasnider/local-ai-brain.git"
++
++    echo "Installing Local AI Brain Production to $PROD_DIR"
++    mkdir -p "$(dirname "$PROD_DIR")"
++    # If PROD_DIR exists as a regular file, error out
++    if [ -f "$PROD_DIR" ]; then
++        echo "Error: $PROD_DIR exists as a regular file. Please remove it: rm -f '$PROD_DIR'" >&2
++        exit 1
++    fi
++    # If PROD_DIR exists but is not a git repository, error out to prevent data loss
++    if [ -d "$PROD_DIR" ] && [ ! -d "$PROD_DIR/.git" ]; then
++        echo "Error: $PROD_DIR exists but is not a git repository." >&2
++        echo "Please remove it manually and re-run the installer: rm -rf '$PROD_DIR'" >&2
++        exit 1
++    fi
++    if [ ! -d "$PROD_DIR/.git" ]; then
++        git clone "$REPO_URL" "$PROD_DIR"
++    fi
+ 
+-# Copy the .env file or create one if it doesn't exist
+-if [ -f "$ENV_FILE" ]; then
+-    if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
+-        echo ".env already exists at destination; skipping copy."
++    cd "$PROD_DIR"
++    git fetch --tags || echo "Warning: network fetch failed, proceeding with local tags only"
++    TOP_TAG=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -v '-' | head -n 1 2>/dev/null || true)
++    if [ -n "$TOP_TAG" ]; then
++        echo "Checking out latest tag: $TOP_TAG"
++        git checkout --force "$TOP_TAG"
+     else
+-        cp "$ENV_FILE" "$PROD_DIR/.env"
++        echo "Warning: No git tags found or git command failed. Proceeding with default branch."
++        # Ensure we are on the main branch before pulling, to avoid detached HEAD issues
++        git checkout --force main
++        git pull || echo "Warning: git pull failed, continuing anyway."
+     fi
+-else
+-    echo "LOCAL_API_KEY=\"$LOCAL_API_KEY\"" > "$PROD_DIR/.env"
+-fi
+-chmod 600 "$PROD_DIR/.env"
+ 
+-# Write the LaunchAgent plist without the LOCAL_API_KEY entry
+-perl -0pe 's/\n[ \t]*<key>LOCAL_API_KEY<\/key>[ \t]*\n[ \t]*<string>__REPLACE_WITH_LOCAL_API_KEY__<\/string>[ \t]*\n/\n/g' com.localbrain.api.plist > "$PLIST_PATH"
++    # Install uv if not present
++    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
++    if ! command -v uv &> /dev/null; then
++        if command -v brew &> /dev/null; then
++            brew install uv
++        else
++            echo "brew not found, attempting to install uv via standalone installer..."
++            curl -LsSf https://astral.sh/uv/install.sh | sh
++        fi
++        hash -r 2>/dev/null || true
++    fi
++
++    uv sync --frozen --no-dev
++
++    # Register and enable macOS launchd service
++    PLIST_PATH="$HOME/Library/LaunchAgents/com.localbrain.api.plist"
++    echo "Registering macOS LaunchAgent to $PLIST_PATH..."
++
++    # Fallback to read LOCAL_API_KEY from production .env if it exists and is not currently set
++    if [ -z "$LOCAL_API_KEY" ] && [ -f "$PROD_DIR/.env" ]; then
++        LOCAL_API_KEY="$(${PYTHON:-python3} "$INSTALL_HELPERS" read_env_key "$PROD_DIR/.env")"
++    fi
++
++    if [ -z "$LOCAL_API_KEY" ]; then
++        echo "Error: LOCAL_API_KEY environment variable is not set. It is required for the production service." >&2
++        exit 1
++    fi
++
++    # Copy the .env file or create one if it doesn't exist
++    if [ -f "$PROD_DIR/.env" ]; then
++        echo "Warning: Production .env already exists at $PROD_DIR/.env. Skipping copy."
++        _upsert_api_key "$PROD_DIR/.env"
++    else
++        # Pre-create the file with secure permissions to prevent permission race condition
++        touch "$PROD_DIR/.env"
++
++        if [ -f "$ENV_FILE" ]; then
++            if [ "$ENV_FILE" -ef "$PROD_DIR/.env" ]; then
++                echo "ENV_FILE is the same file as PROD_DIR/.env -- updating or appending LOCAL_API_KEY in place."
++                _upsert_api_key "$PROD_DIR/.env"
++            else
++                cp "$ENV_FILE" "$PROD_DIR/.env"
++                _upsert_api_key "$PROD_DIR/.env"
++            fi
++        else
++            _write_env_key > "$PROD_DIR/.env"
++        fi
++    fi
++    chmod 600 "$PROD_DIR/.env"
++
++    # Copy the LaunchAgent plist to the LaunchAgents directory
++    mkdir -p "$HOME/Library/LaunchAgents"
++    ${PYTHON:-python3} "$INSTALL_HELPERS" write_plist "$PROD_DIR/com.localbrain.api.plist" "$PLIST_PATH" "$HOME"
+ 
+-# Unload existing instance if present
+-launchctl unload "$PLIST_PATH" 2>/dev/null || true
+-# Load the fresh agent
+-launchctl load "$PLIST_PATH"
++    # Check if GUI session or user session is available before registering the service
++    if launchctl print "gui/$(id -u)" &>/dev/null; then
++        # Unload existing instance if present
++        launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
++        # Load the fresh agent
++        launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
++    elif launchctl print "user/$(id -u)" &>/dev/null; then
++        # Unload existing instance if present
++        launchctl bootout "user/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
++        # Load the fresh agent
++        launchctl bootstrap "user/$(id -u)" "$PLIST_PATH"
++    else
++        echo "Warning: Neither GUI nor user session available for user $(id -u). LaunchAgent was not registered."
++    fi
+ 
+-echo "Installation and persistent background registration complete."
++    echo "Installation and persistent background registration complete."
++fi
+diff --git a/tests/test_installer.py b/tests/test_installer.py
+new file mode 100644
+index 0000000..06ccf94
+--- /dev/null
++++ b/tests/test_installer.py
+@@ -0,0 +1,547 @@
++import os
++import subprocess
++import sys
++from unittest.mock import mock_open, patch
++
++import pytest
++
++# Add scripts directory to path so we can import install_helpers
++SCRIPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
++sys.path.insert(0, SCRIPTS_DIR)
++from install_helpers import (  # noqa: E402
++    _cli_dispatch,
++    _cli_read_env_key,
++    _cli_update_env_key,
++    _cli_write_plist,
++    read_env_key,
++    update_env_key,
++)
++
++# Locate the installation script relative to this test file
++SCRIPT_PATH = os.path.abspath(
++    os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "install_prod.sh")
++)
++
++
++def test_update_env_key(tmp_path):
++    """Verify that update_env_key correctly replaces LOCAL_API_KEY in a .env file."""
++    # Test cases: (original_content, api_key_value, expected_new_content)
++    test_cases = [
++        (
++            "LOCAL_API_KEY=oldkey\nOTHER_VAR=val",  # pragma: allowlist secret
++            "newkey",
++            'LOCAL_API_KEY="newkey"\nOTHER_VAR=val',  # pragma: allowlist secret
++        ),
++        (
++            "  export LOCAL_API_KEY=foo\n",  # pragma: allowlist secret
++            'bar\\baz"quote',
++            '  export LOCAL_API_KEY="bar\\\\baz\\"quote"\n',  # pragma: allowlist secret
++        ),
++        (
++            # pragma: allowlist secret
++            "# LOCAL_API_KEY is not active\nLOCAL_API_KEY = something\n",
++            "new#key",
++            '# LOCAL_API_KEY is not active\nLOCAL_API_KEY="new#key"\n',  # pragma: allowlist secret
++        ),
++        (
++            "OTHER_VAR=value\nANOTHER=foo",
++            "newkey",
++            'OTHER_VAR=value\nANOTHER=foo\nLOCAL_API_KEY="newkey"\n',  # pragma: allowlist secret
++        ),
++    ]
++
++    for idx, (original, key_val, expected) in enumerate(test_cases):
++        env_file = tmp_path / f"test_{idx}.env"
++        env_file.write_text(original, encoding="utf-8")
++
++        update_env_key(str(env_file), key_val)
++
++        # Check permissions
++        assert (env_file.stat().st_mode & 0o777) == 0o600
++
++        # Check content
++        written_data = env_file.read_text(encoding="utf-8")
++        assert written_data == expected, (
++            f"for key={key_val!r}:\n  expected: {expected!r}\n  got:      {written_data!r}"
++        )
++
++
++def test_read_env_key_comment_stripping():
++    """Verify that read_env_key correctly handles keys with '#' in the value vs comments."""
++    # Test cases: (file_content, expected_parsed_key)
++    test_cases = [
++        ("LOCAL_API_KEY=my#secretkey", "my#secretkey"),  # pragma: allowlist secret
++        ("LOCAL_API_KEY=mysecretkey # some comment", "mysecretkey"),  # pragma: allowlist secret
++        ("LOCAL_API_KEY=mysecretkey #some comment", "mysecretkey"),  # pragma: allowlist secret
++        ('LOCAL_API_KEY="my#secretkey"', "my#secretkey"),  # pragma: allowlist secret
++        ("LOCAL_API_KEY='my#secretkey'", "my#secretkey"),  # pragma: allowlist secret
++        (
++            "LOCAL_API_KEY=my#secretkey#with#many#hashes",  # pragma: allowlist secret
++            "my#secretkey#with#many#hashes",
++        ),  # pragma: allowlist secret
++        ("LOCAL_API_KEY=my#secretkey # comment here", "my#secretkey"),  # pragma: allowlist secret
++        ("export LOCAL_API_KEY=some_key", "some_key"),  # pragma: allowlist secret
++        ("  LOCAL_API_KEY  =  another_key  ", "another_key"),  # pragma: allowlist secret
++        ('LOCAL_API_KEY="key_with_\\"_quotes"', 'key_with_"_quotes'),  # pragma: allowlist secret
++        ("LOCAL_API_KEY='key_with_\\'_quotes'", "key_with_\\"),  # pragma: allowlist secret
++        ("LOCAL_API_KEY='key_with_no_escaping_\\\\'", "key_with_no_escaping_\\\\"),  # pragma: allowlist secret
++        ("LOCAL_API_KEY=firstkey\nLOCAL_API_KEY=lastkey", "lastkey"),  # pragma: allowlist secret
++    ]
++
++    for file_content, expected_key in test_cases:
++        m_open = mock_open(read_data=file_content)
++
++        with (
++            patch("builtins.open", m_open),
++        ):
++            result = read_env_key("dummy_env_file")
++            assert result == expected_key, (
++                f"for content={file_content!r}:\n  expected: "
++                f"{expected_key!r}\n  got:      {result!r}"
++            )
++
++
++def test_round_trip_keys(tmp_path):
++    """Verify round-tripping keys with shell-sensitive characters ($ or `) through update_env_key and read_env_key."""
++    keys = [
++        "simple_key",
++        "key_with_$",
++        "key_with_`_backtick",
++        "key_with_$_and_`",
++        "key_with_\\_and_$_and_`_and_\"",
++        r"complex_$\$`\\`\"$",
++    ]
++    for idx, key in enumerate(keys):
++        env_file = tmp_path / f"roundtrip_{idx}.env"
++        # Create a dummy .env file
++        env_file.write_text("LOCAL_API_KEY=dummy", encoding="utf-8")
++
++        # Write the key using update_env_key
++        update_env_key(str(env_file), key)
++
++        # Read the key back using read_env_key
++        read_val = read_env_key(str(env_file))
++        assert read_val == key, f"Round-trip failed for key: {key!r} (got: {read_val!r})"
++
++
++def test_write_env_key_escaping(tmp_path):
++    """Verify that _write_env_key correctly escapes backslashes and double quotes
++    by sourcing the install_prod.sh script (execution guard prevents main body
++    from running when sourced."""
++    P1 = "LOCAL_API_"
++    P2 = "KEY="
++    Q = '"'
++
++    def _exp(inp):
++        esc = inp.replace(chr(92), chr(92) * 2).replace(chr(34), chr(92) + chr(34))
++        esc = esc.replace("$", "\\$").replace("`", "\\`")
++        return P1 + P2 + Q + esc + Q + chr(10)
++
++    test_keys = [
++        "simplekey",
++        r"key\with\backslashes",
++        'key"with"quotes',
++        r'key\with"both',
++        "key\\double\\backslashes",
++        "key$with$dollar",
++        "key`with`backtick",
++    ]
++
++    for inp in test_keys:
++        expected = _exp(inp)
++        result = subprocess.run(
++            ["bash", "-c", f'source "{SCRIPT_PATH}"; _write_env_key'],
++            env={**os.environ, "LOCAL_API_KEY": inp},
++            capture_output=True,
++            text=True,
++        )
++        assert result.returncode == 0, f"bash _write_env_key failed: {result.stderr}"
++        assert result.stdout == expected, (
++            f"for key={inp!r}:\n  expected: {expected!r}\n  got:      {result.stdout!r}"
++        )
++
++
++def test_no_redundant_chmod():
++    """Verify that redundant chmod calls on the .env file have been removed
++    to prevent regressions."""
++    with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
++        content = f.read()
++
++    # Find all occurrences of chmod 600 targeting the .env file
++    chmod_calls = __import__("re").findall(r"chmod\s+600\s+.*\.env", content)
++    assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"
++
++
++# ── CLI dispatch tests ──────────────────────────────────────────────────────
++
++
++def test_cli_dispatch_no_args_exits_with_usage():
++    """_cli_dispatch should print usage and exit 1 when no args given."""
++    with (
++        patch("sys.argv", ["install_helpers.py"]),
++        pytest.raises(SystemExit) as exc_info,
++    ):
++        _cli_dispatch()
++    assert exc_info.value.code == 1
++
++
++def test_cli_dispatch_unknown_command_exits():
++    """_cli_dispatch should print error and exit 1 for unknown commands."""
++    with (
++        patch("sys.argv", ["install_helpers.py", "bogus_command"]),
++        pytest.raises(SystemExit) as exc_info,
++    ):
++        _cli_dispatch()
++    assert exc_info.value.code == 1
++
++
++def test_cli_update_env_key_missing_arg_exits():
++    """_cli_update_env_key should exit 1 when env_file argument is missing."""
++    with (
++        patch("sys.argv", ["install_helpers.py", "update_env_key"]),
++        pytest.raises(SystemExit) as exc_info,
++    ):
++        _cli_update_env_key()
++    assert exc_info.value.code == 1
++
++
++def test_cli_read_env_key_missing_arg_exits():
++    """_cli_read_env_key should exit 1 when env_file argument is missing."""
++    with (
++        patch("sys.argv", ["install_helpers.py", "read_env_key"]),
++        pytest.raises(SystemExit) as exc_info,
++    ):
++        _cli_read_env_key()
++    assert exc_info.value.code == 1
++
++
++def test_cli_write_plist_missing_args_exits():
++    """_cli_write_plist should exit 1 when any required argument is missing."""
++    with (
++        patch("sys.argv", ["install_helpers.py", "write_plist", "template"]),
++        pytest.raises(SystemExit) as exc_info,
++    ):
++        _cli_write_plist()
++    assert exc_info.value.code == 1
++
++
++def test_cli_write_plist_writes_plist(tmp_path):
++    """_cli_write_plist should resolve ~/ to $HOME/ in the plist."""
++    template = tmp_path / "template.plist"
++    output = tmp_path / "output.plist"
++    template.write_text(
++        '<?xml version="1.0"?>\n'
++        "<plist><dict>"
++        "<key>StandardErrorPath</key><string>~/Library/Logs/app.err.log</string>"
++        "</dict></plist>\n"
++    )
++    home = "/Users/testuser"
++    with (
++        patch(
++            "sys.argv",
++            [
++                "install_helpers.py",
++                "write_plist",
++                str(template),
++                str(output),
++                home,
++            ],
++        ),
++    ):
++        _cli_write_plist()
++    result = output.read_text()
++    assert "~/Library/Logs" not in result
++    assert "/Users/testuser/Library/Logs" in result
++
++
++def test_cli_update_env_key_missing_env_var_exits():
++    """_cli_update_env_key should exit 1 and print to stderr when LOCAL_API_KEY_VALUE is missing."""
++    with (
++        patch("sys.argv", ["install_helpers.py", "update_env_key", "dummy_env_file"]),
++        patch.dict(os.environ, {}, clear=True),
++        pytest.raises(SystemExit) as exc_info,
++        patch("sys.stderr.write") as mock_stderr_write,
++    ):
++        _cli_update_env_key()
++    assert exc_info.value.code == 1
++    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
++    assert "Error: LOCAL_API_KEY_VALUE" in written
++
++
++def test_cli_read_env_key_file_not_found_exits(tmp_path):
++    """_cli_read_env_key should exit 1 and print to stderr when the env file does not exist."""
++    non_existent = str(tmp_path / "does_not_exist")
++    with (
++        patch("sys.argv", ["install_helpers.py", "read_env_key", non_existent]),
++        pytest.raises(SystemExit) as exc_info,
++        patch("sys.stderr.write") as mock_stderr_write,
++    ):
++        _cli_read_env_key()
++    assert exc_info.value.code == 1
++    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
++    assert "Error:" in written
++    assert "not found" in written
++
++
++def test_cli_write_plist_file_not_found_exits(tmp_path):
++    """_cli_write_plist should exit 1 and print to stderr when the template file does not exist."""
++    non_existent = str(tmp_path / "does_not_exist")
++    output = str(tmp_path / "output.plist")
++    with (
++        patch(
++            "sys.argv",
++            [
++                "install_helpers.py",
++                "write_plist",
++                non_existent,
++                output,
++                "/Users/testuser",
++            ],
++        ),
++        pytest.raises(SystemExit) as exc_info,
++        patch("sys.stderr.write") as mock_stderr_write,
++    ):
++        _cli_write_plist()
++    assert exc_info.value.code == 1
++    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
++    assert "Error:" in written
++    assert "not found" in written
++
++
++def test_update_env_key_exception_handling(tmp_path):
++    """Verify that update_env_key cleans up the temp file if an exception occurs."""
++    env_file = tmp_path / "test.env"
++    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
++
++    # Patch os.replace to raise an error
++    with patch("os.replace", side_effect=RuntimeError("simulated error")):
++        with pytest.raises(RuntimeError, match="simulated error"):
++            update_env_key(str(env_file), "newkey")
++
++    # The temp file should have been cleaned up.
++    remaining_files = list(tmp_path.glob(".env.tmp-*"))
++    assert len(remaining_files) == 0
++
++
++def test_update_env_key_exception_handling_remove_fails(tmp_path):
++    """Verify that update_env_key propagates the original exception even if os.remove fails."""
++    env_file = tmp_path / "test.env"
++    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
++
++    with (
++        patch("os.replace", side_effect=RuntimeError("simulated error")),
++        patch("os.remove", side_effect=OSError("simulated remove error")),
++    ):
++        with pytest.raises(RuntimeError, match="simulated error"):
++            update_env_key(str(env_file), "newkey")
++
++
++def test_update_env_key_base_exception_handling(tmp_path):
++    """Verify that update_env_key cleans up the temp file if a BaseException occurs."""
++    env_file = tmp_path / "test.env"
++    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
++
++    # Patch os.replace to raise a BaseException (KeyboardInterrupt)
++    with patch("os.replace", side_effect=KeyboardInterrupt("simulated interrupt")):
++        with pytest.raises(KeyboardInterrupt, match="simulated interrupt"):
++            update_env_key(str(env_file), "newkey")
++
++    # The temp file should have been cleaned up.
++    remaining_files = list(tmp_path.glob(".env.tmp-*"))
++    assert len(remaining_files) == 0
++
++
++def test_cli_write_plist_missing_dest_dir(tmp_path):
++    """_cli_write_plist should exit 1 and print to stderr
++    when the destination directory does not exist.
++    """
++    template = tmp_path / "template.plist"
++    template.write_text("dummy plist template", encoding="utf-8")
++    non_existent_dest = str(tmp_path / "non_existent_dir" / "output.plist")
++    with (
++        patch(
++            "sys.argv",
++            [
++                "install_helpers.py",
++                "write_plist",
++                str(template),
++                non_existent_dest,
++                "/Users/testuser",
++            ],
++        ),
++        pytest.raises(SystemExit) as exc_info,
++        patch("sys.stderr.write") as mock_stderr_write,
++    ):
++        _cli_write_plist()
++    assert exc_info.value.code == 1
++    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
++    assert "Error:" in written
++    assert "Destination directory for" in written
++    assert "does not exist" in written
++
++
++def test_cli_write_plist_permission_error(tmp_path):
++    """_cli_write_plist should exit 1 and print to stderr when there is a permission error."""
++    template = tmp_path / "template.plist"
++    template.write_text("dummy plist template", encoding="utf-8")
++    output = str(tmp_path / "output.plist")
++
++    with (
++        patch(
++            "sys.argv",
++            [
++                "install_helpers.py",
++                "write_plist",
++                str(template),
++                output,
++                "/Users/testuser",
++            ],
++        ),
++        patch(
++            "builtins.open",
++            side_effect=[
++                mock_open(read_data="dummy").return_value,
++                PermissionError("Permission denied"),
++            ],
++        ),
++        pytest.raises(SystemExit) as exc_info,
++        patch("sys.stderr.write") as mock_stderr_write,
++    ):
++        _cli_write_plist()
++    assert exc_info.value.code == 1
++    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
++    assert "Error:" in written
++    assert "Permission denied" in written
++
++
++def test_cli_write_plist_template_permission_error(tmp_path):
++    """_cli_write_plist should exit 1 and print to stderr
++    when there is a template read permission error.
++    """
++    template = str(tmp_path / "template.plist")
++    output = str(tmp_path / "output.plist")
++
++    # Construct a PermissionError where filename matches the template
++    err = PermissionError("Permission denied")
++    err.filename = template
++
++    with (
++        patch(
++            "sys.argv",
++            [
++                "install_helpers.py",
++                "write_plist",
++                template,
++                output,
++                "/Users/testuser",
++            ],
++        ),
++        patch("builtins.open", side_effect=err),
++        pytest.raises(SystemExit) as exc_info,
++        patch("sys.stderr.write") as mock_stderr_write,
++    ):
++        _cli_write_plist()
++    assert exc_info.value.code == 1
++    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
++    assert "Error:" in written
++    assert "Permission denied reading Plist template file" in written
++
++
++def test_write_plist_preserves_comments(tmp_path):
++    """Verify that write_plist resolves ~/ paths in XML body but preserves them in XML comments."""
++    template = tmp_path / "template.plist"
++    output = tmp_path / "output.plist"
++
++    template.write_text(
++        '<?xml version="1.0"?>\n'
++        '<plist><dict>\n'
++        '    <!-- Note: Do not change ~/ in this comment! -->\n'
++        '    <key>Path</key><string>~/some/path</string>\n'
++        '</dict></plist>\n',
++        encoding="utf-8",
++    )
++
++    from install_helpers import write_plist
++    write_plist(str(template), str(output), "/Users/testuser")
++
++    result = output.read_text(encoding="utf-8")
++    assert "<!-- Note: Do not change ~/ in this comment! -->" in result
++    assert "<string>/Users/testuser/some/path</string>" in result
++
++
++def test_update_env_key_resolves_symlinks(tmp_path):
++    """Verify that update_env_key resolves symlinks and modifies the target file instead of replacing the symlink itself."""
++    target_env = tmp_path / "real.env"
++    symlink_env = tmp_path / "link.env"
++
++    target_env.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
++    os.symlink(str(target_env), str(symlink_env))
++
++    from install_helpers import update_env_key
++    update_env_key(str(symlink_env), "newkey")
++
++    # Verify symlink is still a symlink
++    assert os.path.islink(str(symlink_env))
++    assert os.path.realpath(str(symlink_env)) == str(target_env)
++
++    # Verify the target was updated
++    assert target_env.read_text(encoding="utf-8") == 'LOCAL_API_KEY="newkey"\n'
++
++
++def test_installer_trap_preservation():
++    """Verify that the trap preservation logic in install_prod.sh works correctly."""
++    bash_script = """
++    # Set an old trap
++    trap 'echo "OLD_TRAP_RUN"' EXIT
++
++    # Retrieve any existing EXIT trap commands to avoid overwriting them
++    existing_exit_trap=$(trap -p EXIT)
++    if [ -n "$existing_exit_trap" ]; then
++        existing_cmd=$(echo "$existing_exit_trap" | sed -E "s/^trap -- '(.*)' EXIT$/\\1/")
++        run_exit_trap() {
++            eval "$existing_cmd"
++            echo "NEW_TRAP_RUN"
++        }
++        trap run_exit_trap EXIT
++    else
++        echo "NO_OLD_TRAP"
++    fi
++    """
++    result = subprocess.run(
++        ["bash", "-c", bash_script],
++        capture_output=True,
++        text=True,
++    )
++    assert result.returncode == 0
++    assert "OLD_TRAP_RUN" in result.stdout
++    assert "NEW_TRAP_RUN" in result.stdout
++
++
++def test_installer_env_file_tilde_expansion():
++    """Verify that the ENV_FILE tilde expansion logic resolves both ~/ and ~username (or just ~*) paths."""
++    bash_script = """
++    # Mock HOME and ENV_FILE
++    HOME="/Users/mockhome"
++
++    # Test ~/path
++    ENV_FILE="~/some/.env"
++    if [[ "$ENV_FILE" == ~* ]]; then
++        ENV_FILE="${ENV_FILE/#\\~/$HOME}"
++    fi
++    echo "RESULT1:$ENV_FILE"
++
++    # Test ~other/path
++    ENV_FILE="~other/.env"
++    if [[ "$ENV_FILE" == ~* ]]; then
++        ENV_FILE="${ENV_FILE/#\\~/$HOME}"
++    fi
++    echo "RESULT2:$ENV_FILE"
++    """
++    result = subprocess.run(
++        ["bash", "-c", bash_script],
++        capture_output=True,
++        text=True,
++    )
++    assert result.returncode == 0
++    assert "RESULT1:/Users/mockhome/some/.env" in result.stdout
++    assert "RESULT2:/Users/mockhomeother/.env" in result.stdout

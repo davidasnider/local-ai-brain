@@ -8,10 +8,9 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
 
 # Expand ~ to $HOME in ENV_FILE paths
-# For named user paths (e.g. ~john), let the shell handle it by not quoting
-# the expanded string if possible, or eval, but simple $HOME is safer.
+# For named user paths, we expand using shell eval
 if [[ "$ENV_FILE" == ~* ]]; then
-    ENV_FILE="${ENV_FILE/#\~/$HOME}"
+    ENV_FILE=$(eval echo "$ENV_FILE")
 fi
 
 case "$ENV_FILE" in
@@ -69,18 +68,27 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # The temp dir and helpers are only needed during direct execution, not when sourced.
     INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
     # Register cleanup to prevent temp file leaks
-    # Retrieve any existing EXIT trap commands to avoid overwriting them
-    existing_exit_trap=$(trap -p EXIT)
-    if [ -n "$existing_exit_trap" ]; then
-        existing_cmd=$(echo "$existing_exit_trap" | sed -E "s/^trap -- '(.*)' EXIT$/\1/")
+    # Use a more robust way to retrieve EXIT trap commands by using a temporary file
+    # to store the existing trap command, avoiding quoting/escaping issues with 'eval'.
+    trap_file=$(mktemp /tmp/trap_XXXXXX)
+    trap -p EXIT > "$trap_file"
+    if [ -s "$trap_file" ]; then
+        # The output of trap -p EXIT is: trap -- 'command' EXIT
+        # We need to extract the command between the single quotes.
+        existing_cmd=$(sed -n "s/^trap -- '\(.*\)' EXIT$/\1/p" "$trap_file")
+        # Ensure we properly escape the existing command for the subshell to run it
+        # Actually, since it's already a bash command string, we can just use it
+        # in a function.
         run_exit_trap() {
             eval "$existing_cmd"
             rm -rf "$INSTALL_HELPERS_DIR"
+            rm -f "$trap_file"
         }
         trap run_exit_trap EXIT
     else
-        trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
+        trap 'rm -rf "$INSTALL_HELPERS_DIR"; rm -f "$trap_file"' EXIT
     fi
+    rm -f "$trap_file"
     INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
     cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 

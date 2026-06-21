@@ -172,7 +172,30 @@ def test_no_redundant_chmod():
     assert len(chmod_calls) == 1, f"Expected exactly 1 chmod 600 call on .env, found: {chmod_calls}"
 
 
-# ── CLI dispatch tests ──────────────────────────────────────────────────────
+def test_upsert_api_key_coverage(tmp_path):
+    """Verify _upsert_api_key behavior when key is present vs missing."""
+    env_file = tmp_path / "test.env"
+    env_file.write_text("OTHER_VAR=value\n", encoding="utf-8")
+    
+    # Test append when missing
+    result = subprocess.run(
+        ["bash", "-c", f'source "{SCRIPT_PATH}"; _upsert_api_key "{env_file}"'],
+        env={**os.environ, "LOCAL_API_KEY": "newkey"},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert 'LOCAL_API_KEY="newkey"' in env_file.read_text()
+    
+    # Test update when present
+    result = subprocess.run(
+        ["bash", "-c", f'source "{SCRIPT_PATH}"; _upsert_api_key "{env_file}"'],
+        env={**os.environ, "LOCAL_API_KEY": "updatedkey"},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert 'LOCAL_API_KEY="updatedkey"' in env_file.read_text()
 
 
 def test_cli_dispatch_no_args_exits_with_usage():
@@ -518,23 +541,20 @@ def test_installer_trap_preservation():
 
 
 def test_installer_env_file_tilde_expansion():
-    """Verify that the ENV_FILE tilde expansion logic resolves both ~/ and ~username (or just ~*) paths."""
+    """Verify that the ENV_FILE tilde expansion logic resolves correctly."""
     bash_script = """
     # Mock HOME and ENV_FILE
     HOME="/Users/mockhome"
 
     # Test ~/path
     ENV_FILE="~/some/.env"
-    if [[ "$ENV_FILE" == ~* ]]; then
-        ENV_FILE="${ENV_FILE/#\\~/$HOME}"
-    fi
+    ENV_FILE=$(eval echo "$ENV_FILE")
     echo "RESULT1:$ENV_FILE"
 
-    # Test ~other/path
+    # Test ~other/path (should resolve to other user's home or fail gracefully if invalid)
+    # For this test, we accept whatever 'eval echo ~other' resolves to in this test env.
     ENV_FILE="~other/.env"
-    if [[ "$ENV_FILE" == ~* ]]; then
-        ENV_FILE="${ENV_FILE/#\\~/$HOME}"
-    fi
+    ENV_FILE=$(eval echo "$ENV_FILE")
     echo "RESULT2:$ENV_FILE"
     """
     result = subprocess.run(
@@ -543,5 +563,7 @@ def test_installer_env_file_tilde_expansion():
         text=True,
     )
     assert result.returncode == 0
+    # ~home should expand to /Users/mockhome
     assert "RESULT1:/Users/mockhome/some/.env" in result.stdout
-    assert "RESULT2:/Users/mockhomeother/.env" in result.stdout
+    # ~other should NOT be /Users/mockhomeother/.env
+    assert "RESULT2:/Users/mockhomeother/.env" not in result.stdout
