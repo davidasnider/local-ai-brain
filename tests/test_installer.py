@@ -83,7 +83,8 @@ def test_read_env_key_comment_stripping():
         ("export LOCAL_API_KEY=some_key", "some_key"),  # pragma: allowlist secret
         ("  LOCAL_API_KEY  =  another_key  ", "another_key"),  # pragma: allowlist secret
         ('LOCAL_API_KEY="key_with_\\"_quotes"', 'key_with_"_quotes'),  # pragma: allowlist secret
-        ("LOCAL_API_KEY='key_with_\\'_quotes'", "key_with_'_quotes"),  # pragma: allowlist secret
+        ("LOCAL_API_KEY='key_with_\\'_quotes'", "key_with_\\"),  # pragma: allowlist secret
+        ("LOCAL_API_KEY='key_with_no_escaping_\\\\'", "key_with_no_escaping_\\\\"),  # pragma: allowlist secret
         ("LOCAL_API_KEY=firstkey\nLOCAL_API_KEY=lastkey", "lastkey"),  # pragma: allowlist secret
     ]
 
@@ -98,6 +99,29 @@ def test_read_env_key_comment_stripping():
                 f"for content={file_content!r}:\n  expected: "
                 f"{expected_key!r}\n  got:      {result!r}"
             )
+
+
+def test_round_trip_keys(tmp_path):
+    """Verify round-tripping keys with shell-sensitive characters ($ or `) through update_env_key and read_env_key."""
+    keys = [
+        "simple_key",
+        "key_with_$",
+        "key_with_`_backtick",
+        "key_with_$_and_`",
+        "key_with_\\_and_$_and_`_and_\"",
+        r"complex_$\$`\\`\"$",
+    ]
+    for idx, key in enumerate(keys):
+        env_file = tmp_path / f"roundtrip_{idx}.env"
+        # Create a dummy .env file
+        env_file.write_text("LOCAL_API_KEY=dummy", encoding="utf-8")
+
+        # Write the key using update_env_key
+        update_env_key(str(env_file), key)
+
+        # Read the key back using read_env_key
+        read_val = read_env_key(str(env_file))
+        assert read_val == key, f"Round-trip failed for key: {key!r} (got: {read_val!r})"
 
 
 def test_write_env_key_escaping(tmp_path):

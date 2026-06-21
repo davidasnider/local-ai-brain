@@ -70,22 +70,20 @@ def read_env_key(env_file: str) -> str | None:
             if _r.startswith('"'):
                 q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', _r)
                 if q:
-                    _r = q.group(1).replace(r"\"", '"').replace(r"\\", "\\")
+                    _r = re.sub(r'\\([$`"\\`])', r'\1', q.group(1))
                 else:
                     # Mismatched/unclosed quote — strip leading quote, keep rest
                     _r = _r.lstrip('"')
             elif _r.startswith("'"):
-                # Shell does not support backslash-escaping inside single quotes.
-                # Find the first closing quote.
-                q = re.match(r"^'((?:[^'\\]|\\.)*)'(.*)", _r)
+                # Under POSIX shell, a single-quoted string preserves the literal value of
+                # all characters. Backslashes have no special meaning inside single quotes.
+                # The string ends at the first closing single quote.
+                q = re.match(r"^'([^']*)'(.*)", _r)
                 if q:
-                    _r = q.group(1).replace(r"\'", "'").replace(r"\\", "\\")
+                    _r = q.group(1)
                 else:
-                    m = re.match(r"^'([^']*)'(.*)", _r)
-                    if m:
-                        _r = m.group(1)
-                    else:
-                        _r = _r.lstrip("'")
+                    # Mismatched/unclosed quote — strip leading quote, keep rest
+                    _r = _r.lstrip("'")
             else:
                 _r = re.sub(r"\s+#.*", "", _r)
             last_match = _r
