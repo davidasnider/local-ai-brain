@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import tempfile
+from typing import Optional
 from collections.abc import Callable
 
 
@@ -51,8 +52,6 @@ def update_env_key(env_file: str, key: str) -> None:
             except OSError:
                 pass
 
-
-from typing import Optional
 
 def read_env_key(env_file: str) -> Optional[str]:
     """Read the LOCAL_API_KEY value from ``env_file``.

@@ -84,7 +84,10 @@ def test_read_env_key_comment_stripping():
         ("  LOCAL_API_KEY  =  another_key  ", "another_key"),  # pragma: allowlist secret
         ('LOCAL_API_KEY="key_with_\\"_quotes"', 'key_with_"_quotes'),  # pragma: allowlist secret
         ("LOCAL_API_KEY='key_with_\\'_quotes'", "key_with_\\"),  # pragma: allowlist secret
-        ("LOCAL_API_KEY='key_with_no_escaping_\\\\'", "key_with_no_escaping_\\\\"),  # pragma: allowlist secret
+        (
+            "LOCAL_API_KEY='key_with_no_escaping_\\\\'",
+            "key_with_no_escaping_\\\\",
+        ),  # pragma: allowlist secret
         ("LOCAL_API_KEY=firstkey\nLOCAL_API_KEY=lastkey", "lastkey"),  # pragma: allowlist secret
     ]
 
@@ -102,7 +105,10 @@ def test_read_env_key_comment_stripping():
 
 
 def test_round_trip_keys(tmp_path):
-    """Verify round-tripping keys with shell-sensitive characters ($ or `) through update_env_key and read_env_key."""
+    """Verify round-tripping keys with shell-sensitive characters ($ or `)
+
+    through update_env_key and read_env_key.
+    """
     keys = [
         "simple_key",
         "key_with_$",
@@ -493,7 +499,10 @@ def test_write_plist_preserves_comments(tmp_path):
 
 
 def test_update_env_key_resolves_symlinks(tmp_path):
-    """Verify that update_env_key resolves symlinks and modifies the target file instead of replacing the symlink itself."""
+    """Verify that update_env_key resolves symlinks and modifies the target file
+
+    instead of replacing the symlink itself.
+    """
     target_env = tmp_path / "real.env"
     symlink_env = tmp_path / "link.env"
 
