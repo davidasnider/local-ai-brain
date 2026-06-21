@@ -310,3 +310,114 @@ def test_update_env_key_exception_handling_remove_fails(tmp_path):
     ):
         with pytest.raises(RuntimeError, match="simulated error"):
             update_env_key(str(env_file), "newkey")
+
+
+def test_update_env_key_base_exception_handling(tmp_path):
+    """Verify that update_env_key cleans up the temp file if a BaseException occurs."""
+    env_file = tmp_path / "test.env"
+    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+
+    # Patch os.replace to raise a BaseException (KeyboardInterrupt)
+    with patch("os.replace", side_effect=KeyboardInterrupt("simulated interrupt")):
+        with pytest.raises(KeyboardInterrupt, match="simulated interrupt"):
+            update_env_key(str(env_file), "newkey")
+
+    # The temp file should have been cleaned up.
+    remaining_files = list(tmp_path.glob(".env.tmp-*"))
+    assert len(remaining_files) == 0
+
+
+def test_cli_write_plist_missing_dest_dir(tmp_path):
+    """_cli_write_plist should exit 1 and print to stderr
+    when the destination directory does not exist.
+    """
+    template = tmp_path / "template.plist"
+    template.write_text("dummy plist template", encoding="utf-8")
+    non_existent_dest = str(tmp_path / "non_existent_dir" / "output.plist")
+    with (
+        patch(
+            "sys.argv",
+            [
+                "install_helpers.py",
+                "write_plist",
+                str(template),
+                non_existent_dest,
+                "/Users/testuser",
+            ],
+        ),
+        pytest.raises(SystemExit) as exc_info,
+        patch("sys.stderr.write") as mock_stderr_write,
+    ):
+        _cli_write_plist()
+    assert exc_info.value.code == 1
+    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
+    assert "Error:" in written
+    assert "Destination directory for" in written
+    assert "does not exist" in written
+
+
+def test_cli_write_plist_permission_error(tmp_path):
+    """_cli_write_plist should exit 1 and print to stderr when there is a permission error."""
+    template = tmp_path / "template.plist"
+    template.write_text("dummy plist template", encoding="utf-8")
+    output = str(tmp_path / "output.plist")
+
+    with (
+        patch(
+            "sys.argv",
+            [
+                "install_helpers.py",
+                "write_plist",
+                str(template),
+                output,
+                "/Users/testuser",
+            ],
+        ),
+        patch(
+            "builtins.open",
+            side_effect=[
+                mock_open(read_data="dummy").return_value,
+                PermissionError("Permission denied"),
+            ],
+        ),
+        pytest.raises(SystemExit) as exc_info,
+        patch("sys.stderr.write") as mock_stderr_write,
+    ):
+        _cli_write_plist()
+    assert exc_info.value.code == 1
+    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
+    assert "Error:" in written
+    assert "Permission denied" in written
+
+
+def test_cli_write_plist_template_permission_error(tmp_path):
+    """_cli_write_plist should exit 1 and print to stderr
+    when there is a template read permission error.
+    """
+    template = str(tmp_path / "template.plist")
+    output = str(tmp_path / "output.plist")
+
+    # Construct a PermissionError where filename matches the template
+    err = PermissionError("Permission denied")
+    err.filename = template
+
+    with (
+        patch(
+            "sys.argv",
+            [
+                "install_helpers.py",
+                "write_plist",
+                template,
+                output,
+                "/Users/testuser",
+            ],
+        ),
+        patch("builtins.open", side_effect=err),
+        pytest.raises(SystemExit) as exc_info,
+        patch("sys.stderr.write") as mock_stderr_write,
+    ):
+        _cli_write_plist()
+    assert exc_info.value.code == 1
+    written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
+    assert "Error:" in written
+    assert "Permission denied reading Plist template file" in written

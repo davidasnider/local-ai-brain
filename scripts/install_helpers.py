@@ -32,6 +32,7 @@ def update_env_key(env_file: str, key: str) -> None:
 
     dir_name = os.path.dirname(os.path.abspath(env_file))
     fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix=".env.tmp-")
+    replaced = False
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(new_content)
@@ -39,12 +40,13 @@ def update_env_key(env_file: str, key: str) -> None:
             os.fsync(f.fileno())
         os.chmod(temp_path, 0o600)
         os.replace(temp_path, env_file)
-    except Exception:
-        try:
-            os.remove(temp_path)
-        except OSError:
-            pass
-        raise
+        replaced = True
+    finally:
+        if not replaced:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 
 def read_env_key(env_file: str) -> str | None:
@@ -180,10 +182,25 @@ def _cli_write_plist() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+    template = sys.argv[2]
+    output = sys.argv[3]
+    home_dir = sys.argv[4]
     try:
-        write_plist(sys.argv[2], sys.argv[3], sys.argv[4])
-    except FileNotFoundError:
-        print(f"Error: Plist template file '{sys.argv[2]}' not found.", file=sys.stderr)
+        write_plist(template, output, home_dir)
+    except FileNotFoundError as e:
+        if e.filename == template or not os.path.exists(template):
+            print(f"Error: Plist template file '{template}' not found.", file=sys.stderr)
+        else:
+            print(f"Error: Destination directory for '{output}' does not exist.", file=sys.stderr)
+        sys.exit(1)
+    except PermissionError as e:
+        if e.filename == template:
+            print(
+                f"Error: Permission denied reading Plist template file '{template}'.",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Error: Permission denied writing to '{output}'.", file=sys.stderr)
         sys.exit(1)
 
 

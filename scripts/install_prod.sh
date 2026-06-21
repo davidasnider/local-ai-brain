@@ -23,6 +23,9 @@ esac
 # Helper function to update LOCAL_API_KEY in a .env file
 update_env_key() {
     local env_file="$1"
+    if [ -z "$INSTALL_HELPERS" ]; then
+        INSTALL_HELPERS="$SCRIPT_DIR/install_helpers.py"
+    fi
     LOCAL_API_KEY_VALUE="$LOCAL_API_KEY" ${PYTHON:-python3} "$INSTALL_HELPERS" update_env_key "$env_file"
 }
 
