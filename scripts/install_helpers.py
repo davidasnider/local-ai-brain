@@ -8,8 +8,8 @@ import os
 import re
 import sys
 import tempfile
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
 
 def update_env_key(env_file: str, key: str) -> None:
@@ -72,7 +72,7 @@ def read_env_key(env_file: str) -> Optional[str]:
             if content_match.startswith('"'):
                 q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', content_match)
                 if q:
-                    content_match = re.sub(r'\\([$`"\\`])', r'\1', q.group(1))
+                    content_match = re.sub(r'\\([$`"\\`])', r"\1", q.group(1))
                 else:
                     # Mismatched/unclosed quote — strip leading quote, keep rest
                     content_match = content_match.lstrip('"')

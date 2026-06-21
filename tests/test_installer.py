@@ -85,7 +85,7 @@ def test_read_env_key_comment_stripping():
         ('LOCAL_API_KEY="key_with_\\"_quotes"', 'key_with_"_quotes'),  # pragma: allowlist secret
         ("LOCAL_API_KEY='key_with_\\'_quotes'", "key_with_\\"),  # pragma: allowlist secret
         (
-            "LOCAL_API_KEY='key_with_no_escaping_\\\\'",
+            "LOCAL_API_KEY='key_with_no_escaping_\\\\'",  # pragma: allowlist secret
             "key_with_no_escaping_\\\\",
         ),  # pragma: allowlist secret
         ("LOCAL_API_KEY=firstkey\nLOCAL_API_KEY=lastkey", "lastkey"),  # pragma: allowlist secret
@@ -114,13 +114,13 @@ def test_round_trip_keys(tmp_path):
         "key_with_$",
         "key_with_`_backtick",
         "key_with_$_and_`",
-        "key_with_\\_and_$_and_`_and_\"",
+        'key_with_\\_and_$_and_`_and_"',
         r"complex_$\$`\\`\"$",
     ]
     for idx, key in enumerate(keys):
         env_file = tmp_path / f"roundtrip_{idx}.env"
         # Create a dummy .env file
-        env_file.write_text("LOCAL_API_KEY=dummy", encoding="utf-8")
+        env_file.write_text("LOCAL_API_KEY=dummy", encoding="utf-8")  # pragma: allowlist secret
 
         # Write the key using update_env_key
         update_env_key(str(env_file), key)
@@ -182,26 +182,26 @@ def test_upsert_api_key_coverage(tmp_path):
     """Verify _upsert_api_key behavior when key is present vs missing."""
     env_file = tmp_path / "test.env"
     env_file.write_text("OTHER_VAR=value\n", encoding="utf-8")
-    
+
     # Test append when missing
     result = subprocess.run(
         ["bash", "-c", f'source "{SCRIPT_PATH}"; _upsert_api_key "{env_file}"'],
-        env={**os.environ, "LOCAL_API_KEY": "newkey"},
+        env={**os.environ, "LOCAL_API_KEY": "newkey"},  # pragma: allowlist secret
         capture_output=True,
         text=True,
     )
     assert result.returncode == 0
-    assert 'LOCAL_API_KEY="newkey"' in env_file.read_text()
-    
+    assert 'LOCAL_API_KEY="newkey"' in env_file.read_text()  # pragma: allowlist secret
+
     # Test update when present
     result = subprocess.run(
         ["bash", "-c", f'source "{SCRIPT_PATH}"; _upsert_api_key "{env_file}"'],
-        env={**os.environ, "LOCAL_API_KEY": "updatedkey"},
+        env={**os.environ, "LOCAL_API_KEY": "updatedkey"},  # pragma: allowlist secret
         capture_output=True,
         text=True,
     )
     assert result.returncode == 0
-    assert 'LOCAL_API_KEY="updatedkey"' in env_file.read_text()
+    assert 'LOCAL_API_KEY="updatedkey"' in env_file.read_text()  # pragma: allowlist secret
 
 
 def test_cli_dispatch_no_args_exits_with_usage():
@@ -340,7 +340,7 @@ def test_cli_write_plist_file_not_found_exits(tmp_path):
 def test_update_env_key_exception_handling(tmp_path):
     """Verify that update_env_key cleans up the temp file if an exception occurs."""
     env_file = tmp_path / "test.env"
-    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")  # pragma: allowlist secret
 
     # Patch os.replace to raise an error
     with patch("os.replace", side_effect=RuntimeError("simulated error")):
@@ -355,7 +355,7 @@ def test_update_env_key_exception_handling(tmp_path):
 def test_update_env_key_exception_handling_remove_fails(tmp_path):
     """Verify that update_env_key propagates the original exception even if os.remove fails."""
     env_file = tmp_path / "test.env"
-    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")  # pragma: allowlist secret
 
     with (
         patch("os.replace", side_effect=RuntimeError("simulated error")),
@@ -368,7 +368,7 @@ def test_update_env_key_exception_handling_remove_fails(tmp_path):
 def test_update_env_key_base_exception_handling(tmp_path):
     """Verify that update_env_key cleans up the temp file if a BaseException occurs."""
     env_file = tmp_path / "test.env"
-    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+    env_file.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")  # pragma: allowlist secret
 
     # Patch os.replace to raise a BaseException (KeyboardInterrupt)
     with patch("os.replace", side_effect=KeyboardInterrupt("simulated interrupt")):
@@ -483,14 +483,15 @@ def test_write_plist_preserves_comments(tmp_path):
 
     template.write_text(
         '<?xml version="1.0"?>\n'
-        '<plist><dict>\n'
-        '    <!-- Note: Do not change ~/ in this comment! -->\n'
-        '    <key>Path</key><string>~/some/path</string>\n'
-        '</dict></plist>\n',
+        "<plist><dict>\n"
+        "    <!-- Note: Do not change ~/ in this comment! -->\n"
+        "    <key>Path</key><string>~/some/path</string>\n"
+        "</dict></plist>\n",
         encoding="utf-8",
     )
 
     from install_helpers import write_plist
+
     write_plist(str(template), str(output), "/Users/testuser")
 
     result = output.read_text(encoding="utf-8")
@@ -506,10 +507,11 @@ def test_update_env_key_resolves_symlinks(tmp_path):
     target_env = tmp_path / "real.env"
     symlink_env = tmp_path / "link.env"
 
-    target_env.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+    target_env.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")  # pragma: allowlist secret
     os.symlink(str(target_env), str(symlink_env))
 
     from install_helpers import update_env_key
+
     update_env_key(str(symlink_env), "newkey")
 
     # Verify symlink is still a symlink
@@ -517,7 +519,10 @@ def test_update_env_key_resolves_symlinks(tmp_path):
     assert os.path.realpath(str(symlink_env)) == str(target_env)
 
     # Verify the target was updated
-    assert target_env.read_text(encoding="utf-8") == 'LOCAL_API_KEY="newkey"\n'
+    assert (
+        target_env.read_text(encoding="utf-8")
+        == 'LOCAL_API_KEY="newkey"\n'  # pragma: allowlist secret
+    )  # pragma: allowlist secret
 
 
 def test_installer_trap_preservation():
