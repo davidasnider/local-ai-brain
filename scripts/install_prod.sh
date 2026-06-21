@@ -10,7 +10,7 @@ ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
 # Expand ~ to $HOME in ENV_FILE paths
 # For named user paths (e.g. ~john), let the shell handle it by not quoting
 # the expanded string if possible, or eval, but simple $HOME is safer.
-if [[ "$ENV_FILE" == ~/* ]]; then
+if [[ "$ENV_FILE" == ~* ]]; then
     ENV_FILE="${ENV_FILE/#\~/$HOME}"
 fi
 
@@ -69,7 +69,18 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # The temp dir and helpers are only needed during direct execution, not when sourced.
     INSTALL_HELPERS_DIR=$(mktemp -d /tmp/install_helpers.XXXXXXXXXX)
     # Register cleanup to prevent temp file leaks
-    trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
+    # Retrieve any existing EXIT trap commands to avoid overwriting them
+    existing_exit_trap=$(trap -p EXIT)
+    if [ -n "$existing_exit_trap" ]; then
+        existing_cmd=$(echo "$existing_exit_trap" | sed -E "s/^trap -- '(.*)' EXIT$/\1/")
+        run_exit_trap() {
+            eval "$existing_cmd"
+            rm -rf "$INSTALL_HELPERS_DIR"
+        }
+        trap run_exit_trap EXIT
+    else
+        trap 'rm -rf "$INSTALL_HELPERS_DIR"' EXIT
+    fi
     INSTALL_HELPERS="$INSTALL_HELPERS_DIR/install_helpers.py"
     cp "$SCRIPT_DIR/install_helpers.py" "$INSTALL_HELPERS"
 

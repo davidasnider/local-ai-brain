@@ -41,7 +41,8 @@ def update_env_key(env_file: str, key: str) -> None:
             f.flush()
             os.fsync(f.fileno())
         os.chmod(temp_path, 0o600)
-        os.replace(temp_path, env_file)
+        real_env_file = os.path.realpath(env_file)
+        os.replace(temp_path, real_env_file)
         replaced = True
     finally:
         if not replaced:
@@ -66,27 +67,27 @@ def read_env_key(env_file: str) -> str | None:
             m = re.match(r"^\s*(?:export\s+)?LOCAL_API_KEY\s*=\s*(.*)", line)
             if not m:
                 continue
-            _r = m.group(1).strip()
-            if _r.startswith('"'):
-                q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', _r)
+            content_match = m.group(1).strip()
+            if content_match.startswith('"'):
+                q = re.match(r'^"((?:[^"\\]|\\.)*)"(.*)', content_match)
                 if q:
-                    _r = re.sub(r'\\([$`"\\`])', r'\1', q.group(1))
+                    content_match = re.sub(r'\\([$`"\\`])', r'\1', q.group(1))
                 else:
                     # Mismatched/unclosed quote — strip leading quote, keep rest
-                    _r = _r.lstrip('"')
-            elif _r.startswith("'"):
+                    content_match = content_match.lstrip('"')
+            elif content_match.startswith("'"):
                 # Under POSIX shell, a single-quoted string preserves the literal value of
                 # all characters. Backslashes have no special meaning inside single quotes.
                 # The string ends at the first closing single quote.
-                q = re.match(r"^'([^']*)'(.*)", _r)
+                q = re.match(r"^'([^']*)'(.*)", content_match)
                 if q:
-                    _r = q.group(1)
+                    content_match = q.group(1)
                 else:
                     # Mismatched/unclosed quote — strip leading quote, keep rest
-                    _r = _r.lstrip("'")
+                    content_match = content_match.lstrip("'")
             else:
-                _r = re.sub(r"\s+#.*", "", _r)
-            last_match = _r
+                content_match = re.sub(r"\s+#.*", "", content_match)
+            last_match = content_match
     return last_match
 
 
@@ -103,8 +104,12 @@ def write_plist(template_path: str, output_path: str, home_dir: str) -> None:
     """
     with open(template_path, "r", encoding="utf-8") as f:
         content = f.read()
-    # Only replace ~/ (not bare ~) to avoid mangling unrelated content
-    content = content.replace("~/", home_dir + "/")
+    # Only replace ~/ (not bare ~) to avoid mangling unrelated content;
+    # split by XML comments to ensure comments are not mangled
+    parts = re.split(r"(<!--.*?-->)", content, flags=re.DOTALL)
+    for i in range(0, len(parts), 2):
+        parts[i] = parts[i].replace("~/", home_dir + "/")
+    content = "".join(parts)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
 

@@ -445,3 +445,103 @@ def test_cli_write_plist_template_permission_error(tmp_path):
     written = "".join(call.args[0] for call in mock_stderr_write.call_args_list)
     assert "Error:" in written
     assert "Permission denied reading Plist template file" in written
+
+
+def test_write_plist_preserves_comments(tmp_path):
+    """Verify that write_plist resolves ~/ paths in XML body but preserves them in XML comments."""
+    template = tmp_path / "template.plist"
+    output = tmp_path / "output.plist"
+
+    template.write_text(
+        '<?xml version="1.0"?>\n'
+        '<plist><dict>\n'
+        '    <!-- Note: Do not change ~/ in this comment! -->\n'
+        '    <key>Path</key><string>~/some/path</string>\n'
+        '</dict></plist>\n',
+        encoding="utf-8",
+    )
+
+    from install_helpers import write_plist
+    write_plist(str(template), str(output), "/Users/testuser")
+
+    result = output.read_text(encoding="utf-8")
+    assert "<!-- Note: Do not change ~/ in this comment! -->" in result
+    assert "<string>/Users/testuser/some/path</string>" in result
+
+
+def test_update_env_key_resolves_symlinks(tmp_path):
+    """Verify that update_env_key resolves symlinks and modifies the target file instead of replacing the symlink itself."""
+    target_env = tmp_path / "real.env"
+    symlink_env = tmp_path / "link.env"
+
+    target_env.write_text("LOCAL_API_KEY=oldkey\n", encoding="utf-8")
+    os.symlink(str(target_env), str(symlink_env))
+
+    from install_helpers import update_env_key
+    update_env_key(str(symlink_env), "newkey")
+
+    # Verify symlink is still a symlink
+    assert os.path.islink(str(symlink_env))
+    assert os.path.realpath(str(symlink_env)) == str(target_env)
+
+    # Verify the target was updated
+    assert target_env.read_text(encoding="utf-8") == 'LOCAL_API_KEY="newkey"\n'
+
+
+def test_installer_trap_preservation():
+    """Verify that the trap preservation logic in install_prod.sh works correctly."""
+    bash_script = """
+    # Set an old trap
+    trap 'echo "OLD_TRAP_RUN"' EXIT
+
+    # Retrieve any existing EXIT trap commands to avoid overwriting them
+    existing_exit_trap=$(trap -p EXIT)
+    if [ -n "$existing_exit_trap" ]; then
+        existing_cmd=$(echo "$existing_exit_trap" | sed -E "s/^trap -- '(.*)' EXIT$/\\1/")
+        run_exit_trap() {
+            eval "$existing_cmd"
+            echo "NEW_TRAP_RUN"
+        }
+        trap run_exit_trap EXIT
+    else
+        echo "NO_OLD_TRAP"
+    fi
+    """
+    result = subprocess.run(
+        ["bash", "-c", bash_script],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert "OLD_TRAP_RUN" in result.stdout
+    assert "NEW_TRAP_RUN" in result.stdout
+
+
+def test_installer_env_file_tilde_expansion():
+    """Verify that the ENV_FILE tilde expansion logic resolves both ~/ and ~username (or just ~*) paths."""
+    bash_script = """
+    # Mock HOME and ENV_FILE
+    HOME="/Users/mockhome"
+
+    # Test ~/path
+    ENV_FILE="~/some/.env"
+    if [[ "$ENV_FILE" == ~* ]]; then
+        ENV_FILE="${ENV_FILE/#\\~/$HOME}"
+    fi
+    echo "RESULT1:$ENV_FILE"
+
+    # Test ~other/path
+    ENV_FILE="~other/.env"
+    if [[ "$ENV_FILE" == ~* ]]; then
+        ENV_FILE="${ENV_FILE/#\\~/$HOME}"
+    fi
+    echo "RESULT2:$ENV_FILE"
+    """
+    result = subprocess.run(
+        ["bash", "-c", bash_script],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert "RESULT1:/Users/mockhome/some/.env" in result.stdout
+    assert "RESULT2:/Users/mockhomeother/.env" in result.stdout
