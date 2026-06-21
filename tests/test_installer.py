@@ -101,9 +101,6 @@ def test_read_env_key_comment_stripping():
 
 
 def test_write_env_key_escaping(tmp_path):
-    import warnings
-
-    warnings.filterwarnings("ignore", category=SyntaxWarning)
     """Verify that _write_env_key correctly escapes backslashes and double quotes
     by sourcing the install_prod.sh script (execution guard prevents main body
     from running when sourced."""
@@ -113,6 +110,7 @@ def test_write_env_key_escaping(tmp_path):
 
     def _exp(inp):
         esc = inp.replace(chr(92), chr(92) * 2).replace(chr(34), chr(92) + chr(34))
+        esc = esc.replace("$", "\\$").replace("`", "\\`")
         return P1 + P2 + Q + esc + Q + chr(10)
 
     test_keys = [
@@ -121,6 +119,8 @@ def test_write_env_key_escaping(tmp_path):
         'key"with"quotes',
         r'key\with"both',
         "key\\double\\backslashes",
+        "key$with$dollar",
+        "key`with`backtick",
     ]
 
     for inp in test_keys:

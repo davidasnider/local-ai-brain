@@ -33,6 +33,8 @@ update_env_key() {
 _write_env_key() {
     local _ekey="${LOCAL_API_KEY//\\/\\\\}"
     _ekey="${_ekey//\"/\\\"}"
+    _ekey="${_ekey//\$/\\\$}"
+    _ekey="${_ekey//\`/\\\`}"
     printf 'LOCAL_API_KEY="%s"\n' "$_ekey"
 }
 
