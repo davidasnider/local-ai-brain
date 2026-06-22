@@ -8,28 +8,18 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd "$HOME/.local/share/local-ai-brain-prod" &amp;&amp; export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" &amp;&amp; exec uv run local-brain serve</string>
+        <string>cd ~/.local/share/local-ai-brain-prod &amp;&amp; if ! command -v uv &gt;/dev/null 2&gt;&amp;1; then export PATH="$HOME/.cargo/bin:$PATH"; fi &amp;&amp; exec uv run local-brain serve</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
-    <key>ThrottleInterval</key>
-    <integer>30</integer>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>LOCAL_API_KEY</key>
+        <string>__REPLACE_WITH_LOCAL_API_KEY__</string>
     </dict>
-    <!-- Standard output goes to /dev/null because the application handles log -->
-    <!-- writing and rotation internally using loguru. Standard error is       -->
-    <!-- captured to a diagnostic log for debugging launchd startup failures.  -->
-    <!-- Note: launchd does not natively resolve tilde (~) paths. The helper   -->
-    <!-- script resolves ~/ to the absolute home directory path during         -->
-    <!-- installation.                                                         -->
-    <key>StandardOutPath</key>
-    <string>/dev/null</string>
-    <key>StandardErrorPath</key>
-    <string>~/Library/Logs/com.localbrain.api.err.log</string>
 </dict>
 </plist>
