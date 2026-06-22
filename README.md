@@ -91,6 +91,15 @@ The repository includes several agent skills in the `.agents/skills` directory t
    uv run ruff check .
    uv run ruff format .
    ```
+### Agent Skills
+
+The repository includes a suite of agent skills located in the `.agents/skills` directory to streamline your local development workflow. These skills can be invoked via agentic tools like Copilot or Hermes to automate common tasks:
+
+- **`bump-version`**: Bumps the project version in `pyproject.toml` and updates `uv.lock`.
+- **`restart-dev`**: Forcefully kills and restarts the local development server on port `8888`.
+- **`run-dev`**: Launches the API in development mode with hot-reload enabled.
+- **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the local development server logs.
+- **`vllm-update`**: Checks for updates to `vllm-mlx` and models on Hugging Face.
 
 ## API Usage & Examples
 

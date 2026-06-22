@@ -9,3 +9,5 @@ scratch.py
 test_speech.mp3
 src/local_ai_brain.egg-info/
 threads.json
+*.log
+

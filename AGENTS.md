@@ -67,5 +67,6 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
     * There is also a standalone utility script available in `scripts/start_llm.sh` to start the `llama-server` wrapper module independently, primarily for testing purposes. It relies on the same defaults and `llm_config.yaml` as the production service.
     * The API Gateway (`src/local_ai_brain/main.py`) must serialize concurrent LLM requests using an `asyncio.Semaphore(1)` so requests queue at the proxy layer rather than overloading the backend.
 
-11. **Agent Skills & Local Workflow:**
-    * Use the agent skills located in `.agents/skills` (e.g., `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, `vllm-update`) to streamline local development tasks. These tools provide safe, verified shortcuts for common operations.
+11. **Agent Skills & Workflows:**
+    * The repository contains a suite of automated skills in the `.agents/skills` directory (e.g., `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, `vllm-update`).
+    * Familiarize yourself with these skills, as they provide predefined bash scripts and safe, verified shortcuts for streamlining local dev workflows. Use them or reference them when requested to automate common development tasks like version bumping or dependency updates.
