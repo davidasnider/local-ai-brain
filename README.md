@@ -69,6 +69,13 @@ This starts the optimized LLM server on `127.0.0.1:8000` using the parameters de
 
 ## Local Development & Testing
 
+The repository includes several agent skills in the `.agents/skills` directory to streamline local development workflows:
+- `bump-version`: Bumps the project version in `pyproject.toml` and syncs `uv.lock`.
+- `restart-dev`: Forcefully kills any existing dev server on port 8888 and restarts it.
+- `run-dev`: Launches the API in development mode with hot-reload enabled.
+- `tail-logs`: Opens an iTerm2 window to tail the dev server logs.
+- `vllm-update`: Updates the `vllm-mlx` dependency and checks for model updates on HF.
+
 1. **Setup Environment:**
    ```bash
    uv sync

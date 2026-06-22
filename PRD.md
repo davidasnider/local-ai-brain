@@ -44,6 +44,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 
 ## 5. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
+* **Agent Skills:** Utilize `.agents/skills` (e.g., `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, `vllm-update`) to automate and streamline local development workflows.
 * **Linting & Formatting:** `ruff` will be the sole tool for both linting and formatting.
 * **Pre-commit Hooks:** The repository must include a `.pre-commit-config.yaml` to enforce quality checks before any code is committed. The hooks must include:
   * **Secret Scanning:** To ensure the local API key is never committed.
