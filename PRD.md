@@ -44,12 +44,6 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 
 ## 5. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
-* **Agent Skills:** Utilize `.agents/skills` (e.g., `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, `vllm-update`) to automate and streamline local development workflows.
-* **Linting & Formatting:** `ruff` will be the sole tool for both linting and formatting.
-* **Pre-commit Hooks:** The repository must include a `.pre-commit-config.yaml` to enforce quality checks before any code is committed. The hooks must include:
-  * **Secret Scanning:** To ensure the local API key is never committed.
-  * **Auto-formatting & Linting:** Running `ruff`.
-  * **Fast Local Tests:** Triggering a lightweight `pytest` suite for the FastAPI endpoints.
 * **Agent Skills:** Provide agent skills (in `.agents/skills`) like `bump-version`, `restart-dev`, `run-dev`, `tail-logs`, and `vllm-update` to streamline local development workflows. Note that dev skills start the gateway on port 8888, and `uv run local-brain serve` starts backends + production gateway on 8000 concurrently.
 
 
