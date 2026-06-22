@@ -69,6 +69,13 @@ This starts the optimized LLM server on `127.0.0.1:8000` using the parameters de
 
 ## Local Development & Testing
 
+The repository includes several agent skills in the `.agents/skills` directory to streamline local development workflows:
+- `bump-version`: Bumps the project version in `pyproject.toml` and syncs `uv.lock`.
+- `restart-dev`: Forcefully kills any existing dev server on port 8888 and restarts it.
+- `run-dev`: Launches the API in development mode with hot-reload enabled.
+- `tail-logs`: Opens an iTerm2 window to tail the dev server logs.
+- `vllm-update`: Updates the `vllm-mlx` dependency and checks for model updates on HF.
+
 1. **Setup Environment:**
    ```bash
    uv sync
@@ -84,16 +91,6 @@ This starts the optimized LLM server on `127.0.0.1:8000` using the parameters de
    uv run ruff check .
    uv run ruff format .
    ```
-
-### Agent Skills (Local Dev Workflow)
-The repository includes several agent skills in the `.agents/skills` directory to aid the local development workflow:
-- **`bump-version`**: Bumps the project version in `pyproject.toml` and updates `uv.lock`.
-- **`restart-dev`**: Forcefully kills and restarts the local development server on port `8888`.
-- **`run-dev`**: Launches the API in development mode on port `8888` with hot-reload enabled.
-- **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the dev server logs in real-time.
-- **`vllm-update`**: Updates the `vllm-mlx` dependency to the latest commit and checks for Hugging Face model updates.
-
-Note that dev skills start the gateway on port 8888, and `uv run local-brain serve` starts backends + production gateway on 8000 concurrently.
 
 ## API Usage & Examples
 
