@@ -101,6 +101,17 @@ The repository includes a suite of agent skills located in the `.agents/skills` 
 - **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the local development server logs.
 - **`vllm-update`**: Checks for updates to `vllm-mlx` and models on Hugging Face.
 
+
+### Agent Skills (Local Development Workflow)
+
+The repository includes several agent skills in the `.agents/skills` directory to streamline local development workflows:
+
+- **bump-version**: Bumps the project version in `pyproject.toml` and updates `uv.lock`.
+- **restart-dev**: Forcefully kills and restarts the local development server on port 8888.
+- **run-dev**: Launches the Local AI Brain API in development mode on port 8888 with hot-reload.
+- **tail-logs**: Opens a new iTerm2 window to tail the local development server logs in real-time.
+- **vllm-update**: Updates `vllm-mlx` to the latest version and checks for model updates on Hugging Face.
+
 ## API Usage & Examples
 
 All requests must include the `Authorization: Bearer <LOCAL_API_KEY>` header.
