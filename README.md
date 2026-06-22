@@ -100,6 +100,7 @@ The repository includes a suite of agent skills located in the `.agents/skills` 
 - **`run-dev`**: Launches the API in development mode with hot-reload enabled.
 - **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the local development server logs.
 - **`vllm-update`**: Checks for updates to `vllm-mlx` and models on Hugging Face.
+
 ## API Usage & Examples
 
 All requests must include the `Authorization: Bearer <LOCAL_API_KEY>` header.
