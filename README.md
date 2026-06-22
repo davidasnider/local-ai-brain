@@ -84,8 +84,6 @@ This starts the optimized LLM server on `127.0.0.1:8000` using the parameters de
    uv run ruff check .
    uv run ruff format .
    ```
-
-
 ### Agent Skills
 
 The repository includes a suite of agent skills located in the `.agents/skills` directory to streamline your local development workflow. These skills can be invoked via agentic tools like Copilot or Hermes to automate common tasks:
