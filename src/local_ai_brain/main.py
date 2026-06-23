@@ -372,9 +372,11 @@ def normalize_model_metadata(model_obj: dict):
     # Inject project-defined aliases for the primary LLM model
     if model_obj.get("id") == settings.QWEN_MODEL_PATH:
         existing_aliases = model_obj.get("aliases", [])
+        existing_set = set(existing_aliases)
         for alias in settings.QWEN_MODEL_ALIASES:
-            if alias not in existing_aliases:
+            if alias not in existing_set:
                 existing_aliases.append(alias)
+                existing_set.add(alias)
         model_obj["aliases"] = existing_aliases
 
     return model_obj
