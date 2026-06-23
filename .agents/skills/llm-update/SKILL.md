@@ -45,7 +45,9 @@ check_model() {
   fi
   local refs_dir="${cache_dir}/models--${normalized_repo}/refs"
   local local_ref_file=""
-  if [ -d "$refs_dir" ]; then
+  if [ -f "${refs_dir}/main" ]; then
+    local_ref_file="${refs_dir}/main"
+  elif [ -d "$refs_dir" ]; then
     local_ref_file=$(find "$refs_dir" -type f | head -n 1)
   fi
 
