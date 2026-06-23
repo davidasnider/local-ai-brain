@@ -74,7 +74,7 @@ The repository includes several agent skills in the `.agents/skills` directory t
 - `restart-dev`: Forcefully kills any existing dev server on port 8888 and restarts it.
 - `run-dev`: Launches the API in development mode with hot-reload enabled.
 - `tail-logs`: Opens an iTerm2 window to tail the dev server logs.
-- `vllm-update`: Updates the `vllm-mlx` dependency and checks for model updates on HF.
+- `llm-update`: Updates the `llama-cpp-python` dependency and checks for model updates on HF.
 
 1. **Setup Environment:**
    ```bash
@@ -99,7 +99,7 @@ The repository includes a suite of agent skills located in the `.agents/skills` 
 - **`restart-dev`**: Forcefully kills and restarts the local development server on port `8888`.
 - **`run-dev`**: Launches the API in development mode with hot-reload enabled.
 - **`tail-logs`**: Opens a new iTerm2 window (or provides the command) to tail the local development server logs.
-- **`vllm-update`**: Checks for updates to `vllm-mlx` and models on Hugging Face.
+- **`llm-update`**: Checks for updates to `llama-cpp-python` and models on Hugging Face.
 
 ## API Usage & Examples
 
