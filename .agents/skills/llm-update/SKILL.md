@@ -20,16 +20,40 @@ echo "🔍 Checking for model updates on Hugging Face..."
 
 check_model() {
   local name=$1
-  local url=$2
-  echo -n "Checking $name... "
-  COMMIT=$(git ls-remote $url HEAD | cut -f1)
-  echo "Latest remote commit: $COMMIT"
+  local repo_id=$2
+  echo -n "Checking $name ($repo_id)... "
+  
+  local remote_commit
+  remote_commit=$(git ls-remote "https://huggingface.co/$repo_id" HEAD | cut -f1)
+  if [ -z "$remote_commit" ]; then
+    echo "⚠️ Failed to fetch remote commit."
+    return
+  fi
+  
+  local normalized_repo="${repo_id/\//--}"
+  local refs_dir="$HOME/.cache/huggingface/hub/models--${normalized_repo}/refs"
+  local local_ref_file=""
+  if [ -d "$refs_dir" ]; then
+    local_ref_file=$(find "$refs_dir" -type f | head -n 1)
+  fi
+
+  if [ -n "$local_ref_file" ] && [ -f "$local_ref_file" ]; then
+    local local_commit
+    local_commit=$(cat "$local_ref_file")
+    if [ "$local_commit" = "$remote_commit" ]; then
+      echo "Up to date (Commit: ${local_commit:0:7})"
+    else
+      echo "⚠️ UPDATE AVAILABLE! (Local: ${local_commit:0:7} -> Remote: ${remote_commit:0:7})"
+    fi
+  else
+    echo "No local cached commit found (Latest remote: ${remote_commit:0:7})"
+  fi
 }
 
-check_model "Qwen 35B" "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
-check_model "Qwen 27B" "https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF"
-check_model "Whisper" "https://huggingface.co/mlx-community/whisper-large-v3-mlx"
-check_model "Kokoro" "https://huggingface.co/fastrtc/kokoro-onnx"
+check_model "Qwen 35B" "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+check_model "Qwen 27B" "unsloth/Qwen3.6-27B-MTP-GGUF"
+check_model "Whisper" "mlx-community/whisper-large-v3-mlx"
+check_model "Kokoro" "fastrtc/kokoro-onnx"
 
 echo "✅ Update check complete."
 ```
