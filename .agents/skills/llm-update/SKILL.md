@@ -10,9 +10,15 @@ description: Updates llama-cpp-python to the latest version and checks for model
 ```bash
 # Update llama-cpp-python
 echo "🔄 Checking for llama-cpp-python updates..."
-uv lock --upgrade-package llama-cpp-python
+if ! uv lock --upgrade-package llama-cpp-python; then
+  echo "❌ Failed to update llama-cpp-python in lockfile."
+  exit 1
+fi
 echo "🔄 Running uv sync (this may take a minute)..."
-uv sync
+if ! uv sync; then
+  echo "❌ uv sync failed."
+  exit 1
+fi
 echo "✅ llama-cpp-python update complete."
 
 # Check Models
