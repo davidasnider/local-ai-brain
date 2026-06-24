@@ -14,7 +14,7 @@ dependencies = [
     "opentelemetry-sdk>=1.41.1",
     "psutil>=7.2.2",
     "prometheus-client>=0.21.1",
-    "pydantic-settings>=2.14.0",
+    "pydantic-settings>=2.14.2",
     "soundfile>=0.13.1",
     "uvicorn>=0.46.0",
     "llama-cpp-python[server]",
