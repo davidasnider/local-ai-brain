@@ -55,6 +55,9 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
    * Use dependency injection for model loading to ensure models load on startup and stay hot in memory, rather than reloading on each request.
    * Use the `{model_id:path}` syntax for FastAPI route parameters when accepting model identifiers to properly handle HuggingFace/MLX model names with forward slashes.
 
+   * For performance-sensitive string sanitization (like in middleware), use a conditional check (`if '\n' in s:`) before calling `.replace()` to avoid the overhead of method execution and string allocation in the common case where no changes are needed.
+   * For performance-sensitive list membership checks inside loops where insertion order must be preserved, use a supplementary `set` alongside the list to achieve O(1) lookups.
+
 9. **Interactive CLI Tool:**
    * Maintain the `local-brain` CLI tool located in `src/local_ai_brain/cli.py`.
    * When modifying or adding features to this tool, rely strictly on standard Python libraries (like `urllib.request`) to avoid inflating the project's dependency footprint.
