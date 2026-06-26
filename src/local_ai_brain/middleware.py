@@ -19,8 +19,15 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             raise
         finally:
             client_host = request.client.host if request.client else "-"
-            method = request.method.replace("\n", "\\n").replace("\r", "\\r")
-            url_path = request.url.path.replace("\n", "\\n").replace("\r", "\\r")
+
+            method = request.method
+            if "\n" in method or "\r" in method:
+                method = method.replace("\n", "\\n").replace("\r", "\\r")
+
+            url_path = request.url.path
+            if "\n" in url_path or "\r" in url_path:
+                url_path = url_path.replace("\n", "\\n").replace("\r", "\\r")
+
             http_version = request.scope.get("http_version", "1.1")
 
             if url_path != "/metrics":
