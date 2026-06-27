@@ -10,7 +10,7 @@ It uses a microservices architecture: a FastAPI API Gateway proxy sits in front 
 - **STT (Speech-to-Text):** Lightning Whisper MLX for high-speed transcription.
 - **TTS (Text-to-Speech):** Kokoro TTS via ONNX with custom dynamic voice routing. Input length is restricted by the `TTS_MAX_CHARACTERS` setting (defaults to 4096).
 - **Observability:** Granular logging with `loguru` directly to file and a robust Prometheus `/metrics` endpoint.
-- **Security:** Authenticated via a static `LOCAL_API_KEY` Bearer token.
+- **Security:** Authenticated via a static `LOCAL_API_KEY` Bearer token. HTTP request methods and paths are sanitized to protect against CRLF log injection attacks.
 
 ## Prerequisites
 
