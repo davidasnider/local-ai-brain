@@ -8,7 +8,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup).
 * **Audio Constraints:** Text-to-Speech (TTS) input length must be restricted by the configurable `TTS_MAX_CHARACTERS` setting (defaults to 4096) to prevent extended blocking of resources.
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
-* **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access.
+* **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access. HTTP access logs must implement CRLF sanitization for request methods and paths to prevent log injection vulnerabilities.
 * **Observability & Telemetry:**
   * Granular logging using `loguru` (including file rotation) and background system monitoring via `psutil` observable gauges for process and system memory usage.
   * Must expose a Prometheus `/metrics` endpoint instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`) for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, generation latencies, and process/system memory usage.
