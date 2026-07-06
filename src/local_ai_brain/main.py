@@ -138,9 +138,10 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                 if isinstance(last_msg_obj, dict):
                     last_msg = last_msg_obj.get("content", "")
                     if isinstance(last_msg, str):
-                        prompt_preview = last_msg[:100].replace("\n", " ") + (
-                            "..." if len(last_msg) > 100 else ""
-                        )
+                        preview = last_msg[:100]
+                        if "\n" in preview or "\r" in preview:
+                            preview = preview.replace("\n", " ").replace("\r", " ")
+                        prompt_preview = preview + ("..." if len(last_msg) > 100 else "")
                     elif isinstance(last_msg, list):
                         # Multi-part content (vision/tooling) — extract text parts
                         text_parts = [
@@ -152,15 +153,17 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                         ]
                         combined = " ".join(text_parts)
                         if combined:
-                            prompt_preview = combined[:100].replace("\n", " ") + (
-                                "..." if len(combined) > 100 else ""
-                            )
+                            preview = combined[:100]
+                            if "\n" in preview or "\r" in preview:
+                                preview = preview.replace("\n", " ").replace("\r", " ")
+                            prompt_preview = preview + ("..." if len(combined) > 100 else "")
                         else:
                             prompt_preview = "[multi-part content]"
             elif "prompt" in payload and isinstance(payload["prompt"], str):
-                prompt_preview = payload["prompt"][:100].replace("\n", " ") + (
-                    "..." if len(payload["prompt"]) > 100 else ""
-                )
+                preview = payload["prompt"][:100]
+                if "\n" in preview or "\r" in preview:
+                    preview = preview.replace("\n", " ").replace("\r", " ")
+                prompt_preview = preview + ("..." if len(payload["prompt"]) > 100 else "")
 
             if settings.LOG_PROMPTS:
                 preview = json.dumps(prompt_preview if prompt_preview else "[empty prompt]")
