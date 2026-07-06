@@ -547,16 +547,25 @@ async def get_metrics(request: Request):
 
     client = request.app.state.client
     headers = {"Authorization": f"Bearer {settings.LOCAL_API_KEY}"}
-    for name, url in [
-        ("vLLM", settings.VLLM_URL),
-        ("STT", settings.STT_URL),
-        ("TTS", settings.TTS_URL),
-    ]:
+
+    async def fetch_metric(name, url):
         try:
             resp = await client.get(f"{url}/metrics", headers=headers, timeout=2.0)
             if resp.status_code == 200:
-                combined_metrics += b"\n" + resp.content
+                return resp.content
         except Exception as e:
             logger.warning(f"Failed to fetch metrics from {name} at {url}: {e}")
+        return None
+
+    tasks = [
+        fetch_metric("vLLM", settings.VLLM_URL),
+        fetch_metric("STT", settings.STT_URL),
+        fetch_metric("TTS", settings.TTS_URL),
+    ]
+
+    results = await asyncio.gather(*tasks)
+    for res in results:
+        if res is not None:
+            combined_metrics += b"\n" + res
 
     return Response(combined_metrics, media_type=CONTENT_TYPE_LATEST)

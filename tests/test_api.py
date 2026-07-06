@@ -170,6 +170,9 @@ def test_metrics_aggregation(mock_get, client):
 
     mock_get.side_effect = side_effect
 
+    # Trigger a request to ensure http_requests_total is recorded by middleware
+    client.get("/health", headers={"Authorization": "Bearer test-api-key"})
+
     response = client.get("/metrics", headers={"Authorization": "Bearer test-api-key"})
     assert response.status_code == 200
 
