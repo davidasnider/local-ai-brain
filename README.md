@@ -195,4 +195,4 @@ Use the [Extended OpenAI Conversation](https://github.com/jekalmin/extended_open
 - **API Key:** `<LOCAL_API_KEY>`
 
 ## Monitoring
-Metrics are exposed at `/metrics` in Prometheus format, covering HTTP requests, active LLM requests, token consumption and generation, processing latency, and precise system and process RAM usage.
+Metrics are exposed at `/metrics` in Prometheus format, fetching backend metrics (vLLM, STT, TTS) concurrently to minimize latency, covering HTTP requests, active LLM requests, token consumption and generation, processing latency, and precise system and process RAM usage.

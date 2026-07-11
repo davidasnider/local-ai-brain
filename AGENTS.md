@@ -45,7 +45,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
    * Build a simple dictionary/router for the Kokoro TTS endpoint that maps "season" or "character" string parameters to their respective Kokoro voice embedding files.
 
 6. **Telemetry Endpoint:**
-   * Expose a `/metrics` route using OpenTelemetry and `opentelemetry-exporter-prometheus`. Track precise metrics: `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, latencies, and process/system memory consumption. The endpoint requires Bearer token authentication like all other routes.
+   * Expose a `/metrics` route using OpenTelemetry and `opentelemetry-exporter-prometheus`. The endpoint fetches backend metrics (vLLM, STT, TTS) concurrently to minimize latency. Track precise metrics: `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, latencies, and process/system memory consumption. The endpoint requires Bearer token authentication like all other routes.
 
 7. **Background Service:**
    * Write a `com.localbrain.api.plist` template file in the repository root so the user can easily install it via `launchctl` for 24/7 uptime on macOS.

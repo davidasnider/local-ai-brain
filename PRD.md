@@ -41,7 +41,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
   * **Special Feature - Voice Router:** Must accept a custom parameter in the payload (e.g., `character` or `season`) to dynamically swap Kokoro voice profiles on the fly (e.g., Default, Santa, Irish, Jack Skellington).
 
 * **`GET /metrics`**
-  * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`). These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies, and process/system memory usage.
+  * Authenticated endpoint requiring the same Bearer token (`LOCAL_API_KEY`) as other protected routes, exposing Prometheus metrics instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`). The endpoint fetches backend metrics (vLLM, STT, TTS) concurrently to minimize latency. These include detailed metrics such as `http_requests_total`, token counts, active requests, generation latencies, and process/system memory usage.
 
 ## 5. Development Environment & Tooling
 * **Package Management:** `uv` will be used for all project and dependency management.
