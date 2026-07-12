@@ -1000,3 +1000,10 @@ def test_sanitize_prompt():
     # Test long text with newlines inside the first 100 characters and longer than 100 characters
     long_text_nl = "a\n" + "b" * 99
     assert _sanitize_prompt(long_text_nl) == "a " + "b" * 98 + "..."
+
+    # Test empty string input
+    assert _sanitize_prompt("") == ""
+
+    # Test exactly 100 chars with a newline at the boundary
+    boundary_nl = "a" * 99 + "\n"
+    assert _sanitize_prompt(boundary_nl) == "a" * 99 + " "
