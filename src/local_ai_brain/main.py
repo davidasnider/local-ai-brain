@@ -133,9 +133,9 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             client_port = request.client.port if request.client else 0
             messages = payload.get("messages", [])
             prompt_preview = ""
-            if messages and isinstance(messages, list):
+            if settings.LOG_PROMPTS and messages and isinstance(messages, list):
                 last_msg_obj = messages[-1]
-                if settings.LOG_PROMPTS and isinstance(last_msg_obj, dict):
+                if isinstance(last_msg_obj, dict):
                     last_msg = last_msg_obj.get("content", "")
                     if isinstance(last_msg, str):
                         preview = last_msg[:100]
