@@ -12,7 +12,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Observability & Telemetry:**
   * Granular logging using `loguru` (including file rotation) and background system monitoring via `psutil` observable gauges for process and system memory usage.
   * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last user message (newlines collapsed). Enabling this may write potentially sensitive user-provided content to logs; use with caution.
-  * Must expose a Prometheus `/metrics` endpoint instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`) for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, generation latencies, and process/system memory usage.
+  * Must expose a Prometheus `/metrics` endpoint instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`) for local network scraping. This endpoint tracks detailed metrics (fetching from backends concurrently) like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, generation latencies, and process/system memory usage.
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
 ## 3. Core Models
