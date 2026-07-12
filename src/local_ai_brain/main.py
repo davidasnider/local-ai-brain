@@ -135,7 +135,7 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             prompt_preview = ""
             if messages and isinstance(messages, list):
                 last_msg_obj = messages[-1]
-                if isinstance(last_msg_obj, dict):
+                if settings.LOG_PROMPTS and isinstance(last_msg_obj, dict):
                     last_msg = last_msg_obj.get("content", "")
                     if isinstance(last_msg, str):
                         preview = last_msg[:100]
@@ -159,7 +159,9 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                             prompt_preview = preview + ("..." if len(combined) > 100 else "")
                         else:
                             prompt_preview = "[multi-part content]"
-            elif "prompt" in payload and isinstance(payload["prompt"], str):
+            elif (
+                settings.LOG_PROMPTS and "prompt" in payload and isinstance(payload["prompt"], str)
+            ):
                 preview = payload["prompt"][:100]
                 if "\n" in preview or "\r" in preview:
                     preview = preview.replace("\n", " ").replace("\r", " ")
