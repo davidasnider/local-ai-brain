@@ -20,12 +20,13 @@ def _sanitize_prompt(text: str) -> str:
     """Truncate and normalize text for log previews.
 
     Replaces newlines and carriage returns with spaces, then truncates to
-    100 characters with an ellipsis suffix when the original text was truncated.
+    100 characters with an ellipsis suffix when the text was truncated.
+    Output never exceeds 100 characters.
     """
-    preview = text[:100]
-    if "\n" in preview or "\r" in preview:
-        preview = preview.replace("\n", " ").replace("\r", " ")
-    return preview + ("..." if len(text) > 100 else "")
+    normalized = text.replace("\n", " ").replace("\r", " ")
+    if len(normalized) <= 100:
+        return normalized
+    return normalized[:97] + "..."
 
 
 # Standardize logging using our centralized configuration
