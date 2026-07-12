@@ -21,7 +21,7 @@ def _sanitize_prompt(text: str) -> str:
 
     Replaces newlines and carriage returns with spaces, then truncates to
     100 characters with an ellipsis suffix when the text was truncated.
-    Output never exceeds 100 characters.
+    Truncated output never exceeds 100 characters.
     """
     if "\n" in text or "\r" in text:
         normalized = text.replace("\n", " ").replace("\r", " ")
