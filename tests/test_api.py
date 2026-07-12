@@ -978,3 +978,25 @@ def test_ollama_compatibility_endpoints_overflow(mock_get, client):
     overflow_model = [m for m in data_tags["models"] if m["name"] == "overflow-model"]
     assert len(overflow_model) == 1
     assert overflow_model[0]["model"] == "overflow-model"
+
+
+def test_sanitize_prompt():
+    from local_ai_brain.main import _sanitize_prompt
+
+    # Test short text, no newlines/carriage returns
+    assert _sanitize_prompt("hello world") == "hello world"
+
+    # Test text with newlines and carriage returns
+    assert _sanitize_prompt("hello\nworld\rtest") == "hello world test"
+
+    # Test long text truncation (exactly 100 characters)
+    long_text = "a" * 100
+    assert _sanitize_prompt(long_text) == "a" * 100
+
+    # Test long text truncation (101 characters)
+    long_text_101 = "a" * 101
+    assert _sanitize_prompt(long_text_101) == "a" * 100 + "..."
+
+    # Test long text with newlines inside the first 100 characters and longer than 100 characters
+    long_text_nl = "a\n" + "b" * 99
+    assert _sanitize_prompt(long_text_nl) == "a " + "b" * 98 + "..."
