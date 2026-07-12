@@ -19,8 +19,8 @@ from .middleware import MetricsMiddleware
 def _sanitize_prompt(text: str) -> str:
     """Truncate and normalize text for log previews.
 
-    Returns a space-normalized preview of up to 100 characters with an ellipsis
-    suffix when the original text was truncated.
+    Replaces newlines and carriage returns with spaces, then truncates to
+    100 characters with an ellipsis suffix when the original text was truncated.
     """
     preview = text[:100]
     if "\n" in preview or "\r" in preview:

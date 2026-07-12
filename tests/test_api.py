@@ -980,30 +980,19 @@ def test_ollama_compatibility_endpoints_overflow(mock_get, client):
     assert overflow_model[0]["model"] == "overflow-model"
 
 
-def test_sanitize_prompt():
+@pytest.mark.parametrize(
+    "input_text, expected",
+    [
+        ("hello world", "hello world"),
+        ("hello\nworld\rtest", "hello world test"),
+        ("a" * 100, "a" * 100),
+        ("a" * 101, "a" * 100 + "..."),
+        ("a\n" + "b" * 99, "a " + "b" * 98 + "..."),
+        ("", ""),
+        ("a" * 99 + "\n", "a" * 99 + " "),
+    ],
+)
+def test_sanitize_prompt(input_text: str, expected: str):
     from local_ai_brain.main import _sanitize_prompt
 
-    # Test short text, no newlines/carriage returns
-    assert _sanitize_prompt("hello world") == "hello world"
-
-    # Test text with newlines and carriage returns
-    assert _sanitize_prompt("hello\nworld\rtest") == "hello world test"
-
-    # Test long text truncation (exactly 100 characters)
-    long_text = "a" * 100
-    assert _sanitize_prompt(long_text) == "a" * 100
-
-    # Test long text truncation (101 characters)
-    long_text_101 = "a" * 101
-    assert _sanitize_prompt(long_text_101) == "a" * 100 + "..."
-
-    # Test long text with newlines inside the first 100 characters and longer than 100 characters
-    long_text_nl = "a\n" + "b" * 99
-    assert _sanitize_prompt(long_text_nl) == "a " + "b" * 98 + "..."
-
-    # Test empty string input
-    assert _sanitize_prompt("") == ""
-
-    # Test exactly 100 chars with a newline at the boundary
-    boundary_nl = "a" * 99 + "\n"
-    assert _sanitize_prompt(boundary_nl) == "a" * 99 + " "
+    assert _sanitize_prompt(input_text) == expected
