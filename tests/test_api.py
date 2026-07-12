@@ -784,7 +784,7 @@ def test_proxy_chat_logging_redacted(mock_send, client):
             )
             assert response.status_code == 200
 
-            log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+            log_messages = [call.args[0] for call in mock_logger.debug.call_args_list]
             assert any("Incoming chat from" in msg for msg in log_messages)
             assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
             assert not any("Sensitive information" in msg for msg in log_messages)
