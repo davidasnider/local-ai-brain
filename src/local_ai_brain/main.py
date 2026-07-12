@@ -23,7 +23,10 @@ def _sanitize_prompt(text: str) -> str:
     100 characters with an ellipsis suffix when the text was truncated.
     Output never exceeds 100 characters.
     """
-    normalized = text.replace("\n", " ").replace("\r", " ")
+    if "\n" in text or "\r" in text:
+        normalized = text.replace("\n", " ").replace("\r", " ")
+    else:
+        normalized = text
     if len(normalized) <= 100:
         return normalized
     return normalized[:97] + "..."
