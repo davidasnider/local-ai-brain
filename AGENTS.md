@@ -39,6 +39,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 
 4. **Logging (Crucial):**
    * Standard library logging should be intercepted and routed to `loguru`, with rotating log files configured.
+   * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload.
    * Models must remain loaded 24/7.
 
 5. **Dynamic TTS Routing:**

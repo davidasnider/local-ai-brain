@@ -11,7 +11,7 @@ os.environ["TESTING"] = "1"
 os.environ["LOCAL_API_KEY"] = "test-api-key"
 
 from local_ai_brain.config import settings
-from local_ai_brain.main import app
+from local_ai_brain.main import _sanitize_prompt, app
 
 
 @pytest.fixture
@@ -784,7 +784,7 @@ def test_proxy_chat_logging_redacted(mock_send, client):
             )
             assert response.status_code == 200
 
-            log_messages = [call.args[0] for call in mock_logger.info.call_args_list]
+            log_messages = [call.args[0] for call in mock_logger.debug.call_args_list]
             assert any("Incoming chat from" in msg for msg in log_messages)
             assert any("[PROMPT REDACTED]" in msg for msg in log_messages)
             assert not any("Sensitive information" in msg for msg in log_messages)
@@ -978,3 +978,19 @@ def test_ollama_compatibility_endpoints_overflow(mock_get, client):
     overflow_model = [m for m in data_tags["models"] if m["name"] == "overflow-model"]
     assert len(overflow_model) == 1
     assert overflow_model[0]["model"] == "overflow-model"
+
+
+@pytest.mark.parametrize(
+    "input_text, expected",
+    [
+        ("hello world", "hello world"),
+        ("hello\nworld\rtest", "hello world test"),
+        ("a" * 100, "a" * 100),
+        ("a" * 101, "a" * 97 + "..."),
+        ("a\n" + "b" * 99, "a " + "b" * 95 + "..."),
+        ("", ""),
+        ("a" * 99 + "\n", "a" * 99 + " "),
+    ],
+)
+def test_sanitize_prompt(input_text: str, expected: str):
+    assert _sanitize_prompt(input_text) == expected

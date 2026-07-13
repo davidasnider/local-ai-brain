@@ -15,6 +15,23 @@ from .config import settings
 from .logging import configure_logging
 from .middleware import MetricsMiddleware
 
+
+def _sanitize_prompt(text: str) -> str:
+    """Truncate and normalize text for log previews.
+
+    Replaces newlines and carriage returns with spaces, then truncates to
+    100 characters with an ellipsis suffix when the text was truncated.
+    Truncated output never exceeds 100 characters.
+    """
+    if "\n" in text or "\r" in text:
+        normalized = text.replace("\n", " ").replace("\r", " ")
+    else:
+        normalized = text
+    if len(normalized) <= 100:
+        return normalized
+    return normalized[:97] + "..."
+
+
 # Standardize logging using our centralized configuration
 configure_logging(settings.TESTING)
 
@@ -133,14 +150,12 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
             client_port = request.client.port if request.client else 0
             messages = payload.get("messages", [])
             prompt_preview = ""
-            if messages and isinstance(messages, list):
+            if settings.LOG_PROMPTS and messages and isinstance(messages, list):
                 last_msg_obj = messages[-1]
                 if isinstance(last_msg_obj, dict):
                     last_msg = last_msg_obj.get("content", "")
                     if isinstance(last_msg, str):
-                        prompt_preview = last_msg[:100].replace("\n", " ") + (
-                            "..." if len(last_msg) > 100 else ""
-                        )
+                        prompt_preview = _sanitize_prompt(last_msg)
                     elif isinstance(last_msg, list):
                         # Multi-part content (vision/tooling) — extract text parts
                         text_parts = [
@@ -152,21 +167,19 @@ async def proxy_request(request: Request, target_url: str, use_semaphore: bool =
                         ]
                         combined = " ".join(text_parts)
                         if combined:
-                            prompt_preview = combined[:100].replace("\n", " ") + (
-                                "..." if len(combined) > 100 else ""
-                            )
+                            prompt_preview = _sanitize_prompt(combined)
                         else:
                             prompt_preview = "[multi-part content]"
-            elif "prompt" in payload and isinstance(payload["prompt"], str):
-                prompt_preview = payload["prompt"][:100].replace("\n", " ") + (
-                    "..." if len(payload["prompt"]) > 100 else ""
-                )
+            elif (
+                settings.LOG_PROMPTS and "prompt" in payload and isinstance(payload["prompt"], str)
+            ):
+                prompt_preview = _sanitize_prompt(payload["prompt"])
 
             if settings.LOG_PROMPTS:
                 preview = json.dumps(prompt_preview if prompt_preview else "[empty prompt]")
                 logger.info(f"Incoming chat from {client_host}:{client_port} - {preview}")
             else:
-                logger.info(f"Incoming chat from {client_host}:{client_port} - [PROMPT REDACTED]")
+                logger.debug(f"Incoming chat from {client_host}:{client_port} - [PROMPT REDACTED]")
 
             body = json.dumps(payload).encode("utf-8")
         content = body
