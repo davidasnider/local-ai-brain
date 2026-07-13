@@ -11,7 +11,7 @@ os.environ["TESTING"] = "1"
 os.environ["LOCAL_API_KEY"] = "test-api-key"
 
 from local_ai_brain.config import settings
-from local_ai_brain.main import app
+from local_ai_brain.main import _sanitize_prompt, app
 
 
 @pytest.fixture
@@ -993,6 +993,4 @@ def test_ollama_compatibility_endpoints_overflow(mock_get, client):
     ],
 )
 def test_sanitize_prompt(input_text: str, expected: str):
-    from local_ai_brain.main import _sanitize_prompt
-
     assert _sanitize_prompt(input_text) == expected
