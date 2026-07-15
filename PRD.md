@@ -8,10 +8,10 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup).
 * **Audio Constraints:** Text-to-Speech (TTS) input length must be restricted by the configurable `TTS_MAX_CHARACTERS` setting (defaults to 4096) to prevent extended blocking of resources.
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
-* **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access. HTTP access logs must implement CRLF sanitization for request methods and paths to prevent log injection vulnerabilities.
+* **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access. HTTP access logs must implement CRLF sanitization for request methods and paths to prevent log injection vulnerabilities, avoiding overhead by using a conditional check first.
 * **Observability & Telemetry:**
   * Granular logging using `loguru` (including file rotation) and background system monitoring via `psutil` observable gauges for process and system memory usage.
-  * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last user message (newlines collapsed). Enabling this may write potentially sensitive user-provided content to logs; use with caution.
+  * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload (newlines collapsed). Enabling this may write potentially sensitive user-provided content to logs; use with caution.
   * Must expose a Prometheus `/metrics` endpoint instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`) for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, generation latencies, and process/system memory usage.
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
@@ -25,7 +25,7 @@ All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`
 
 * **`POST /v1/chat/completions`**
   * Fully OpenAI-compatible schema.
-  * Automatically normalizes legacy model aliases by rewriting request `model` values from `QWEN_MODEL_ALIASES` to `QWEN_MODEL_PATH`, ensuring backward compatibility for clients with hardcoded model IDs.
+  * Automatically normalizes legacy model aliases by rewriting request `model` values from `QWEN_MODEL_ALIASES` to `QWEN_MODEL_PATH`, ensuring backward compatibility for clients with hardcoded model IDs (using O(1) lookups).
   * Handles multi-turn chat, tool calling, and vision inputs.
   * Primary interface for coding tools (Hermes, Gemini CLI) and Home Assistant (via Extended OpenAI integration).
 
