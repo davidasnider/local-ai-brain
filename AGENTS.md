@@ -25,7 +25,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 
 2. **Configuration Management:**
 
-   * Use `pydantic-settings` to manage all application-level configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `QWEN_MODEL_ALIASES`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS` via `.env`). LLM runtime tunables (cache type, speculative decoding flags, batch sizes) are configured separately via `llm_config.yaml`.
+   * Use `pydantic-settings` to manage all application-level configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `QWEN_MODEL_ALIASES`), microservice URLs (`VLLM_URL` (used to specify the LLM backend URL, retaining this identifier even after migrating to `llama-cpp-python` for backwards compatibility), `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS` via `.env`). LLM runtime tunables (cache type, speculative decoding flags, batch sizes) are configured separately via `llm_config.yaml`.
 
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
@@ -39,7 +39,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 
 4. **Logging (Crucial):**
    * Standard library logging should be intercepted and routed to `loguru`, with rotating log files configured.
-   * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload, replacing `\n` and `\r` with spaces and appending an ellipsis if truncated.
+   * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload, replacing `\n` and `\r` with spaces and appending an ellipsis if truncated. When `LOG_PROMPTS=false`, the application emits `DEBUG`-level log lines for redacted chat requests.
    * Models must remain loaded 24/7.
 
 5. **Dynamic TTS Routing:**
