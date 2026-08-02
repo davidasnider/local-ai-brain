@@ -11,7 +11,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access. HTTP access logs must implement CRLF sanitization for request methods and paths to prevent log injection vulnerabilities.
 * **Observability & Telemetry:**
   * Granular logging using `loguru` (including file rotation) and background system monitoring via `psutil` observable gauges for process and system memory usage.
-  * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload, replacing `\n` and `\r` with spaces and appending an ellipsis if truncated. Enabling this may write potentially sensitive user-provided content to logs; use with caution.
+  * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload, replacing `\n` and `\r` with spaces and appending an ellipsis if truncated. Enabling this may write potentially sensitive user-provided content to logs; use with caution. When `LOG_PROMPTS=false`, the application emits `DEBUG`-level log lines for redacted chat requests to preserve production observability without cluttering `INFO` logs.
   * Must expose a Prometheus `/metrics` endpoint instrumented via OpenTelemetry SDK (`opentelemetry-exporter-prometheus`) for local network scraping. This endpoint tracks detailed metrics like `http_requests_total`, `llm_active_requests`, `llm_tokens_consumed_total`, `llm_tokens_generated_total`, generation latencies, and process/system memory usage.
 * **Resilience:** Include a macOS `launchd` `.plist` template to ensure the service automatically starts on boot.
 
