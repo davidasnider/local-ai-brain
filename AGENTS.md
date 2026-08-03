@@ -39,7 +39,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 
 4. **Logging (Crucial):**
    * Standard library logging should be intercepted and routed to `loguru`, with rotating log files configured.
-   * Set `LOG_PROMPTS=true` in the environment to log a 100-character preview of the last message in the request payload, replacing `\n` and `\r` with spaces and appending an ellipsis if truncated. When `LOG_PROMPTS=false`, the application emits `DEBUG`-level log lines for redacted chat requests to preserve production observability without cluttering `INFO` logs.
+   * Set `LOG_PROMPTS=true` in the environment to log a preview of the last message in the request payload, replacing `\n` and `\r` with spaces. Truncated output is strictly capped to never exceed 100 characters in total, including an appended ellipsis. When `LOG_PROMPTS=false`, the application emits `DEBUG`-level log lines for redacted chat requests to preserve production observability without cluttering `INFO` logs.
    * Models must remain loaded 24/7.
 
 5. **Dynamic TTS Routing:**
