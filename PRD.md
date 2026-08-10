@@ -5,7 +5,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 
 ## 2. Core Requirements & Constraints
 * **Framework:** Python 3.12+ with FastAPI.
-* **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup).
+* **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup) for settings including `HF_TOKEN`, `KOKORO_HF_REPO`, `KOKORO_ONNX_FILE`, and `KOKORO_VOICES_FILE`.
 * **Audio Constraints:** Text-to-Speech (TTS) input length must be restricted by the configurable `TTS_MAX_CHARACTERS` setting (defaults to 4096) to prevent extended blocking of resources.
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access. HTTP access logs must implement CRLF sanitization for request methods and paths to prevent log injection vulnerabilities.
