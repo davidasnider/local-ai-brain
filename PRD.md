@@ -5,7 +5,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 
 ## 2. Core Requirements & Constraints
 * **Framework:** Python 3.12+ with FastAPI.
-* **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup).
+* **Configuration:** Strict environment variable validation using `pydantic-settings` (fail-fast on startup). Must support Kokoro configuration variables (`KOKORO_HF_REPO`, `KOKORO_ONNX_FILE`, `KOKORO_VOICES_FILE`, `HF_TOKEN`).
 * **Audio Constraints:** Text-to-Speech (TTS) input length must be restricted by the configurable `TTS_MAX_CHARACTERS` setting (defaults to 4096) to prevent extended blocking of resources.
 * **Model State:** All primary models (LLM, STT, TTS) remain loaded in memory 24/7 for instant, low-latency responses.
 * **Security:** Must implement a single static API Key via `Bearer` token in the HTTP headers to prevent rogue local network access. HTTP access logs must implement CRLF sanitization for request methods and paths to prevent log injection vulnerabilities.
@@ -18,7 +18,7 @@ A highly responsive, unified local AI API hosted on a Mac Mini (Apple Silicon). 
 ## 3. Core Models
 * **Text/Reasoning/Vision (LLM):** Qwen 3.6 (e.g., 27B parameter) quantized (GGUF to respect RAM limits). The `local-brain serve` orchestrator starts the llama-cpp-python backend (via `llama-server`) configured via `llm_config.yaml`. It supports a **96K context window** (`MAX_CONTEXT_TOKENS` = 98304) and a default of **16K output tokens** (`DEFAULT_MAX_TOKENS` = 16384). The API dynamically clamps requested `max_tokens` to the maximum supported context size (`MAX_CONTEXT_TOKENS` = 98304) to prevent extremely large values from causing backend generation failures, improving compatibility with upstream tools like Hermes. KV cache quantization and optimized batch sizes (e.g., `-ngl`, `--ctx-size`, `-fa on`, `--batch-size`, `--ubatch-size`, `--spec-type`, `--cache-type-k q8_0`) are enabled for improved performance and memory efficiency on Apple Silicon. Must use stability overrides and gateway-level request serialization to prevent macOS Metal watchdog timeouts. Token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS`) are configured via environment variables (`.env`). The codebase uses `VLLM_URL` in its configuration (`src/local_ai_brain/config.py`) to specify the LLM backend URL, retaining this identifier even after migrating to `llama-cpp-python` for backwards compatibility.
 * **Speech-to-Text (STT):** Lightning Whisper MLX.
-* **Text-to-Speech (TTS):** Kokoro TTS via MLX (or ONNX).
+* **Text-to-Speech (TTS):** Kokoro TTS via MLX (or ONNX), configured via `KOKORO_HF_REPO`, `KOKORO_ONNX_FILE`, `KOKORO_VOICES_FILE`, and an optional `HF_TOKEN`.
 
 ## 4. API Endpoints
 All functional endpoints must be authenticated via Bearer token (`LOCAL_API_KEY`).
