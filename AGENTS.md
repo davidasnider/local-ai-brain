@@ -25,7 +25,7 @@ You are an expert Python backend engineer specializing in Apple Silicon, `llama-
 
 2. **Configuration Management:**
 
-   * Use `pydantic-settings` to manage all application-level configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `QWEN_MODEL_ALIASES`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS` via `.env`). LLM runtime tunables (cache type, speculative decoding flags, batch sizes) are configured separately via `llm_config.yaml`. The codebase uses `VLLM_URL` in its configuration (`src/local_ai_brain/config.py`) to specify the LLM backend URL, retaining this identifier even after migrating to `llama-cpp-python` for backwards compatibility.
+   * Use `pydantic-settings` to manage all application-level configuration. Key settings include (but are not limited to): `LOCAL_API_KEY`, `TTS_MAX_CHARACTERS`, model paths (`QWEN_MODEL_PATH`, `WHISPER_MODEL_PATH`, `KOKORO_MODEL_PATH`, `KOKORO_HF_REPO`, `KOKORO_ONNX_FILE`, `KOKORO_VOICES_FILE`, `QWEN_MODEL_ALIASES`), HuggingFace token (`HF_TOKEN`), microservice URLs (`VLLM_URL`, `STT_URL`, `TTS_URL`), token limits (`MAX_CONTEXT_TOKENS`, `DEFAULT_MAX_TOKENS` via `.env`). LLM runtime tunables (cache type, speculative decoding flags, batch sizes) are configured separately via `llm_config.yaml`. The codebase uses `VLLM_URL` in its configuration (`src/local_ai_brain/config.py`) to specify the LLM backend URL, retaining this identifier even after migrating to `llama-cpp-python` for backwards compatibility.
 
    * The application must fail fast on startup if the API key or critical configurations are missing.
 
