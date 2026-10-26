@@ -1,7 +1,6 @@
 import os
 import sys
 
-import opentelemetry.exporter.prometheus
 import psutil
 from opentelemetry import metrics
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
@@ -18,14 +17,11 @@ if _current_mod and hasattr(_current_mod, "OTEL_REGISTRY"):
 else:
     OTEL_REGISTRY = CollectorRegistry()
 
-# Monkeypatch the REGISTRY used by the OTel Prometheus reader to use our custom one.
-opentelemetry.exporter.prometheus.REGISTRY = OTEL_REGISTRY
-
 # Create or reuse the reader
 if _current_mod and hasattr(_current_mod, "OTEL_METRICS_READER"):
     OTEL_METRICS_READER = _current_mod.OTEL_METRICS_READER
 else:
-    OTEL_METRICS_READER = PrometheusMetricReader()
+    OTEL_METRICS_READER = PrometheusMetricReader(registry=OTEL_REGISTRY)
 
 # Create or reuse the provider
 if _current_mod and hasattr(_current_mod, "provider"):
